@@ -1,4 +1,4 @@
-package PCP.Core;
+package net.viktorc.pcp.core;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
