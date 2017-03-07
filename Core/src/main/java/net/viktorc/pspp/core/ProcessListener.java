@@ -1,9 +1,8 @@
 package net.viktorc.pspp.core;
 
 public interface ProcessListener {
-
-	void onNewStandardOutput(String standardOutput);
-	void onNewErrorOutput(String errorOutput);
+	
+	void onStarted(ProcessManager manager);
 	void onTermination(int resultCode);
 	
 }
