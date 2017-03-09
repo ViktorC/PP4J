@@ -9,6 +9,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -113,11 +114,12 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @param commandListener An instance of {@link #commandListener CommandListener} for consuming the subsequent 
 	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
 	 * for new commands based on these outputs.
-	 * @return Whether the command was successfully submitted. If the process has not started up yet or is processing 
-	 * another command at the moment, no new commands can be submitted and false is returned.
+	 * @return A {@link #Future} instance for the submitted command. If it is not null, the command was successfully 
+	 * submitted. If the process has not started up yet or is processing another command at the moment, no new commands 
+	 * can be submitted and null is returned.
 	 * @throws IOException If the command cannot be written to the standard in stream.
 	 */
-	public boolean sendCommand(String command, CommandListener commandListener) throws IOException {
+	public Future<?> sendCommand(String command, CommandListener commandListener) throws IOException {
 		startLock.lock();
 		try {
 			if (ready) {
@@ -126,7 +128,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				stdInWriter.newLine();
 				stdInWriter.flush();
 				this.commandListener = commandListener;
-				executor.submit(() -> {
+				return executor.submit(() -> {
 					synchronized (ProcessManager.this) {
 						while (!ready) {
 							try {
@@ -136,9 +138,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 						this.commandListener = null;
 					}
 				});
-				return true;
 			}
-			return false;
+			return null;
 		} finally {
 			startLock.unlock();
 		}

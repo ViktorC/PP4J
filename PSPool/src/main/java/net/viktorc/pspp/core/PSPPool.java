@@ -5,6 +5,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * A class for maintaining a pool of identical running processes.
@@ -52,14 +53,16 @@ public class PSPPool implements AutoCloseable {
 	 * @param command The command to send to the process' standard in.
 	 * @param commandListener The {@link #CommandListener} instance that possibly processes the outputs of 
 	 * the process and determines when the process has finished processing the sent command.
+	 * @return A {@link #Future} instance for the submitted command.
 	 */
-	public void executeCommand(String command, CommandListener commandListener) {
+	public Future<?> executeCommand(String command, CommandListener commandListener) {
 		while (true) {
 			for (ProcessManager p : processManagers) {
 				if (p.isRunning()) {
 					try {
-						if (p.sendCommand(command, commandListener))
-							return;
+						Future<?> future = p.sendCommand(command, commandListener);
+						if (future != null)
+							return future;
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
