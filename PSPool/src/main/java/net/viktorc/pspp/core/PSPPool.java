@@ -12,7 +12,7 @@ import java.util.concurrent.Executors;
  * @author A6714
  *
  */
-public class PSPPool {
+public class PSPPool implements AutoCloseable {
 	
 	private final Queue<ProcessManager> processManagers;
 	private final ExecutorService executor;
@@ -26,7 +26,8 @@ public class PSPPool {
 	 * @param poolSize The number of processes to maintain in the pool.
 	 * @throws IOException If the process command is invalid.
 	 */
-	public PSPPool(String processCommand, ProcessListener listener, int poolSize) throws IOException {
+	public PSPPool(String processCommand, ProcessListener listener, int poolSize)
+			throws IOException {
 		processManagers = new ConcurrentLinkedQueue<>();
 		executor = Executors.newFixedThreadPool(poolSize);
 		for (int i = 0; i < poolSize; i++) {
@@ -64,6 +65,13 @@ public class PSPPool {
 					}
 				}
 			}
+		}
+	}
+	@Override
+	public void close() throws Exception {
+		for (ProcessManager p : processManagers) {
+			p.clearListeners();
+			p.close();
 		}
 	}
 	

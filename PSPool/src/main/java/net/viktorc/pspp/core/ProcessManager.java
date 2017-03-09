@@ -229,6 +229,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	}
 	@Override
 	public void close() throws Exception {
+		commandListener = null;
 		cancel();
 	}
 	
