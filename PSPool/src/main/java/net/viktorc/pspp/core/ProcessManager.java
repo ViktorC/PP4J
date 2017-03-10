@@ -120,9 +120,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @throws IOException If the command cannot be written to the standard in stream.
 	 */
 	public Future<?> sendCommand(String command, CommandListener commandListener) throws IOException {
-		startLock.lock();
-		try {
-			if (ready) {
+		if (ready && startLock.tryLock()) {
+			try {
 				ready = false;
 				stdInWriter.write(command);
 				stdInWriter.newLine();
@@ -138,11 +137,11 @@ public class ProcessManager implements Runnable, AutoCloseable {
 						this.commandListener = null;
 					}
 				});
+			} finally {
+				startLock.unlock();
 			}
+		} else
 			return null;
-		} finally {
-			startLock.unlock();
-		}
 	}
 	/**
 	 * It prompts the currently running process, if there is one, to terminate.
