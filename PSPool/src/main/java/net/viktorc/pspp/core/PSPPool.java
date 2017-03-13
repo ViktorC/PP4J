@@ -22,17 +22,17 @@ public class PSPPool implements AutoCloseable {
 	 * Constructs a pool of the specified number of identical processes started by the specified command. The number 
 	 * of pooled process is kept constant, meaning if a process dies, a new one is created.
 	 * 
-	 * @param processCommand The command for starting the processes.
+	 * @param processCommands The command for starting the processes.
 	 * @param listener The process listener instance.
 	 * @param poolSize The number of processes to maintain in the pool.
 	 * @throws IOException If the process command is invalid.
 	 */
-	public PSPPool(String processCommand, ProcessListener listener, int poolSize)
+	public PSPPool(String[] processCommands, ProcessListener listener, int poolSize)
 			throws IOException {
 		processManagers = new ConcurrentLinkedQueue<>();
 		executor = Executors.newFixedThreadPool(poolSize);
 		for (int i = 0; i < poolSize; i++) {
-			ProcessManager p = new ProcessManager(processCommand);
+			ProcessManager p = new ProcessManager(processCommands);
 			p.addListener(listener);
 			p.addListener(new ProcessListener() {
 				
@@ -53,14 +53,16 @@ public class PSPPool implements AutoCloseable {
 	 * @param command The command to send to the process' standard in.
 	 * @param commandListener The {@link #CommandListener} instance that possibly processes the outputs of 
 	 * the process and determines when the process has finished processing the sent command.
-	 * @return A {@link #Future} instance for the submitted command.
+	 * @param cancelProcessAfterwards Whether the process that executed the command should be cancelled after 
+	 * the execution of the command.
+	 * @return A {@link #java.util.concurrent.Future<?> Future} instance for the submitted command.
 	 */
-	public Future<?> executeCommand(String command, CommandListener commandListener) {
+	public Future<?> executeCommand(String command, CommandListener commandListener, boolean cancelProcessAfterwards) {
 		while (true) {
 			for (ProcessManager p : processManagers) {
 				if (p.isRunning()) {
 					try {
-						Future<?> future = p.sendCommand(command, commandListener);
+						Future<?> future = p.sendCommand(command, commandListener, cancelProcessAfterwards);
 						if (future != null)
 							return future;
 					} catch (IOException e) {

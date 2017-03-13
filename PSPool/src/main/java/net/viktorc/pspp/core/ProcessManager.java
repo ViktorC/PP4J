@@ -1,10 +1,10 @@
 package net.viktorc.pspp.core;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.Reader;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -16,7 +16,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A runnable class for starting, managing, and interacting with processes. The process is started by calling the 
- * {@link #run()} method.
+ * {@link #run() run} method.
  * 
  * @author A6714
  *
@@ -32,8 +32,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	private final ProcessBuilder builder;
 	private final Queue<ProcessListener> listeners;
 	private Process process;
-	private BufferedReader stdOutReader;
-	private BufferedReader errOutReader;
+	private Reader stdOutReader;
+	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
 	private ExecutorService executor;
 	private Lock startLock;
@@ -45,11 +45,11 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	/**
 	 * Constructs a manager for the specified process without actually starting the process.
 	 * 
-	 * @param process The process command.
+	 * @param processCommands The process command.
 	 * @throws IOException If the process command is invalid.
 	 */
-	public ProcessManager(String process) throws IOException {
-		builder = new ProcessBuilder(process);
+	public ProcessManager(String[] processCommands) throws IOException {
+		builder = new ProcessBuilder(processCommands);
 		listeners = new ConcurrentLinkedQueue<>();
 		startLock = new ReentrantLock();
 	}
@@ -90,13 +90,23 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @param error Whether it is the error out or the standard out stream of the process.
 	 * @throws IOException If there is some problem with the stream.
 	 */
-	private void startListening(BufferedReader reader, boolean error) throws IOException {
-		String line = "";
-		while ((line = reader.readLine()) != null) {
-			if (stop)
+	private void startListening(Reader reader, boolean error) throws IOException {
+		int c;
+		StringBuilder output = new StringBuilder();
+		while ((c = reader.read()) != -1) {
+			output.append((char) c);
+			String line = output.toString().trim();
+			if (stop) {
+				// On Windows all output of the process has to be read for it to terminate.
+				while (-1 != reader.read());
 				break;
+			}
+			if (c == '\n')
+				output.setLength(0);
+			else
+				continue;
 			line = line.trim();
-			if ("".equals(line))
+			if (line.isEmpty())
 				continue;
 			synchronized (ProcessManager.this) {
 				ready = (commandListener == null ? ready : (error ? commandListener.onNewErrorOutput(line) :
@@ -111,15 +121,17 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * Attempts to write the specified command followed by a new line to the standard in stream of the process.
 	 * 
 	 * @param command The command to write to the process' standard in.
-	 * @param commandListener An instance of {@link #commandListener CommandListener} for consuming the subsequent 
+	 * @param commandListener An instance of {@link #CommandListener CommandListener} for consuming the subsequent 
 	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
 	 * for new commands based on these outputs.
-	 * @return A {@link #Future} instance for the submitted command. If it is not null, the command was successfully 
-	 * submitted. If the process has not started up yet or is processing another command at the moment, no new commands 
-	 * can be submitted and null is returned.
+	 * @param cancelAfterwards Whether the process should be cancelled after the execution of the command.
+	 * @return A {@link #java.util.concurrent.Future<?> Future} instance for the submitted command. If it is not null, 
+	 * the command was successfully submitted. If the process has not started up yet or is processing another command at 
+	 * the moment, no new commands can be submitted and null is returned.
 	 * @throws IOException If the command cannot be written to the standard in stream.
 	 */
-	public Future<?> sendCommand(String command, CommandListener commandListener) throws IOException {
+	public Future<?> sendCommand(String command, CommandListener commandListener, boolean cancelAfterwards)
+			throws IOException {
 		if (ready && startLock.tryLock()) {
 			try {
 				ready = false;
@@ -135,6 +147,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 							} catch (InterruptedException e) { }
 						}
 						this.commandListener = null;
+						if (cancelAfterwards)
+							cancel();
 					}
 				});
 			} finally {
@@ -142,6 +156,21 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			}
 		} else
 			return null;
+	}
+	/**
+	 * Attempts to write the specified command followed by a new line to the standard in stream of the process.
+	 * 
+	 * @param command The command to write to the process' standard in.
+	 * @param commandListener An instance of {@link #CommandListener CommandListener} for consuming the subsequent 
+	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
+	 * for new commands based on these outputs.
+	 * @return A {@link #java.util.concurrent.Future<?> Future} instance for the submitted command. If it is not null, 
+	 * the command was successfully submitted. If the process has not started up yet or is processing another command at 
+	 * the moment, no new commands can be submitted and null is returned.
+	 * @throws IOException If the command cannot be written to the standard in stream.
+	 */
+	public Future<?> sendCommand(String command, CommandListener commandListener) throws IOException {
+		return sendCommand(command, commandListener, false);
 	}
 	/**
 	 * It prompts the currently running process, if there is one, to terminate.
@@ -163,8 +192,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		try {
 			// Start process
 			process = builder.start();
-			stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-			errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+			stdOutReader = new InputStreamReader(process.getInputStream());
+			errOutReader = new InputStreamReader(process.getErrorStream());
 			stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 			executor = Executors.newFixedThreadPool(3);
 			executor.submit(() -> {
@@ -200,23 +229,17 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			if (stdOutReader != null) {
 				try {
 					stdOutReader.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+				} catch (IOException e) { }
 			}
 			if (errOutReader != null) {
 				try {
 					errOutReader.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+				} catch (IOException e) { }
 			}
 			if (stdInWriter != null) {
 				try {
 					stdInWriter.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+				} catch (IOException e) { }
 			}
 			if (executor != null)
 				executor.shutdown();
