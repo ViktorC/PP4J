@@ -29,14 +29,15 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 */
 	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -99;
 	
+	private final ExecutorService executor;
+	private final Lock startLock;
+	private final Object commandOutputLock;
 	private final ProcessBuilder builder;
 	private final Queue<ProcessListener> listeners;
 	private Process process;
 	private Reader stdOutReader;
 	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
-	private ExecutorService executor;
-	private Lock startLock;
 	private volatile CommandListener commandListener;
 	private volatile boolean running;
 	private volatile boolean ready;
@@ -49,9 +50,11 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @throws IOException If the process command is invalid.
 	 */
 	public ProcessManager(String[] processCommands) throws IOException {
+		executor = Executors.newFixedThreadPool(3);
+		startLock = new ReentrantLock();
+		commandOutputLock = new Object();
 		builder = new ProcessBuilder(processCommands);
 		listeners = new ConcurrentLinkedQueue<>();
-		startLock = new ReentrantLock();
 	}
 	/**
 	 * Subscribes a process listener to the manager instance.
@@ -108,11 +111,11 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			line = line.trim();
 			if (line.isEmpty())
 				continue;
-			synchronized (ProcessManager.this) {
+			synchronized (commandOutputLock) {
 				ready = (commandListener == null ? ready : (error ? commandListener.onNewErrorOutput(line) :
 					commandListener.onNewStandardOutput(line)));
 				if (ready) {
-					ProcessManager.this.notifyAll();
+					commandOutputLock.notifyAll();
 				}
 			}
 		}
@@ -123,7 +126,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @param command The command to write to the process' standard in.
 	 * @param commandListener An instance of {@link #CommandListener CommandListener} for consuming the subsequent 
 	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
-	 * for new commands based on these outputs.
+	 * for new commands based on these outputs. If it is null, it is assumed that the command should not produce any 
+	 * output and the process will
 	 * @param cancelAfterwards Whether the process should be cancelled after the execution of the command.
 	 * @return A {@link #java.util.concurrent.Future<?> Future} instance for the submitted command. If it is not null, 
 	 * the command was successfully submitted. If the process has not started up yet or is processing another command at 
@@ -132,7 +136,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 */
 	public Future<?> sendCommand(String command, CommandListener commandListener, boolean cancelAfterwards)
 			throws IOException {
-		if (ready && startLock.tryLock()) {
+		if (ready && !stop && startLock.tryLock()) {
 			try {
 				ready = false;
 				stdInWriter.write(command);
@@ -140,10 +144,10 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				stdInWriter.flush();
 				this.commandListener = commandListener;
 				return executor.submit(() -> {
-					synchronized (ProcessManager.this) {
+					synchronized (commandOutputLock) {
 						while (!ready) {
 							try {
-								ProcessManager.this.wait();
+								commandOutputLock.wait();
 							} catch (InterruptedException e) { }
 						}
 						this.commandListener = null;
@@ -182,9 +186,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		}
 	}
 	@Override
-	public void run() throws ProcessManagerException {
-		if (running)
-			throw new ProcessManagerException(new IllegalStateException());
+	public synchronized void run() throws ProcessManagerException {
 		running = true;
 		ready = false;
 		stop = false;
@@ -195,7 +197,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			stdOutReader = new InputStreamReader(process.getInputStream());
 			errOutReader = new InputStreamReader(process.getErrorStream());
 			stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
-			executor = Executors.newFixedThreadPool(3);
 			executor.submit(() -> {
 				try {
 					startListening(stdOutReader, false);
@@ -241,19 +242,18 @@ public class ProcessManager implements Runnable, AutoCloseable {
 					stdInWriter.close();
 				} catch (IOException e) { }
 			}
-			if (executor != null)
-				executor.shutdown();
 			ready = false;
+			running = false;
 			// Execute the onTermination listener methods.
 			for (ProcessListener l : listeners)
 				l.onTermination(rc.get());
-			running = false;
 		}
 	}
 	@Override
 	public void close() throws Exception {
 		commandListener = null;
 		cancel();
+		executor.shutdown();
 	}
 	
 }

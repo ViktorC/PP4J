@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuite tests="1" failures="0" name="net.viktorc.pspp.core.AppTest" time="0.001" errors="0" skipped="0">
+<testsuite tests="1" failures="0" name="net.viktorc.pspp.core.AppTest" time="0.015" errors="0" skipped="0">
   <properties>
     <property name="java.runtime.name" value="Java(TM) SE Runtime Environment"/>
     <property name="sun.boot.library.path" value="C:\Program Files\Java\jdk1.8.0_121\jre\bin"/>
@@ -27,9 +27,9 @@
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="user.variant" value=""/>
     <property name="os.name" value="Windows 7"/>
-    <property name="classworlds.conf" value="C:\dev\Eclipse Java SE\workspace\.metadata\.plugins\org.eclipse.m2e.launching\launches\m2conf1785592654614978466.tmp"/>
+    <property name="classworlds.conf" value="C:\dev\Eclipse Java SE\workspace\.metadata\.plugins\org.eclipse.m2e.launching\launches\m2conf1785605489858117328.tmp"/>
     <property name="sun.jnu.encoding" value="Cp1252"/>
-    <property name="java.library.path" value="C:\Program Files\Java\jdk1.8.0_121\bin;C:\Windows\Sun\Java\bin;C:\Windows\system32;C:\Windows;C:/Program Files/Java/jre1.8.0_66/bin/server;C:/Program Files/Java/jre1.8.0_66/bin;C:/Program Files/Java/jre1.8.0_66/lib/amd64;C:\Program Files\Java\jre1.8.0_66\bin;C:\Program Files (x86)\Java\jre7\bin;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\IBM\Rational\common;C:\Program Files (x86)\Intel\iCLS Client\;C:\Program Files\Intel\iCLS Client\;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files\IBM\DB2DSDriver\bin;C:\PROGRA~1\IBM\DB2DSD~1\BIN;C:\Program Files (x86)\Sennheiser\SoftphoneSDK\;C:\Program Files (x86)\IBM\Personal Communications\;C:\Program Files (x86)\IBM\Trace Facility\;C:\Program Files (x86)\IBM\Rational\ClearCase\bin;C:\Program Files (x86)\IBM\gsk8\lib;C:\Program Files (x86)\IBM\gsk8\bin;C:\Program Files (x86)\Ant\bin;C:\Perl64\bin;C:\Program Files\TortoiseSVN\bin;C:\Program Files\CollabNet\Subversion Client;C:\Program Files\Novell\iPrint;C:\Program Files\nodejs\;C:\Users\A6714\AppData\Roaming\npm;Z:.;;C:\dev\Eclipse Java SE\eclipse;;."/>
+    <property name="java.library.path" value="C:\Program Files\Java\jdk1.8.0_121\bin;C:\Windows\Sun\Java\bin;C:\Windows\system32;C:\Windows;C:/Program Files/Java/jre1.8.0_121/bin/server;C:/Program Files/Java/jre1.8.0_121/bin;C:/Program Files/Java/jre1.8.0_121/lib/amd64;C:\Program Files\Java\jre1.8.0_66\bin;C:\Program Files (x86)\Java\jre7\bin;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\IBM\Rational\common;C:\Program Files (x86)\Intel\iCLS Client\;C:\Program Files\Intel\iCLS Client\;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files\IBM\DB2DSDriver\bin;C:\PROGRA~1\IBM\DB2DSD~1\BIN;C:\Program Files (x86)\Sennheiser\SoftphoneSDK\;C:\Program Files (x86)\IBM\Personal Communications\;C:\Program Files (x86)\IBM\Trace Facility\;C:\Program Files (x86)\IBM\Rational\ClearCase\bin;C:\Program Files (x86)\IBM\gsk8\lib;C:\Program Files (x86)\IBM\gsk8\bin;C:\Program Files (x86)\Ant\bin;C:\Perl64\bin;C:\Program Files\TortoiseSVN\bin;C:\Program Files\CollabNet\Subversion Client;C:\Program Files\Novell\iPrint;C:\Program Files\nodejs\;C:\Users\A6714\AppData\Roaming\npm;Z:.;;C:\Windows\system32;;."/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="java.class.version" value="52.0"/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
@@ -61,5 +61,5 @@
     <property name="sun.desktop" value="windows"/>
     <property name="sun.cpu.isalist" value="amd64"/>
   </properties>
-  <testcase classname="net.viktorc.pspp.core.AppTest" name="testApp" time="0.001"/>
+  <testcase classname="net.viktorc.pspp.core.AppTest" name="testApp" time="0.015"/>
 </testsuite>

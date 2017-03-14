@@ -1,8 +1,10 @@
 package net.viktorc.pspp.core;
 
 /**
- * An interface for listeners for the {@link #ProcessManager} class. It defines a method to execute 
- * right after the starting of the process and method to call right after its termination.
+ * An interface for listeners for the {@link #ProcessManager} class. It defines a method to execute right 
+ * after the starting of the process and method to call right after its termination. Its implementation 
+ * should be stateless as the same {@link #ProcessListener} instance is used for every {@link #ProcessManager} 
+ * of a {@link #PSPPool} instance.
  * 
  * @author A6714
  *
