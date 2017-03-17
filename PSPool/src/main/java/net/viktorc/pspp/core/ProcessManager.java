@@ -97,18 +97,22 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		int c;
 		StringBuilder output = new StringBuilder();
 		while ((c = reader.read()) != -1) {
-			output.append((char) c);
-			String line = output.toString().trim();
 			if (stop) {
 				// On Windows all output of the process has to be read for it to terminate.
-				while (-1 != reader.read());
+				while (reader.read() != -1);
 				break;
 			}
-			if (c == '\n')
+			String line;
+			if (c == '\n') {
+				line = output.toString().trim();
 				output.setLength(0);
-			else
-				continue;
-			line = line.trim();
+			} else {
+				output.append((char) c);
+				if (reader.ready())
+					continue;
+				else
+					line = output.toString().trim();
+			}
 			if (line.isEmpty())
 				continue;
 			synchronized (commandOutputLock) {
@@ -144,6 +148,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				stdInWriter.flush();
 				this.commandListener = commandListener;
 				return executor.submit(() -> {
+					long start = System.currentTimeMillis();
 					synchronized (commandOutputLock) {
 						while (!ready) {
 							try {
@@ -154,6 +159,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 						if (cancelAfterwards)
 							cancel();
 					}
+					return System.currentTimeMillis() - start;
 				});
 			} finally {
 				startLock.unlock();
