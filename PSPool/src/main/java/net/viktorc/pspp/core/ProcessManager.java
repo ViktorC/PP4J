@@ -6,6 +6,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.util.Queue;
+import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,10 +37,14 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	private final Object commandOutputLock;
 	private final ProcessBuilder builder;
 	private final Queue<ProcessListener> listeners;
+	private final long id;
+	private final long keepAliveTime;
 	private Process process;
 	private Reader stdOutReader;
 	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
+	private Timer timer;
+	private TimerTask task;
 	private volatile CommandListener commandListener;
 	private volatile boolean running;
 	private volatile boolean ready;
@@ -49,12 +56,14 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @param processCommands The process command.
 	 * @throws IOException If the process command is invalid.
 	 */
-	public ProcessManager(String[] processCommands) throws IOException {
+	public ProcessManager(String[] processCommands, long keepAliveTime) throws IOException {
 		executor = Executors.newFixedThreadPool(3);
 		startLock = new ReentrantLock();
 		commandOutputLock = new Object();
 		builder = new ProcessBuilder(processCommands);
 		listeners = new ConcurrentLinkedQueue<>();
+		id = (new Random()).nextLong();
+		this.keepAliveTime = keepAliveTime;
 	}
 	/**
 	 * Subscribes a process listener to the manager instance.
@@ -77,6 +86,14 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 */
 	public void clearListeners() {
 		listeners.clear();
+	}
+	/**
+	 * Returns the 64 bit ID number of the instance.
+	 * 
+	 * @return The ID of the instance.
+	 */
+	public long getId() {
+		return id;
 	}
 	/**
 	 * Returns whether the process is currently running.
@@ -142,6 +159,10 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			throws IOException {
 		if (ready && !stop && startLock.tryLock()) {
 			try {
+				if (task != null) {
+					task.cancel();
+					task = null;
+				}
 				ready = false;
 				stdInWriter.write(command);
 				stdInWriter.newLine();
@@ -158,6 +179,17 @@ public class ProcessManager implements Runnable, AutoCloseable {
 						this.commandListener = null;
 						if (cancelAfterwards)
 							cancel();
+						else if (task == null) {
+							task = new TimerTask() {
+								
+								@Override
+								public void run() {
+									task = null;
+									cancel();
+								}
+							};
+							timer.schedule(task, keepAliveTime);
+						}
 					}
 					return System.currentTimeMillis() - start;
 				});
@@ -187,6 +219,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 */
 	public void cancel() {
 		if (running) {
+			if (task != null)
+				task.cancel();
 			stop = true;
 			process.destroy();
 		}
@@ -196,6 +230,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		running = true;
 		ready = false;
 		stop = false;
+		timer = new Timer();
 		AtomicInteger rc = new AtomicInteger(0);
 		try {
 			// Start process
@@ -226,6 +261,15 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			} finally {
 				startLock.unlock();
 			}
+			task = new TimerTask() {
+				
+				@Override
+				public void run() {
+					task = null;
+					cancel();
+				}
+			};
+			timer.schedule(task, keepAliveTime);
 			rc.set(process.waitFor());
 		} catch (IOException | InterruptedException e) {
 			// Set result code to the one associated with unexpected termination.
@@ -233,6 +277,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			throw new ProcessManagerException(e);
 		} finally {
 			// Try to clean up and close all the resources.
+			if (timer != null)
+				timer.cancel();
 			if (stdOutReader != null) {
 				try {
 					stdOutReader.close();
@@ -257,6 +303,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	}
 	@Override
 	public void close() throws Exception {
+		if (timer != null)
+			timer.cancel();
 		commandListener = null;
 		cancel();
 		executor.shutdown();
