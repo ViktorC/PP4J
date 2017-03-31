@@ -15,11 +15,11 @@ public interface ProcessListener {
 	 * A 'blank' process listener instance that ignores the process events.
 	 */
 	public static final ProcessListener NULL_LISTENER = new ProcessListener() {
-		
-		@Override
-		public void onTermination(int resultCode) { }
+
 		@Override
 		public void onStarted(ProcessManager manager) { }
+		@Override
+		public void onTermination(ProcessManager manager, int resultCode) { }
 	};
 	
 	/**
@@ -34,8 +34,9 @@ public interface ProcessListener {
 	 * A method called right after the process terminates. Its main purpose is to allow for wrap-up 
 	 * activities.
 	 * 
+	 * @param manager The {@link #ProcessManager} instance to which the listener is subscribed..
 	 * @param resultCode The result code the process returned.
 	 */
-	void onTermination(int resultCode);
+	void onTermination(ProcessManager manager, int resultCode);
 	
 }

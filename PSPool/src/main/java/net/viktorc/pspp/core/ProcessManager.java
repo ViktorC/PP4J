@@ -37,13 +37,13 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	private final Object commandOutputLock;
 	private final ProcessBuilder builder;
 	private final Queue<ProcessListener> listeners;
-	private final long id;
 	private final long keepAliveTime;
+	private final Timer timer;
+	private final long id;
 	private Process process;
 	private Reader stdOutReader;
 	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
-	private Timer timer;
 	private TimerTask task;
 	private volatile CommandListener commandListener;
 	private volatile boolean running;
@@ -62,8 +62,9 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		commandOutputLock = new Object();
 		builder = new ProcessBuilder(processCommands);
 		listeners = new ConcurrentLinkedQueue<>();
-		id = (new Random()).nextLong();
 		this.keepAliveTime = keepAliveTime;
+		timer = keepAliveTime > 0 ? new Timer() : null;
+		id = (new Random()).nextLong();
 	}
 	/**
 	 * Subscribes a process listener to the manager instance.
@@ -179,13 +180,13 @@ public class ProcessManager implements Runnable, AutoCloseable {
 						this.commandListener = null;
 						if (cancelAfterwards)
 							cancel();
-						else if (task == null) {
+						else if (timer != null && task == null) {
 							task = new TimerTask() {
 								
 								@Override
 								public void run() {
 									task = null;
-									cancel();
+									ProcessManager.this.cancel();
 								}
 							};
 							timer.schedule(task, keepAliveTime);
@@ -218,19 +219,19 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * It prompts the currently running process, if there is one, to terminate.
 	 */
 	public void cancel() {
-		if (running) {
-			if (task != null)
-				task.cancel();
-			stop = true;
-			process.destroy();
+		if (task != null) {
+			task.cancel();
+			task = null;
 		}
+		stop = true;
+		if (process != null)
+			process.destroy();
 	}
 	@Override
 	public synchronized void run() throws ProcessManagerException {
 		running = true;
 		ready = false;
 		stop = false;
-		timer = new Timer();
 		AtomicInteger rc = new AtomicInteger(0);
 		try {
 			// Start process
@@ -261,15 +262,17 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			} finally {
 				startLock.unlock();
 			}
-			task = new TimerTask() {
-				
-				@Override
-				public void run() {
-					task = null;
-					cancel();
-				}
-			};
-			timer.schedule(task, keepAliveTime);
+			if (timer != null && task == null) {
+				task = new TimerTask() {
+					
+					@Override
+					public void run() {
+						task = null;
+						ProcessManager.this.cancel();
+					}
+				};
+				timer.schedule(task, keepAliveTime);
+			}
 			rc.set(process.waitFor());
 		} catch (IOException | InterruptedException e) {
 			// Set result code to the one associated with unexpected termination.
@@ -277,8 +280,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			throw new ProcessManagerException(e);
 		} finally {
 			// Try to clean up and close all the resources.
-			if (timer != null)
-				timer.cancel();
 			if (stdOutReader != null) {
 				try {
 					stdOutReader.close();
@@ -298,7 +299,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			running = false;
 			// Execute the onTermination listener methods.
 			for (ProcessListener l : listeners)
-				l.onTermination(rc.get());
+				l.onTermination(this, rc.get());
 		}
 	}
 	@Override

@@ -7,11 +7,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A class for maintaining a pool of identical running processes.
+ * A class for maintaining a pool of identical pre-started processes.
  * 
  * @author A6714
  *
@@ -22,8 +23,12 @@ public class PSPPool implements AutoCloseable {
 	private final ProcessListener listener;
 	private final int minPoolSize;
 	private final int maxPoolSize;
+	private final int queueSize;
 	private final long keepAliveTime;
+	private final Object submitLock;
+	private final AtomicInteger submittedProcesses;
 	private final BlockingQueue<ProcessManager> activeProcesses;
+	private final BlockingQueue<Runnable> queuedProcesses;
 	private final ThreadPoolExecutor executor;
 	private final Logger logger;
 	private final CountDownLatch latch;
@@ -39,30 +44,94 @@ public class PSPPool implements AutoCloseable {
 	 * as the same instance is used for all processes.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
-	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled.
+	 * @param queueSize The number of tasks the queue can accommodate. If it is 0 or less, the queue will not be limited.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
+	 * life-cycle of the processes will not be limited.
 	 * @throws IOException If the process cannot be started.
+	 * @throws IllegalArgumentException If minPoolSize is less than 1 or maxPoolSize is less than minPoolSize.
 	 */
-	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize, long keepAliveTime)
-			throws IOException {
+	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize,
+			int queueSize, long keepAliveTime) throws IOException, IllegalArgumentException {
+		if (minPoolSize < 1)
+			throw new IllegalArgumentException("The minimum pool size has to be at least 1.");
+		if (maxPoolSize < minPoolSize)
+			throw new IllegalArgumentException("The maximum pool size has to be greater than the minimum pool size.");
 		this.processCommands = processCommands;
 		this.listener = listener;
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
+		this.queueSize = queueSize;
 		this.keepAliveTime = keepAliveTime;
 		this.verbose = verbose;
 		logger = Logger.getAnonymousLogger();
+		submitLock = new Object();
+		submittedProcesses = new AtomicInteger(0);
 		activeProcesses = new LinkedBlockingQueue<>();
-		executor = new ThreadPoolExecutor(minPoolSize, maxPoolSize, keepAliveTime, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+		queuedProcesses = queueSize > 0 ? new LinkedBlockingQueue<>(queueSize) : new LinkedBlockingQueue<>();
+		executor = new ThreadPoolExecutor(minPoolSize, maxPoolSize, keepAliveTime, TimeUnit.MILLISECONDS, queuedProcesses);
 		latch = new CountDownLatch(minPoolSize);
 		for (int i = 0; i < minPoolSize; i++)
 			submitNewProcess();
 		// Wait for the processes in the initial pool to start up.
 		try {
 			latch.await();
+			// Allow the start up locks in the managers to be released.
+			Thread.sleep(100);
 		} catch (InterruptedException e) {
 			if (verbose)
 				logger.log(Level.SEVERE, "Error while waiting for the pool to start up.", e);
 		}
+	}
+	/**
+	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
+	 * is dynamically adjusted based on the number of requests and running processes.
+	 * 
+	 * @param processCommands The commands to start the process that will be pooled.
+	 * @param listener A {@link #ProcessListener} instance that is added to each process in the pool. It should be stateless 
+	 * as the same instance is used for all processes.
+	 * @param minPoolSize The minimum size of the process pool.
+	 * @param maxPoolSize The maximum size of the process pool.
+	 * @param queueSize The number of tasks the queue can accommodate. If it is less than 0, the queue will not be limited.
+	 * @throws IOException If the process cannot be started.
+	 * @throws IllegalArgumentException If minPoolSize is less than 1 or maxPoolSize is less than minPoolSize.
+	 */
+	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize, int queueSize)
+			throws IOException, IllegalArgumentException {
+		this(processCommands, listener, minPoolSize, maxPoolSize, queueSize, 0);
+	}
+	/**
+	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
+	 * is dynamically adjusted based on the number of requests and running processes.
+	 * 
+	 * @param processCommands The commands to start the process that will be pooled.
+	 * @param listener A {@link #ProcessListener} instance that is added to each process in the pool. It should be stateless 
+	 * as the same instance is used for all processes.
+	 * @param minPoolSize The minimum size of the process pool.
+	 * @param maxPoolSize The maximum size of the process pool.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
+	 * life-cycle of the processes will not be limited.
+	 * @throws IOException If the process cannot be started.
+	 * @throws IllegalArgumentException If minPoolSize is less than 1 or maxPoolSize is less than minPoolSize.
+	 */
+	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize, long keepAliveTime)
+			throws IOException, IllegalArgumentException {
+		this(processCommands, listener, minPoolSize, maxPoolSize, -1, keepAliveTime);
+	}
+	/**
+	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
+	 * is dynamically adjusted based on the number of requests and running processes.
+	 * 
+	 * @param processCommands The commands to start the process that will be pooled.
+	 * @param listener A {@link #ProcessListener} instance that is added to each process in the pool. It should be stateless 
+	 * as the same instance is used for all processes.
+	 * @param minPoolSize The minimum size of the process pool.
+	 * @param maxPoolSize The maximum size of the process pool.
+	 * @throws IOException If the process cannot be started.
+	 * @throws IllegalArgumentException If minPoolSize is less than 1 or maxPoolSize is less than minPoolSize.
+	 */
+	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize)
+			throws IOException, IllegalArgumentException {
+		this(processCommands, listener, minPoolSize, maxPoolSize, -1, 0);
 	}
 	/**
 	 * Sets whether the pool should log to the console.
@@ -78,38 +147,42 @@ public class PSPPool implements AutoCloseable {
 	 * @throws IOException If the process cannot be started.
 	 */
 	private void submitNewProcess() throws IOException {
+		submittedProcesses.incrementAndGet();
 		ProcessManager p = new ProcessManager(processCommands, keepAliveTime);
-		p.addListener(listener);
+		if (listener != null)
+			p.addListener(listener);
 		p.addListener(new ProcessListener() {
 			
 			@Override
-			public void onTermination(int resultCode) {
-				activeProcesses.remove(p);
+			public void onStarted(ProcessManager manager) {
+				activeProcesses.add(manager);
 				if (verbose) {
-					logger.info("Process manager #" + Long.toHexString(p.getId()) + " stopped executing.");
-					logger.info("Active processes: " + activeProcesses.size() + ".");
+					logger.info("Process manager #" + Long.toHexString(manager.getId()) + " started executing.");
+					logger.info("Active processes: " + activeProcesses.size() + "; queued processes: " + queuedProcesses.size() + ".");
 				}
-				if (!close && activeProcesses.size() < minPoolSize)
-					executor.execute(p);
+				latch.countDown();
+			}
+			@Override
+			public void onTermination(ProcessManager manager, int resultCode) {
+				activeProcesses.remove(manager);
+				if (verbose) {
+					logger.info("Process manager #" + Long.toHexString(manager.getId()) + " stopped executing.");
+					logger.info("Active processes: " + activeProcesses.size() + "; queued processes: " + queuedProcesses.size() + ".");
+				}
+				if (!close && submittedProcesses.get() <= minPoolSize)
+					executor.execute(manager);
 				else {
 					try {
 						p.close();
 						if (verbose)
-							logger.info("Shutting down process manager #" + Long.toHexString(p.getId()) + ".");
+							logger.info("Shutting down process manager #" + Long.toHexString(manager.getId()) + ".");
+						submittedProcesses.decrementAndGet();
 					} catch (Exception e) {
 						if (verbose)
-							logger.log(Level.SEVERE, "Error while shutting down process manager #" + Long.toHexString(p.getId()) + ".", e);
+							logger.log(Level.SEVERE, "Error while shutting down process manager #" +
+									Long.toHexString(manager.getId()) + ".", e);
 					}
 				}
-			}
-			@Override
-			public void onStarted(ProcessManager manager) {
-				if (verbose) {
-					logger.info("Process manager #" + Long.toHexString(p.getId()) + " started executing.");
-					logger.info("Active processes: " + activeProcesses.size() + ".");
-				}
-				activeProcesses.add(p);
-				latch.countDown();
 			}
 		});
 		executor.execute(p);
@@ -126,6 +199,7 @@ public class PSPPool implements AutoCloseable {
 	 * @return A {@link #java.util.concurrent.Future<?> Future} instance for the submitted command.
 	 */
 	public Future<?> executeCommand(String command, CommandListener commandListener, boolean cancelProcessAfterwards) {
+		boolean submittedNewProcess = false;
 		while (true) {
 			for (ProcessManager p : activeProcesses) {
 				try {
@@ -138,12 +212,17 @@ public class PSPPool implements AutoCloseable {
 								Long.toHexString(p.getId()) + ".", e);
 				}
 			}
-			if (activeProcesses.size() < maxPoolSize) {
-				try {
-					submitNewProcess();
-				} catch (IOException e) {
-					if (verbose)
-						logger.log(Level.SEVERE, "Error while submitting a new process.", e);
+			if (!submittedNewProcess) {
+				synchronized (submitLock) {
+					if (queueSize < 1 || submittedProcesses.get() < maxPoolSize + queueSize) {
+						try {
+							submitNewProcess();
+							submittedNewProcess = true;
+						} catch (IOException e) {
+							if (verbose)
+								logger.log(Level.SEVERE, "Error while submitting a new process.", e);
+						}
+					}
 				}
 			}
 		}
