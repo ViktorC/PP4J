@@ -275,7 +275,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			}
 			rc.set(process.waitFor());
 		} catch (IOException | InterruptedException e) {
-			// Set result code to the one associated with unexpected termination.
+			// Set the result code to the value associated with unexpected termination.
 			rc.set(UNEXPECTED_TERMINATION_RESULT_CODE);
 			throw new ProcessManagerException(e);
 		} finally {
