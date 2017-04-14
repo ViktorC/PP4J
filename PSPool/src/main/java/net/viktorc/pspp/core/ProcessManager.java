@@ -148,8 +148,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @param command The command to write to the process' standard in.
 	 * @param commandListener An instance of {@link #CommandListener CommandListener} for consuming the subsequent 
 	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
-	 * for new commands based on these outputs. If it is null, it is assumed that the command should not produce any 
-	 * output and the process will
+	 * for new commands based on these outputs. If it is null, the process manager will not accept any other command for 
+	 * the rest of the current progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
 	 * @param cancelAfterwards Whether the process should be cancelled after the execution of the command.
 	 * @return A {@link #java.util.concurrent.Future<?> Future} instance for the submitted command. If it is not null, 
 	 * the command was successfully submitted. If the process has not started up yet or is processing another command at 
@@ -165,12 +165,12 @@ public class ProcessManager implements Runnable, AutoCloseable {
 					task = null;
 				}
 				ready = false;
+				this.commandListener = commandListener;
 				stdInWriter.write(command);
 				stdInWriter.newLine();
 				stdInWriter.flush();
-				this.commandListener = commandListener;
+				long start = System.nanoTime();
 				return executor.submit(() -> {
-					long start = System.currentTimeMillis();
 					synchronized (commandOutputLock) {
 						while (!ready) {
 							try {
@@ -178,27 +178,27 @@ public class ProcessManager implements Runnable, AutoCloseable {
 							} catch (InterruptedException e) { }
 						}
 						this.commandListener = null;
-						if (cancelAfterwards)
-							cancel();
-						else if (timer != null && task == null) {
-							task = new TimerTask() {
-								
-								@Override
-								public void run() {
-									task = null;
-									ProcessManager.this.cancel();
-								}
-							};
-							timer.schedule(task, keepAliveTime);
-						}
 					}
-					return System.currentTimeMillis() - start;
+					if (cancelAfterwards)
+						cancel();
+					else if (timer != null && task == null) {
+						task = new TimerTask() {
+							
+							@Override
+							public void run() {
+								task = null;
+								ProcessManager.this.cancel();
+							}
+						};
+						timer.schedule(task, keepAliveTime);
+					}
+					return System.nanoTime() - start;
 				});
 			} finally {
 				startLock.unlock();
 			}
-		} else
-			return null;
+		}
+		return null;
 	}
 	/**
 	 * Attempts to write the specified command followed by a new line to the standard in stream of the process.
