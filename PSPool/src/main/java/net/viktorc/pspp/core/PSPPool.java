@@ -19,7 +19,7 @@ import java.util.logging.Logger;
  */
 public class PSPPool implements AutoCloseable {
 	
-	private final String[] processCommands;
+	private final ProcessBuilder builder;
 	private final ProcessListener listener;
 	private final int minPoolSize;
 	private final int maxPoolSize;
@@ -40,7 +40,7 @@ public class PSPPool implements AutoCloseable {
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
 	 * 
-	 * @param processCommands The commands to start the process that will be pooled.
+	 * @param builder The process builder for building the pooled processes.
 	 * @param listener A {@link #ProcessListener} instance that is added to each process in the pool. It should be stateless 
 	 * as the same instance is used for all processes.
 	 * @param minPoolSize The minimum size of the process pool.
@@ -54,13 +54,15 @@ public class PSPPool implements AutoCloseable {
 	 * @throws IOException If the process cannot be started.
 	 * @throws IllegalArgumentException If minPoolSize is less than 1 or maxPoolSize is less than minPoolSize.
 	 */
-	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize,
+	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize,
 			int queueSize, long keepAliveTime) throws IOException, IllegalArgumentException {
 		if (minPoolSize < 1)
 			throw new IllegalArgumentException("The minimum pool size has to be at least 1.");
 		if (maxPoolSize < minPoolSize)
 			throw new IllegalArgumentException("The maximum pool size has to be greater than the minimum pool size.");
-		this.processCommands = processCommands;
+		if (builder == null)
+			throw new IllegalArgumentException("The process builder cannot be null.");
+		this.builder = builder;
 		this.listener = listener;
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
@@ -91,7 +93,7 @@ public class PSPPool implements AutoCloseable {
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
 	 * 
-	 * @param processCommands The commands to start the process that will be pooled.
+	 * @param builder The process builder for building the pooled processes.
 	 * @param listener A {@link #ProcessListener} instance that is added to each process in the pool. It should be stateless 
 	 * as the same instance is used for all processes.
 	 * @param minPoolSize The minimum size of the process pool.
@@ -100,15 +102,15 @@ public class PSPPool implements AutoCloseable {
 	 * @throws IOException If the process cannot be started.
 	 * @throws IllegalArgumentException If minPoolSize is less than 1 or maxPoolSize is less than minPoolSize.
 	 */
-	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize, int queueSize)
+	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize, int queueSize)
 			throws IOException, IllegalArgumentException {
-		this(processCommands, listener, minPoolSize, maxPoolSize, queueSize, 0);
+		this(builder, listener, minPoolSize, maxPoolSize, queueSize, 0);
 	}
 	/**
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
 	 * 
-	 * @param processCommands The commands to start the process that will be pooled.
+	 * @param builder The process builder for building the pooled processes.
 	 * @param listener A {@link #ProcessListener} instance that is added to each process in the pool. It should be stateless 
 	 * as the same instance is used for all processes.
 	 * @param minPoolSize The minimum size of the process pool.
@@ -118,15 +120,15 @@ public class PSPPool implements AutoCloseable {
 	 * @throws IOException If the process cannot be started.
 	 * @throws IllegalArgumentException If minPoolSize is less than 1 or maxPoolSize is less than minPoolSize.
 	 */
-	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize, long keepAliveTime)
+	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize, long keepAliveTime)
 			throws IOException, IllegalArgumentException {
-		this(processCommands, listener, minPoolSize, maxPoolSize, -1, keepAliveTime);
+		this(builder, listener, minPoolSize, maxPoolSize, -1, keepAliveTime);
 	}
 	/**
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
 	 * 
-	 * @param processCommands The commands to start the process that will be pooled.
+	 * @param builder The process builder for building the pooled processes.
 	 * @param listener A {@link #ProcessListener} instance that is added to each process in the pool. It should be stateless 
 	 * as the same instance is used for all processes.
 	 * @param minPoolSize The minimum size of the process pool.
@@ -134,9 +136,9 @@ public class PSPPool implements AutoCloseable {
 	 * @throws IOException If the process cannot be started.
 	 * @throws IllegalArgumentException If minPoolSize is less than 1 or maxPoolSize is less than minPoolSize.
 	 */
-	public PSPPool(String[] processCommands, ProcessListener listener, int minPoolSize, int maxPoolSize)
+	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize)
 			throws IOException, IllegalArgumentException {
-		this(processCommands, listener, minPoolSize, maxPoolSize, -1, 0);
+		this(builder, listener, minPoolSize, maxPoolSize, -1, 0);
 	}
 	/**
 	 * Sets whether the pool should log to the console.
@@ -160,7 +162,7 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private void submitNewProcess() throws IOException {
 		numOfSubmittedProcesses.incrementAndGet();
-		ProcessManager p = new ProcessManager(processCommands, keepAliveTime);
+		ProcessManager p = new ProcessManager(builder, keepAliveTime);
 		if (listener != null)
 			p.addListener(listener);
 		p.addListener(new ProcessListener() {
@@ -169,7 +171,7 @@ public class PSPPool implements AutoCloseable {
 			public void onStarted(ProcessManager manager) {
 				activeProcesses.add(manager);
 				if (verbose) {
-					logger.info("Process manager #" + Long.toHexString(manager.getId()) + " started executing.");
+					logger.info("Process manager " + manager + " started executing.");
 					logPoolStats();
 				}
 				latch.countDown();
@@ -178,7 +180,7 @@ public class PSPPool implements AutoCloseable {
 			public void onTermination(ProcessManager manager, int resultCode) {
 				activeProcesses.remove(manager);
 				if (verbose) {
-					logger.info("Process manager #" + Long.toHexString(manager.getId()) + " stopped executing.");
+					logger.info("Process manager " + manager + " stopped executing.");
 					logPoolStats();
 				}
 				if (!close && (numOfSubmittedProcesses.get() <= minPoolSize || (numOfSubmittedProcesses.get() < maxPoolSize + queueSize
@@ -188,12 +190,11 @@ public class PSPPool implements AutoCloseable {
 					try {
 						p.close();
 						if (verbose)
-							logger.info("Shutting down process manager #" + Long.toHexString(manager.getId()) + ".");
+							logger.info("Shutting down process manager " + manager + ".");
 						numOfSubmittedProcesses.decrementAndGet();
 					} catch (Exception e) {
 						if (verbose)
-							logger.log(Level.SEVERE, "Error while shutting down process manager #" +
-									Long.toHexString(manager.getId()) + ".", e);
+							logger.log(Level.SEVERE, "Error while shutting down process manager " + manager + ".", e);
 					}
 				}
 			}
@@ -253,8 +254,8 @@ public class PSPPool implements AutoCloseable {
 						}
 					} catch (IOException e) {
 						if (verbose)
-							logger.log(Level.SEVERE, "Error while sending the command '" + command + "' to process manager #" +
-									Long.toHexString(p.getId()) + ".", e);
+							logger.log(Level.SEVERE, "Error while sending the command '" +
+									command + "' to process manager " + p + ".", e);
 					}
 				}
 				if (!submittedNewProcess) {

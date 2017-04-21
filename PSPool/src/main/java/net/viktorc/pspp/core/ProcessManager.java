@@ -53,14 +53,14 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	/**
 	 * Constructs a manager for the specified process without actually starting the process.
 	 * 
-	 * @param processCommands The process command.
+	 * @param builder The process builder.
 	 * @throws IOException If the process command is invalid.
 	 */
-	public ProcessManager(String[] processCommands, long keepAliveTime) throws IOException {
+	public ProcessManager(ProcessBuilder builder, long keepAliveTime) throws IOException {
 		executor = Executors.newFixedThreadPool(3);
 		startLock = new ReentrantLock();
 		commandOutputLock = new Object();
-		builder = new ProcessBuilder(processCommands);
+		this.builder = builder;
 		listeners = new ConcurrentLinkedQueue<>();
 		this.keepAliveTime = keepAliveTime;
 		timer = keepAliveTime > 0 ? new Timer() : null;
@@ -136,9 +136,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			synchronized (commandOutputLock) {
 				ready = (commandListener == null ? ready : (error ? commandListener.onNewErrorOutput(line) :
 					commandListener.onNewStandardOutput(line)));
-				if (ready) {
+				if (ready)
 					commandOutputLock.notifyAll();
-				}
 			}
 		}
 	}
@@ -178,19 +177,19 @@ public class ProcessManager implements Runnable, AutoCloseable {
 							} catch (InterruptedException e) { }
 						}
 						this.commandListener = null;
-					}
-					if (cancelAfterwards)
-						cancel();
-					else if (timer != null && task == null) {
-						task = new TimerTask() {
-							
-							@Override
-							public void run() {
-								task = null;
-								ProcessManager.this.cancel();
-							}
-						};
-						timer.schedule(task, keepAliveTime);
+						if (cancelAfterwards)
+							cancel();
+						else if (timer != null && task == null) {
+							task = new TimerTask() {
+								
+								@Override
+								public void run() {
+									task = null;
+									ProcessManager.this.cancel();
+								}
+							};
+							timer.schedule(task, keepAliveTime);
+						}
 					}
 					return System.nanoTime() - start;
 				});
@@ -309,6 +308,10 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		commandListener = null;
 		cancel();
 		executor.shutdown();
+	}
+	@Override
+	public String toString() {
+		return "#" + Long.toHexString(id);
 	}
 	
 }
