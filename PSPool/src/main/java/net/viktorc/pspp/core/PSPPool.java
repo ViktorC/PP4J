@@ -1,9 +1,11 @@
 package net.viktorc.pspp.core;
 
 import java.io.IOException;
+import java.util.ConcurrentModificationException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -30,7 +32,8 @@ public class PSPPool implements AutoCloseable {
 	private final AtomicInteger numOfExecutingProcesses;
 	private final BlockingQueue<ProcessManager> activeProcesses;
 	private final BlockingQueue<Runnable> queuedProcesses;
-	private final ThreadPoolExecutor executor;
+	private final ExecutorService commandHandlerPool;
+	private final ThreadPoolExecutor managerPool;
 	private final Logger logger;
 	private final CountDownLatch latch;
 	private volatile boolean verbose;
@@ -75,7 +78,8 @@ public class PSPPool implements AutoCloseable {
 		numOfExecutingProcesses = new AtomicInteger(0);
 		activeProcesses = new LinkedBlockingQueue<>();
 		queuedProcesses = queueSize > 0 ? new LinkedBlockingQueue<>(queueSize) : new LinkedBlockingQueue<>();
-		executor = new ThreadPoolExecutor(minPoolSize, maxPoolSize, keepAliveTime, TimeUnit.MILLISECONDS, queuedProcesses);
+		commandHandlerPool = Executors.newCachedThreadPool();
+		managerPool = new ThreadPoolExecutor(minPoolSize, maxPoolSize, keepAliveTime, TimeUnit.MILLISECONDS, queuedProcesses);
 		latch = new CountDownLatch(minPoolSize);
 		for (int i = 0; i < minPoolSize; i++)
 			submitNewProcess();
@@ -185,7 +189,7 @@ public class PSPPool implements AutoCloseable {
 				}
 				if (!close && (numOfSubmittedProcesses.get() <= minPoolSize || (numOfSubmittedProcesses.get() < maxPoolSize + queueSize
 						&& activeProcesses.size() == numOfExecutingProcesses.get())))
-					executor.execute(manager);
+					managerPool.execute(manager);
 				else {
 					try {
 						p.close();
@@ -199,7 +203,7 @@ public class PSPPool implements AutoCloseable {
 				}
 			}
 		});
-		executor.execute(p);
+		managerPool.execute(p);
 	}
 	/**
 	 * Executes the command on any of the available processes in the pool. It blocks until the command could successfully be 
@@ -210,78 +214,85 @@ public class PSPPool implements AutoCloseable {
 	 * the process and determines when the process has finished processing the sent command.
 	 * @param cancelProcessAfterwards Whether the process that executed the command should be cancelled after 
 	 * the execution of the command.
-	 * @return A {@link #java.util.concurrent.Future<?> Future} instance for the submitted command.
 	 */
-	public Future<?> executeCommand(String command, CommandListener commandListener, boolean cancelProcessAfterwards) {
-		try {
-			boolean submittedNewProcess = false;
-			long start = System.nanoTime();
-			CommandListener listener = new CommandListener() {
-				
-				@Override
-				public boolean onNewStandardOutput(String standardOutput) {
-					boolean out = commandListener.onNewStandardOutput(standardOutput);
-					if (out) {
-						numOfExecutingProcesses.decrementAndGet();
-						if (verbose)
-							logPoolStats();
-					}
-					return out;
-				}
-				
-				@Override
-				public boolean onNewErrorOutput(String errorOutput) {
-					boolean out = commandListener.onNewErrorOutput(errorOutput);
-					if (out) {
-						numOfExecutingProcesses.decrementAndGet();
-						if (verbose)
-							logPoolStats();
-					}
-					return out;
-				}
-			};
-			while (true) {
-				for (ProcessManager p : activeProcesses) {
-					try {
-						Future<?> future = p.sendCommand(command, listener, cancelProcessAfterwards);
-						if (future != null) {
-							numOfExecutingProcesses.incrementAndGet();
-							if (verbose) {
-								logger.info("Command submission wait time: " + (System.nanoTime() - start));
+	public void executeCommand(String command, CommandListener commandListener, boolean cancelProcessAfterwards) {
+		long start = System.nanoTime();
+		commandHandlerPool.submit(() -> {
+			try {
+				boolean submittedNewProcess = false;
+				CommandListener listener = new CommandListener() {
+					
+					@Override
+					public boolean onNewStandardOutput(String standardOutput) {
+						boolean out = commandListener.onNewStandardOutput(standardOutput);
+						if (out) {
+							numOfExecutingProcesses.decrementAndGet();
+							if (verbose)
 								logPoolStats();
-							}
-							return future;
 						}
-					} catch (IOException e) {
-						if (verbose)
-							logger.log(Level.SEVERE, "Error while sending the command '" +
-									command + "' to process manager " + p + ".", e);
+						return out;
 					}
-				}
-				if (!submittedNewProcess) {
-					synchronized (submitLock) {
-						if (queueSize < 1 || numOfSubmittedProcesses.get() < maxPoolSize + queueSize) {
+					
+					@Override
+					public boolean onNewErrorOutput(String errorOutput) {
+						boolean out = commandListener.onNewErrorOutput(errorOutput);
+						if (out) {
+							numOfExecutingProcesses.decrementAndGet();
+							if (verbose)
+								logPoolStats();
+						}
+						return out;
+					}
+				};
+				while (true) {
+					try {
+						for (ProcessManager p : activeProcesses) {
 							try {
-								submitNewProcess();
-								submittedNewProcess = true;
+								long submit = System.nanoTime();
+								if (p.sendCommand(command, s -> numOfExecutingProcesses.incrementAndGet(), listener,
+										cancelProcessAfterwards)) {
+									if (verbose) {
+										logger.info(String.format("Submission delay: %.3f; Command execution time: %.3f%n",
+												(float) (((double) submit)/1000000000), (float) (((double) (System.nanoTime() - start))/1000000000)));
+										logPoolStats();
+									}
+									return;
+								}
 							} catch (IOException e) {
 								if (verbose)
-									logger.log(Level.SEVERE, "Error while submitting a new process.", e);
+									logger.log(Level.SEVERE, "Error while sending the command '" +
+											command + "' to process manager " + p + ".", e);
+							}
+						}
+					} catch (ConcurrentModificationException e) {
+						if (verbose)
+							logger.log(Level.WARNING, "List of processes concurrently modified.", e);
+					}
+					if (!submittedNewProcess) {
+						synchronized (submitLock) {
+							if (queueSize < 1 || numOfSubmittedProcesses.get() < maxPoolSize + queueSize) {
+								try {
+									submitNewProcess();
+									submittedNewProcess = true;
+								} catch (IOException e) {
+									if (verbose)
+										logger.log(Level.SEVERE, "Error while submitting a new process.", e);
+								}
 							}
 						}
 					}
 				}
-			}
-		} finally {
-			if (numOfSubmittedProcesses.get() < maxPoolSize + queueSize && activeProcesses.size() == numOfExecutingProcesses.get()) {
-				try {
-					submitNewProcess();
-				} catch (IOException e) {
-					if (verbose)
-						logger.log(Level.SEVERE, "Error while submitting a new process.", e);
+			} finally {
+				if (numOfSubmittedProcesses.get() < maxPoolSize + queueSize && activeProcesses.size() == numOfExecutingProcesses.get()) {
+					try {
+						submitNewProcess();
+					} catch (IOException e) {
+						if (verbose)
+							logger.log(Level.SEVERE, "Error while submitting a new process.", e);
+					}
 				}
 			}
-		}
+		});
 	}
 	@Override
 	public void close() throws Exception {
@@ -290,7 +301,8 @@ public class PSPPool implements AutoCloseable {
 			p.clearListeners();
 			p.close();
 		}
-		executor.shutdown();
+		commandHandlerPool.shutdown();
+		managerPool.shutdown();
 	}
 	
 }
