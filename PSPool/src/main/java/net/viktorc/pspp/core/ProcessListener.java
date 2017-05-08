@@ -12,19 +12,8 @@ package net.viktorc.pspp.core;
 public interface ProcessListener {
 	
 	/**
-	 * A 'blank' process listener instance that ignores the process events.
-	 */
-	public static final ProcessListener NULL_LISTENER = new ProcessListener() {
-
-		@Override
-		public void onStarted(ProcessManager manager) { }
-		@Override
-		public void onTermination(ProcessManager manager, int resultCode) { }
-	};
-	
-	/**
-	 * A method called right after the process is started. Its main purpose is to allow for preliminary 
-	 * activities such as pre-loading.
+	 * A method called right after the process is started. Its main purpose is to allow for startup 
+	 * activities such as the execution of preliminary commands.
 	 * 
 	 * @param manager The {@link #ProcessManager} instance to which the listener is subscribed. It 
 	 * serves as a handle for sending commands to the underlying process after startup if needed.
@@ -34,9 +23,8 @@ public interface ProcessListener {
 	 * A method called right after the process terminates. Its main purpose is to allow for wrap-up 
 	 * activities.
 	 * 
-	 * @param manager The {@link #ProcessManager} instance to which the listener is subscribed..
 	 * @param resultCode The result code the process returned.
 	 */
-	void onTermination(ProcessManager manager, int resultCode);
+	void onTermination(int resultCode);
 	
 }

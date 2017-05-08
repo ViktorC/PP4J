@@ -63,28 +63,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		id = (new Random()).nextLong();
 	}
 	/**
-	 * Subscribes a process listener to the manager instance.
-	 * 
-	 * @param listener The instance of {@link #ProcessListener ProcessListner} to add.
-	 */
-	public void addListener(ProcessListener listener) {
-		listeners.add(listener);
-	}
-	/**
-	 * Removes a process listener from the manager instance if it is already subscribed.
-	 * 
-	 * @param listener The instance of {@link #ProcessListener ProcessListner} to remove.
-	 */
-	public void removeListener(ProcessListener listener) {
-		listeners.remove(listener);
-	}
-	/**
-	 * Removes all subscribed listeners.
-	 */
-	public void clearListeners() {
-		listeners.clear();
-	}
-	/**
 	 * Returns the 64 bit ID number of the instance.
 	 * 
 	 * @return The ID of the instance.
@@ -93,11 +71,33 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		return id;
 	}
 	/**
+	 * Subscribes a process listener to the manager instance.
+	 * 
+	 * @param listener The instance of {@link #ProcessListener ProcessListner} to add.
+	 */
+	protected void addListener(ProcessListener listener) {
+		listeners.add(listener);
+	}
+	/**
+	 * Removes a process listener from the manager instance if it is already subscribed.
+	 * 
+	 * @param listener The instance of {@link #ProcessListener ProcessListner} to remove.
+	 */
+	protected void removeListener(ProcessListener listener) {
+		listeners.remove(listener);
+	}
+	/**
+	 * Removes all subscribed listeners.
+	 */
+	protected void clearListeners() {
+		listeners.clear();
+	}
+	/**
 	 * Returns whether the process is currently running.
 	 * 
 	 * @return Whether the process is currently running.
 	 */
-	public boolean isRunning() {
+	protected boolean isRunning() {
 		return running;
 	}
 	/**
@@ -105,13 +105,13 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * 
 	 * @return Whether the manager is ready to process commands.
 	 */
-	public boolean isReady() {
+	protected boolean isReady() {
 		return running && !stop && (!lock.isLocked() || lock.isHeldByCurrentThread());
 	}
 	/**
 	 * It prompts the currently running process, if there is one, to terminate.
 	 */
-	public void cancel() {
+	protected void cancel() {
 		lock.lock();
 		try {
 			stop = true;
@@ -297,7 +297,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			}
 			// Execute the onTermination listener methods.
 			for (ProcessListener l : listeners)
-				l.onTermination(this, rc.get());
+				l.onTermination(rc.get());
 		}
 	}
 	@Override

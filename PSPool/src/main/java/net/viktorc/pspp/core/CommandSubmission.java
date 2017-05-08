@@ -11,16 +11,16 @@ import java.util.concurrent.Future;
 public class CommandSubmission {
 	
 	private final String command;
-	private final CommandListener listener;
 	private final boolean cancelAfterwards;
 	private final long creationTime;
+	private CommandListener listener;
 	private Long submissionTime;
 	private Long processedTime;
 	private boolean processed;
 	private volatile Future<?> future;
 	
 	/**
-	 * Constructs an instance.
+	 * Constructs an instance according to the specified parameters.
 	 * 
 	 * @param command The command to write to the process' standard in.
 	 * @param listener An instance of {@link #CommandListener} for consuming the subsequent outputs of the process and 
@@ -28,12 +28,31 @@ public class CommandSubmission {
 	 * these outputs. If it is null, the process manager will not accept any other command for the rest of the current 
 	 * progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
 	 * @param cancelAfterwards Whether the process should be cancelled after the execution of the command.
+	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
 	 */
 	public CommandSubmission(String command, CommandListener listener, boolean cancelAfterwards) {
+		if (command == null)
+			throw new IllegalArgumentException("The command cannot be null or empty.");
+		if (listener == null)
+			throw new IllegalArgumentException("The command listener cannot be null.");
 		this.command = command;
 		this.listener = listener;
 		this.cancelAfterwards = cancelAfterwards;
 		creationTime = System.nanoTime();
+	}
+	/**
+	 * Constructs an instance according to the specified parameters. The process will not be forcibly cancelled after 
+	 * the execution of the command.
+	 * 
+	 * @param command The command to write to the process' standard in.
+	 * @param listener An instance of {@link #CommandListener} for consuming the subsequent outputs of the process and 
+	 * for determining whether the process has finished processing the command and is ready for new commands based on 
+	 * these outputs. If it is null, the process manager will not accept any other command for the rest of the current 
+	 * progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
+	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
+	 */
+	public CommandSubmission(String command, CommandListener listener) {
+		this(command, listener, false);
 	}
 	/**
 	 * Returns the command to write to the process' standard in.
@@ -66,7 +85,7 @@ public class CommandSubmission {
 	 * 
 	 * @return The time when the instance was constructed in nanoseconds.
 	 */
-	public long getCreationTime() {
+	long getCreationTime() {
 		return creationTime;
 	}
 	/**
@@ -75,7 +94,7 @@ public class CommandSubmission {
 	 * 
 	 * @return The time when the command was submitted in nanoseconds or null.
 	 */
-	public Long getSubmissionTime() {
+	Long getSubmissionTime() {
 		return submissionTime;
 	}
 	/**
@@ -84,7 +103,7 @@ public class CommandSubmission {
 	 * 
 	 * @return The time when the command was processed in nanoseconds or null.
 	 */
-	public Long getProcessedTime() {
+	Long getProcessedTime() {
 		return processedTime;
 	}
 	/**
@@ -92,7 +111,7 @@ public class CommandSubmission {
 	 * 
 	 * @return Whether the command has already been processed.
 	 */
-	public boolean isProcessed() {
+	boolean isProcessed() {
 		return processed;
 	}
 	/**

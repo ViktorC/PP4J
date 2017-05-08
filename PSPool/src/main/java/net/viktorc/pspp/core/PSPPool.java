@@ -41,7 +41,9 @@ public class PSPPool implements AutoCloseable {
 	private final ExecutorService commandExecutor;
 	private final BlockingQueue<CommandSubmission> commandQueue;
 	private final AtomicInteger numOfExecutingCommands;
+	private CountDownLatch submissionLatch;
 	private final Logger logger;
+	private volatile boolean submissionSuccessful;
 	private volatile boolean verbose;
 	private volatile boolean close;
 
@@ -123,34 +125,34 @@ public class PSPPool implements AutoCloseable {
 	 * @return The time it took to execute the command including the submission delay in nanoseconds.
 	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
 	 */
-	public Future<Long> submitCommand(String command, CommandListener commandListener, boolean cancelProcessAfterwards) {
-		if (command == null)
+	public Future<Long> submitCommand(CommandSubmission submission) {
+		if (submission == null)
 			throw new IllegalArgumentException("The command cannot be null or empty.");
-		if (commandListener == null)
-			throw new IllegalArgumentException("The command listener cannot be null.");
 		CommandListener listener = new CommandListener() {
 			
 			@Override
 			public boolean onNewStandardOutput(String standardOutput) {
-				return commandListener.onNewStandardOutput(standardOutput);
+				return submission.getListener().onNewStandardOutput(standardOutput);
 			}
 			@Override
 			public boolean onNewErrorOutput(String errorOutput) {
-				return commandListener.onNewErrorOutput(errorOutput);
+				return submission.getListener().onNewErrorOutput(errorOutput);
 			}
 			@Override
 			public void onSubmitted() {
-				commandListener.onSubmitted();
+				submissionSuccessful = true;
+				latch.countDown();
+				submission.getListener().onSubmitted();
 				numOfExecutingCommands.incrementAndGet();
 			}
 			@Override
 			public void onFinished() {
-				commandListener.onFinished();
+				submission.getListener().onFinished();
 				numOfExecutingCommands.decrementAndGet();
 			}
 		};
-		CommandSubmission submission = new CommandSubmission(command, listener, cancelProcessAfterwards);
-		commandQueue.add(submission);
+		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommand(), listener, submission.doCancelAfterwards());
+		commandQueue.add(internalSubmission);
 		synchronized (this) {
 			notifyAll();
 		}
@@ -160,36 +162,36 @@ public class PSPPool implements AutoCloseable {
 			
 			@Override
 			public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-				commandQueue.remove(submission);
+				commandQueue.remove(internalSubmission);
 				if (mayInterruptIfRunning) {
-					Future<?> submissionFuture = submission.getFuture();
+					Future<?> submissionFuture = internalSubmission.getFuture();
 					if (submissionFuture != null)
 						submissionFuture.cancel(true);
 				}
 				cancelled = true;
-				synchronized (submission) {
-					submission.notifyAll();
+				synchronized (internalSubmission) {
+					internalSubmission.notifyAll();
 				}
 				return true;
 			}
 			@Override
 			public Long get() throws InterruptedException, ExecutionException {
-				while (!submission.isProcessed() && !cancelled) {
-					synchronized (submission) {
-						submission.wait();
+				while (!internalSubmission.isProcessed() && !cancelled) {
+					synchronized (internalSubmission) {
+						internalSubmission.wait();
 					}
 				}
-				return cancelled ? null : submission.getProcessedTime() - submission.getCreationTime();
+				return cancelled ? null : internalSubmission.getProcessedTime() - internalSubmission.getCreationTime();
 			}
 			@Override
 			public Long get(long timeout, TimeUnit unit)
 					throws InterruptedException, ExecutionException, TimeoutException {
 				long timeoutNs = unit.toNanos(timeout);
 				long start = System.nanoTime();
-				while (!submission.isProcessed() && !cancelled && timeoutNs > 0) {
-					synchronized (submission) {
+				while (!internalSubmission.isProcessed() && !cancelled && timeoutNs > 0) {
+					synchronized (internalSubmission) {
 						try {
-							submission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
+							internalSubmission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
 							break;
 						} catch (InterruptedException e) {
 							timeoutNs -= (System.nanoTime() - start);
@@ -197,7 +199,7 @@ public class PSPPool implements AutoCloseable {
 					}
 				}
 				return cancelled || timeoutNs <= 0 ? null :
-						submission.getProcessedTime() - submission.getCreationTime();
+						internalSubmission.getProcessedTime() - internalSubmission.getCreationTime();
 			}
 			@Override
 			public boolean isCancelled() {
@@ -205,7 +207,7 @@ public class PSPPool implements AutoCloseable {
 			}
 			@Override
 			public boolean isDone() {
-				return submission.isProcessed();
+				return internalSubmission.isProcessed();
 			}
 		};
 	}
@@ -247,24 +249,24 @@ public class PSPPool implements AutoCloseable {
 				latch.countDown();
 			}
 			@Override
-			public void onTermination(ProcessManager manager, int resultCode) {
-				activeProcesses.remove(manager);
+			public void onTermination(int resultCode) {
+				activeProcesses.remove(p);
 				if (verbose) {
-					logger.info("Process manager " + manager + " stopped executing.");
+					logger.info("Process manager " + p + " stopped executing.");
 					logPoolStats();
 				}
 				synchronized (poolLock) {
 					if (doAddNewProcess())
-						poolExecutor.execute(manager);
+						poolExecutor.execute(p);
 					else {
 						try {
 							p.close();
 							if (verbose)
-								logger.info("Shutting down process manager " + manager + ".");
+								logger.info("Shutting down process manager " + p + ".");
 							totalNumOfProcesses.decrementAndGet();
 						} catch (Exception e) {
 							if (verbose)
-								logger.log(Level.SEVERE, "Error while shutting down process manager " + manager + ".", e);
+								logger.log(Level.SEVERE, "Error while shutting down process manager " + p + ".", e);
 						}
 					}
 				}
@@ -294,26 +296,36 @@ public class PSPPool implements AutoCloseable {
 				CommandSubmission submission = optionalSubmission.get();
 				for (ProcessManager manager : activeProcesses) {
 					if (manager.isReady()) {
-						submission.setFuture(commandExecutor.submit(() -> {
+						submissionLatch = new CountDownLatch(1);
+						Future<?> future = commandExecutor.submit(() -> {
 							try {
 								if (manager.executeCommand(submission)) {
 									if (verbose)
-										logger.info(String.format("Command %s processed; submission took: %.3f;" +
-												" execution took %.3f.%n", submission.getCommand(),
+										logger.info(String.format("Command %s processed; submission delay: %.3f;" +
+												" execution time: %.3f.%n", submission.getCommand(),
 												(float) ((double) (submission.getSubmissionTime() -
 												submission.getCreationTime())/1000000000),
 												(float) ((double) (submission.getProcessedTime() -
 												submission.getSubmissionTime())/1000000000)));
+								} else {
+									submissionSuccessful = false;
+									submissionLatch.countDown();
 								}
 							} catch (IOException e) {
 								if (verbose)
 									logger.log(Level.SEVERE, "Error while submitting command " +
 											submission.getCommand() + ".", e);
 							}
-						}));
-						commandQueue.remove(submission);
-						optionalSubmission = Optional.empty();
-						break;
+						});
+						try {
+							submissionLatch.await();
+						} catch (InterruptedException e) { }
+						if (submissionSuccessful) {
+							submission.setFuture(future);
+							commandQueue.remove(submission);
+							optionalSubmission = Optional.empty();
+							break;
+						}
 					}
 				}
 				synchronized (poolLock) {
