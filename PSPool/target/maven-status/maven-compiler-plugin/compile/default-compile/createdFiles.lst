@@ -1,7 +1,0 @@
-net\viktorc\pspp\core\ProcessListener.class
-net\viktorc\pspp\core\CommandListener.class
-net\viktorc\pspp\core\ProcessManagerException.class
-net\viktorc\pspp\core\ProcessManager.class
-net\viktorc\pspp\core\PSPPool$1.class
-net\viktorc\pspp\core\ProcessListener$1.class
-net\viktorc\pspp\core\PSPPool.class

@@ -14,7 +14,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 
 /**
  * A runnable class for starting, managing, and interacting with processes. The process is started by calling the 
@@ -43,7 +42,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
 	private TimerTask task;
-	private volatile CommandListener commandListener;
+	private volatile CommandSubmission submission;
 	private volatile boolean commandProcessed;
 	private volatile boolean running;
 	private volatile boolean stop;
@@ -102,6 +101,85 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		return running;
 	}
 	/**
+	 * Returns whether the manager is ready process new commands.
+	 * 
+	 * @return Whether the manager is ready to process commands.
+	 */
+	public boolean isReady() {
+		return running && !stop && (!lock.isLocked() || lock.isHeldByCurrentThread());
+	}
+	/**
+	 * It prompts the currently running process, if there is one, to terminate.
+	 */
+	public void cancel() {
+		lock.lock();
+		try {
+			stop = true;
+			if (process != null)
+				process.destroy();
+		} finally {
+			lock.unlock();
+		}
+	}
+	/**
+	 * Attempts to write the specified command followed by a new line to the standard in stream of the process and blocks 
+	 * until it is processed.
+	 * 
+	 * @param commandSubmission The command to execute including a listener for new output lines.
+	 * @return Whether the command was submitted for execution. If the manager is busy processing another command, it 
+	 * returns false; otherwise the command is submitted and true is returned once it's processed.
+	 * @throws IOException If the command cannot be written to the standard in stream.
+	 */
+	public boolean executeCommand(CommandSubmission commandSubmission)
+			throws IOException {
+		if (running && !stop && lock.tryLock()) {
+			try {
+				if (task != null) {
+					task.cancel();
+					task = null;
+				}
+				submission = commandSubmission;
+				commandProcessed = false;
+				stdInWriter.write(submission.getCommand());
+				stdInWriter.newLine();
+				stdInWriter.flush();
+				submission.getListener().onSubmitted();
+				synchronized (lock) {
+					while (running && !stop && !commandProcessed) {
+						try {
+							lock.wait();
+						} catch (InterruptedException e) { }
+					}
+				}
+				if (running && !stop) {
+					if (submission.doCancelAfterwards())
+						cancel();
+					else if (timer != null && task == null) {
+						task = new TimerTask() {
+							
+							@Override
+							public void run() {
+								task = null;
+								ProcessManager.this.cancel();
+							}
+						};
+						timer.schedule(task, keepAliveTime);
+					}
+				}
+				return true;
+			} finally {
+				submission.getListener().onFinished();
+				submission.setProcessedToTrue();
+				synchronized (submission) {
+					submission.notifyAll();
+				}
+				submission = null;
+				lock.unlock();
+			}
+		} else
+			return false;
+	}
+	/**
 	 * Starts listening to the specified channel.
 	 * 
 	 * @param reader The channel to listen to.
@@ -131,147 +209,16 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			if (line.isEmpty())
 				continue;
 			synchronized (lock) {
-				commandProcessed = (commandListener == null ? commandProcessed :
-					(error ? commandListener.onNewErrorOutput(line) : commandListener.onNewStandardOutput(line)));
-				if (commandProcessed)
-					lock.notifyAll();
+				try {
+					commandProcessed = (submission == null ? commandProcessed :
+							(error ? submission.getListener().onNewErrorOutput(line) :
+							submission.getListener().onNewStandardOutput(line)));
+				} finally {
+					if (commandProcessed)
+						lock.notifyAll();
+				}
 			}
 		}
-	}
-	/**
-	 * Attempts to write the specified command followed by a new line to the standard in stream of the process and blocks 
-	 * until it is processed.
-	 * 
-	 * @param command The command to write to the process' standard in.
-	 * @param onSubmitted A consumer that is executed when the command is actually written to the standard in of the 
-	 * underlying process with the command itself as its argument. If the command is not accepted  because the manager 
-	 * is occupied with another command, the consumer is not executed. If it is null, it is ignored.
-	 * @param commandListener An instance of {@link #CommandListener CommandListener} for consuming the subsequent 
-	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
-	 * for new commands based on these outputs. If it is null, the process manager will not accept any other command for 
-	 * the rest of the current progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
-	 * @param cancelAfterwards Whether the process should be cancelled after the execution of the command.
-	 * @return Whether the command was submitted for execution. If the manager is busy processing another command, it 
-	 * returns false; otherwise the command is submitted and true is returned once it's processed.
-	 * @throws IOException If the command cannot be written to the standard in stream.
-	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
-	 */
-	public boolean sendCommand(String command, Consumer<String> onSubmitted, CommandListener commandListener,
-			boolean cancelAfterwards) throws IOException, IllegalArgumentException {
-		if (command == null)
-			throw new IllegalArgumentException("The command cannot be null or empty.");
-		if (commandListener == null)
-			throw new IllegalArgumentException("The command listener cannot be null.");
-		if (!stop && lock.tryLock()) {
-			try {
-				if (task != null) {
-					task.cancel();
-					task = null;
-				}
-				this.commandListener = commandListener;
-				commandProcessed = false;
-				stdInWriter.write(command);
-				stdInWriter.newLine();
-				stdInWriter.flush();
-				if (onSubmitted != null)
-					onSubmitted.accept(command);
-				synchronized (lock) {
-					while (!commandProcessed) {
-						try {
-							lock.wait();
-						} catch (InterruptedException e) { }
-					}
-				}
-				this.commandListener = null;
-				if (cancelAfterwards)
-					cancel();
-				else if (timer != null && task == null) {
-					task = new TimerTask() {
-						
-						@Override
-						public void run() {
-							task = null;
-							ProcessManager.this.cancel();
-						}
-					};
-					timer.schedule(task, keepAliveTime);
-				}
-				return true;
-			} finally {
-				lock.unlock();
-			}
-		} else
-			return false;
-	}
-	/**
-	 * Attempts to write the specified command followed by a new line to the standard in stream of the process and blocks 
-	 * until it is processed.
-	 * 
-	 * @param command The command to write to the process' standard in.
-	 * @param commandListener An instance of {@link #CommandListener CommandListener} for consuming the subsequent 
-	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
-	 * for new commands based on these outputs. If it is null, the process manager will not accept any other command for 
-	 * the rest of the current progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
-	 * @param cancelAfterwards Whether the process should be cancelled after the execution of the command.
-	 * @return Whether the command was submitted for execution. If the manager is busy processing another command, it 
-	 * returns false; otherwise the command is submitted and true is returned once it's processed.
-	 * @throws IOException If the command cannot be written to the standard in stream.
-	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
-	 */
-	public boolean sendCommand(String command, CommandListener commandListener, boolean cancelAfterwards)
-			throws IOException, IllegalArgumentException {
-		return sendCommand(command, null, commandListener, cancelAfterwards);
-	}
-	/**
-	 * Attempts to write the specified command followed by a new line to the standard in stream of the process and blocks 
-	 * until it is processed.
-	 * 
-	 * @param command The command to write to the process' standard in.
-	 * @param onSubmitted A consumer that is executed when the command is actually written to the standard in of the 
-	 * underlying process with the command itself as its argument. If the command is not accepted  because the manager 
-	 * is occupied with another command, the consumer is not executed. If it is null, it is ignored.
-	 * @param commandListener An instance of {@link #CommandListener CommandListener} for consuming the subsequent 
-	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
-	 * for new commands based on these outputs. If it is null, the process manager will not accept any other command for 
-	 * the rest of the current progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
-	 * @return Whether the command was submitted for execution. If the manager is busy processing another command, it 
-	 * returns false; otherwise the command is submitted and true is returned once it's processed.
-	 * @throws IOException If the command cannot be written to the standard in stream.
-	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
-	 */
-	public boolean sendCommand(String command, Consumer<String> onSubmitted, CommandListener commandListener)
-			throws IOException, IllegalArgumentException {
-		return sendCommand(command, onSubmitted, commandListener, false);
-	}
-	/**
-	 * Attempts to write the specified command followed by a new line to the standard in stream of the process and blocks 
-	 * until it is processed.
-	 * 
-	 * @param command The command to write to the process' standard in.
-	 * @param commandListener An instance of {@link #CommandListener CommandListener} for consuming the subsequent 
-	 * outputs of the process and for determining whether the process has finished processing the command and is ready 
-	 * for new commands based on these outputs. If it is null, the process manager will not accept any other command for 
-	 * the rest of the current progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
-	 * @return Whether the command was submitted for execution. If the manager is busy processing another command, it 
-	 * returns false; otherwise the command is submitted and true is returned once it's processed.
-	 * @throws IOException If the command cannot be written to the standard in stream.
-	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
-	 */
-	public boolean sendCommand(String command, CommandListener commandListener)
-			throws IOException, IllegalArgumentException {
-		return sendCommand(command, null, commandListener, false);
-	}
-	/**
-	 * It prompts the currently running process, if there is one, to terminate.
-	 */
-	public void cancel() {
-		if (task != null) {
-			task.cancel();
-			task = null;
-		}
-		stop = true;
-		if (process != null)
-			process.destroy();
 	}
 	@Override
 	public synchronized void run() throws ProcessManagerException {
@@ -319,12 +266,16 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				lock.unlock();
 			}
 			rc.set(process.waitFor());
-		} catch (IOException | InterruptedException e) {
+		} catch (Exception e) {
 			// Set the result code to the value associated with unexpected termination.
 			rc.set(UNEXPECTED_TERMINATION_RESULT_CODE);
 			throw new ProcessManagerException(e);
 		} finally {
 			// Try to clean up and close all the resources.
+			if (task != null) {
+				task.cancel();
+				task = null;
+			}
 			if (stdOutReader != null) {
 				try {
 					stdOutReader.close();
@@ -341,6 +292,9 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				} catch (IOException e) { }
 			}
 			running = false;
+			synchronized (lock) {
+				lock.notifyAll();
+			}
 			// Execute the onTermination listener methods.
 			for (ProcessListener l : listeners)
 				l.onTermination(this, rc.get());
@@ -350,7 +304,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	public void close() throws Exception {
 		if (timer != null)
 			timer.cancel();
-		commandListener = null;
+		submission = null;
 		cancel();
 		executor.shutdown();
 	}
