@@ -13,7 +13,7 @@ public interface ProcessListener {
 	
 	/**
 	 * A method called right after the process is started. Its main purpose is to allow for startup 
-	 * activities such as the execution of preliminary commands.
+	 * activities such as the execution of commands.
 	 * 
 	 * @param manager The {@link #ProcessManager} instance to which the listener is subscribed. It 
 	 * serves as a handle for sending commands to the underlying process after startup if needed.

@@ -3,7 +3,7 @@ package net.viktorc.pspp.core;
 import java.util.concurrent.Future;
 
 /**
- * A class that holds all information necessary for executing commands in {@link #ProcessManager} instances.
+ * A class that holds all information necessary for executing and processing commands in {@link #ProcessManager} instances.
  * 
  * @author Viktor
  *

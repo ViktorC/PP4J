@@ -3,14 +3,16 @@ package net.viktorc.pspp.core;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.BlockingQueue;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -18,6 +20,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.PooledObjectFactory;
+import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.apache.commons.pool2.impl.GenericObjectPool;
 
 /**
  * A class for maintaining and managing a pool of identical pre-started processes.
@@ -27,21 +34,18 @@ import java.util.logging.Logger;
  */
 public class PSPPool implements AutoCloseable {
 	
-	private final ProcessBuilder builder;
-	private final ProcessListener listener;
 	private final int minPoolSize;
 	private final int maxPoolSize;
 	private final int reserveSize;
-	private final long keepAliveTime;
+	private final GenericObjectPool<ProcessManager> managerPool;
 	private final ThreadPoolExecutor poolExecutor;
 	private final List<ProcessManager> activeProcesses;
-	private final AtomicInteger totalNumOfProcesses;
 	private final Object poolLock;
-	private final CountDownLatch latch;
+	private final CountDownLatch startupLatch;
 	private final ExecutorService commandExecutor;
-	private final BlockingQueue<CommandSubmission> commandQueue;
+	private final Queue<CommandSubmission> commandQueue;
+	private final Semaphore submissionSemaphore;
 	private final AtomicInteger numOfExecutingCommands;
-	private CountDownLatch submissionLatch;
 	private final Logger logger;
 	private volatile boolean submissionSuccessful;
 	private volatile boolean verbose;
@@ -61,7 +65,7 @@ public class PSPPool implements AutoCloseable {
 	 * life-cycle of the processes will not be limited.
 	 * @throws IOException If the process cannot be started.
 	 * @throws IllegalArgumentException If the minimum pool size is less than 0, or the maximum pool size is less than the 
-	 * minimum pool size or 1, or the reserve size is less than 0 or greater than the minimum pool size, or the listener is null.
+	 * minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size, or the listener is null.
 	 */
 	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize,
 			int reserveSize, long keepAliveTime) throws IOException, IllegalArgumentException {
@@ -70,34 +74,98 @@ public class PSPPool implements AutoCloseable {
 		if (maxPoolSize < 1 || maxPoolSize < minPoolSize)
 			throw new IllegalArgumentException("The maximum pool size has to be at least 1 and at least as great as the " +
 					"minimum pool size.");
-		if (reserveSize < 0 || reserveSize > minPoolSize)
-			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the minimum pool size.");
+		if (reserveSize < 0 || reserveSize > maxPoolSize)
+			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
 		if (builder == null)
 			throw new IllegalArgumentException("The process builder cannot be null.");
-		this.builder = builder;
-		this.listener = listener;
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
-		this.keepAliveTime = keepAliveTime;
 		this.verbose = verbose;
-		totalNumOfProcesses = new AtomicInteger(0);
-		poolExecutor = new ThreadPoolExecutor(minPoolSize, maxPoolSize, keepAliveTime, TimeUnit.MILLISECONDS,
-				new SynchronousQueue<>());
+		managerPool = new GenericObjectPool<>(new PooledObjectFactory<ProcessManager>() {
+
+			@Override
+			public PooledObject<ProcessManager> makeObject() throws Exception {
+				ProcessManager manager = new ProcessManager(builder, keepAliveTime);
+				if (listener != null)
+					manager.addListener(listener);
+				manager.addListener(new ProcessListener() {
+					
+					@Override
+					public void onStarted(ProcessManager manager) {
+						activeProcesses.add(manager);
+						if (verbose) {
+							logger.info("Process manager " + manager + " started executing.");
+							logPoolStats();
+						}
+						startupLatch.countDown();
+					}
+					@Override
+					public void onTermination(int resultCode) {
+						activeProcesses.remove(manager);
+						if (verbose) {
+							logger.info("Process manager " + manager + " stopped executing.");
+							logPoolStats();
+						}
+						synchronized (poolLock) {
+							if (doStartNewProcess(true)) {
+								startNewProcess();
+							}
+						}
+						try {
+							managerPool.returnObject(manager);
+						} catch (Exception e) {
+							if (verbose)
+								logger.log(Level.SEVERE, "Error deactivating process manager " + manager + ".");
+						}
+					}
+				});
+				return new DefaultPooledObject<ProcessManager>(manager);
+			}
+			@Override
+			public void activateObject(PooledObject<ProcessManager> p) throws Exception { }
+			@Override
+			public boolean validateObject(PooledObject<ProcessManager> p) {
+				return !p.getObject().isRunning();
+			}
+			@Override
+			public void passivateObject(PooledObject<ProcessManager> p) throws Exception { }
+			@Override
+			public void destroyObject(PooledObject<ProcessManager> p) throws Exception {
+				ProcessManager manager = p.getObject();
+				manager.clearListeners();
+				manager.close();
+			}
+			
+		});
+		int actualMinSize = Math.max(minPoolSize, reserveSize);
+		managerPool.setMinIdle(actualMinSize);
+		poolExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
+				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
 		activeProcesses = new CopyOnWriteArrayList<>();
 		poolLock = new Object();
-		latch = new CountDownLatch(minPoolSize);
+		startupLatch = new CountDownLatch(actualMinSize);
 		commandExecutor = Executors.newCachedThreadPool();
-		commandQueue = new LinkedBlockingQueue<>();
+		commandQueue = new ConcurrentLinkedQueue<>();
+		submissionSemaphore = new Semaphore(0);
 		numOfExecutingCommands = new AtomicInteger(0);
 		logger = Logger.getAnonymousLogger();
-		for (int i = 0; i < minPoolSize; i++)
-			addNewProccess();
+		try {
+			managerPool.preparePool();
+		} catch (Exception e) {
+			if (verbose)
+				logger.log(Level.SEVERE, "Error while preparing the process managers.", e);
+		}
+		for (int i = 0; i < actualMinSize; i++) {
+			synchronized (poolLock) {
+				startNewProcess();
+			}
+		}
 		// Wait for the processes in the initial pool to start up.
 		try {
-			latch.await();
+			startupLatch.await();
 			// Allow the start up locks in the managers to be released.
-			Thread.sleep(100);
+			Thread.sleep(10);
 		} catch (InterruptedException e) {
 			if (verbose)
 				logger.log(Level.SEVERE, "Error while waiting for the pool to start up.", e);
@@ -112,6 +180,99 @@ public class PSPPool implements AutoCloseable {
 	 */
 	public void setLogging(boolean on) {
 		verbose = on;
+	}
+	/**
+	 * Logs the number of active, queued, and currently executing processes.
+	 */
+	private void logPoolStats() {
+		logger.info("Total processes: " + poolExecutor.getActiveCount() + "; acitve processes: " + activeProcesses.size() +
+				"; submitted commands: " + (numOfExecutingCommands.get() + commandQueue.size()));
+	}
+	/**
+	 * Returns whether a new process should be started.
+	 * 
+	 * @param alreadyInPool Whether the manager whose process is to be started is already in the pool.
+	 * @return Whether a new process should be started.
+	 */
+	private boolean doStartNewProcess(boolean alreadyInPool) {
+		int adjustment = alreadyInPool ? 0 : 1;
+		return !close && (poolExecutor.getActiveCount() + adjustment <= minPoolSize || (poolExecutor.getActiveCount() +
+				adjustment <= Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize)));
+	}
+	/**
+	 * Adds a new {@link #ProcessManager} instance to the process pool.
+	 * 
+	 * @throws IOException If the process cannot be started.
+	 * @throws RejectedExecutionException If the process manager cannot be added to the pool.
+	 */
+	private void startNewProcess() {
+		try {
+			poolExecutor.execute(managerPool.borrowObject());
+		} catch (Exception e) {
+			if (verbose)
+				logger.log(Level.WARNING, "Attempt to extend the pool failed.", e);
+		}
+	}
+	/**
+	 * A method that handles the submission of commands from the queue to the processes.
+	 */
+	private void mainLoop() {
+		Optional<CommandSubmission> optionalSubmission = Optional.empty();
+		while (!close) {
+			try {
+				if (!optionalSubmission.isPresent()) {
+					while (!(optionalSubmission = Optional.ofNullable(commandQueue.peek())).isPresent()) {
+						synchronized (this) {
+							try {
+								wait();
+							} catch (InterruptedException e) {
+								if (close)
+									return;
+							}
+						}
+					}
+				}
+				CommandSubmission submission = optionalSubmission.get();
+				for (ProcessManager manager : activeProcesses) {
+					if (manager.isReady()) {
+						Future<?> future = commandExecutor.submit(() -> {
+							try {
+								if (manager.executeCommand(submission)) {
+									if (verbose)
+										logger.info(String.format("Command \"%s\" processed; submission delay: %.3f;" +
+												" execution time: %.3f.%n", submission.getCommand(),
+												(float) ((double) (submission.getSubmissionTime() -
+												submission.getCreationTime())/1000000000),
+												(float) ((double) (submission.getProcessedTime() -
+												submission.getSubmissionTime())/1000000000)));
+								} else {
+									submissionSuccessful = false;
+									submissionSemaphore.release();
+								}
+							} catch (IOException e) {
+								if (verbose)
+									logger.log(Level.SEVERE, "Error while submitting command " +
+											submission.getCommand() + ".", e);
+							}
+						});
+						submissionSemaphore.acquire();
+						if (submissionSuccessful) {
+							submission.setFuture(future);
+							commandQueue.remove(submission);
+							optionalSubmission = Optional.empty();
+							break;
+						}
+					}
+				}
+				synchronized (poolLock) {
+					if (doStartNewProcess(false))
+						startNewProcess();
+				}
+			} catch (Exception e) {
+				if (verbose)
+					logger.log(Level.SEVERE, "An error occurred while submitting commands.", e);
+			}
+		}
 	}
 	/**
 	 * Executes the command on any of the available processes in the pool. It blocks until the command could successfully be 
@@ -141,7 +302,7 @@ public class PSPPool implements AutoCloseable {
 			@Override
 			public void onSubmitted() {
 				submissionSuccessful = true;
-				latch.countDown();
+				submissionSemaphore.release();
 				submission.getListener().onSubmitted();
 				numOfExecutingCommands.incrementAndGet();
 			}
@@ -150,6 +311,7 @@ public class PSPPool implements AutoCloseable {
 				submission.getListener().onFinished();
 				numOfExecutingCommands.decrementAndGet();
 			}
+			
 		};
 		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommand(), listener, submission.doCancelAfterwards());
 		commandQueue.add(internalSubmission);
@@ -209,140 +371,8 @@ public class PSPPool implements AutoCloseable {
 			public boolean isDone() {
 				return internalSubmission.isProcessed();
 			}
-		};
-	}
-	/**
-	 * Logs the number of active, queued, and currently executing processes.
-	 */
-	private void logPoolStats() {
-		logger.info("Total processes: " + totalNumOfProcesses.get() + "; acitve processes: " + activeProcesses.size() +
-				"; submitted commands: " + (numOfExecutingCommands.get() + commandQueue.size()));
-	}
-	/**
-	 * Returns whether a new process should be added to the pool.
-	 * 
-	 * @return Whether the pool should be extended.
-	 */
-	private boolean doAddNewProcess() {
-		return !close && (totalNumOfProcesses.get() <= minPoolSize || (totalNumOfProcesses.get() <=
-				Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize)));
-	}
-	/**
-	 * Adds a new {@link #ProcessManager} instance to the process pool.
-	 * 
-	 * @throws IOException If the process cannot be started.
-	 */
-	private void addNewProccess() throws IOException {
-		totalNumOfProcesses.incrementAndGet();
-		ProcessManager p = new ProcessManager(builder, keepAliveTime);
-		if (listener != null)
-			p.addListener(listener);
-		p.addListener(new ProcessListener() {
 			
-			@Override
-			public void onStarted(ProcessManager manager) {
-				activeProcesses.add(manager);
-				if (verbose) {
-					logger.info("Process manager " + manager + " started executing.");
-					logPoolStats();
-				}
-				latch.countDown();
-			}
-			@Override
-			public void onTermination(int resultCode) {
-				activeProcesses.remove(p);
-				if (verbose) {
-					logger.info("Process manager " + p + " stopped executing.");
-					logPoolStats();
-				}
-				synchronized (poolLock) {
-					if (doAddNewProcess())
-						poolExecutor.execute(p);
-					else {
-						try {
-							p.close();
-							if (verbose)
-								logger.info("Shutting down process manager " + p + ".");
-							totalNumOfProcesses.decrementAndGet();
-						} catch (Exception e) {
-							if (verbose)
-								logger.log(Level.SEVERE, "Error while shutting down process manager " + p + ".", e);
-						}
-					}
-				}
-			}
-		});
-		poolExecutor.execute(p);
-	}
-	/**
-	 * A method that handles the submission of commands from the queue to the processes.
-	 */
-	private void mainLoop() {
-		Optional<CommandSubmission> optionalSubmission = Optional.empty();
-		while (!close) {
-			try {
-				if (!optionalSubmission.isPresent()) {
-					while (!(optionalSubmission = Optional.ofNullable(commandQueue.peek())).isPresent()) {
-						synchronized (this) {
-							try {
-								wait();
-							} catch (InterruptedException e) {
-								if (close)
-									return;
-							}
-						}
-					}
-				}
-				CommandSubmission submission = optionalSubmission.get();
-				for (ProcessManager manager : activeProcesses) {
-					if (manager.isReady()) {
-						submissionLatch = new CountDownLatch(1);
-						Future<?> future = commandExecutor.submit(() -> {
-							try {
-								if (manager.executeCommand(submission)) {
-									if (verbose)
-										logger.info(String.format("Command %s processed; submission delay: %.3f;" +
-												" execution time: %.3f.%n", submission.getCommand(),
-												(float) ((double) (submission.getSubmissionTime() -
-												submission.getCreationTime())/1000000000),
-												(float) ((double) (submission.getProcessedTime() -
-												submission.getSubmissionTime())/1000000000)));
-								} else {
-									submissionSuccessful = false;
-									submissionLatch.countDown();
-								}
-							} catch (IOException e) {
-								if (verbose)
-									logger.log(Level.SEVERE, "Error while submitting command " +
-											submission.getCommand() + ".", e);
-							}
-						});
-						try {
-							submissionLatch.await();
-						} catch (InterruptedException e) { }
-						if (submissionSuccessful) {
-							submission.setFuture(future);
-							commandQueue.remove(submission);
-							optionalSubmission = Optional.empty();
-							break;
-						}
-					}
-				}
-				synchronized (poolLock) {
-					if (doAddNewProcess()) {
-						try {
-							addNewProccess();
-						} catch (IOException e) {
-							if (verbose)
-								logger.log(Level.SEVERE, "Error while submitting a new process.", e);
-						}
-					}
-				}
-			} catch (Exception e) {
-				if (verbose)
-					logger.log(Level.SEVERE, "An error occurred while submitting commands.", e);
-			}
-		}
+		};
 	}
 	@Override
 	public void close() throws Exception {

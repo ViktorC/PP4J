@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * A runnable class for starting, managing, and interacting with processes. The process is started by calling the 
+ * A class for starting, managing, and interacting with processes. The process is started by calling the 
  * {@link #run() run} method.
  * 
  * @author A6714
@@ -73,7 +73,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	/**
 	 * Subscribes a process listener to the manager instance.
 	 * 
-	 * @param listener The instance of {@link #ProcessListener ProcessListner} to add.
+	 * @param listener The instance of {@link #ProcessListener} to add.
 	 */
 	protected void addListener(ProcessListener listener) {
 		listeners.add(listener);
@@ -81,7 +81,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	/**
 	 * Removes a process listener from the manager instance if it is already subscribed.
 	 * 
-	 * @param listener The instance of {@link #ProcessListener ProcessListner} to remove.
+	 * @param listener The instance of {@link #ProcessListener} to remove.
 	 */
 	protected void removeListener(ProcessListener listener) {
 		listeners.remove(listener);
@@ -119,6 +119,47 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				process.destroy();
 		} finally {
 			lock.unlock();
+		}
+	}
+	/**
+	 * Starts listening to the specified channel.
+	 * 
+	 * @param reader The channel to listen to.
+	 * @param error Whether it is the error out or the standard out stream of the process.
+	 * @throws IOException If there is some problem with the stream.
+	 */
+	private void startListening(Reader reader, boolean error) throws IOException {
+		int c;
+		StringBuilder output = new StringBuilder();
+		while ((c = reader.read()) != -1) {
+			if (stop) {
+				// On Windows all output of the process has to be read for it to terminate.
+				while (reader.read() != -1);
+				break;
+			}
+			String line;
+			if (c == '\n') {
+				line = output.toString().trim();
+				output.setLength(0);
+			} else {
+				output.append((char) c);
+				if (reader.ready())
+					continue;
+				else
+					line = output.toString().trim();
+			}
+			if (line.isEmpty())
+				continue;
+			synchronized (lock) {
+				try {
+					commandProcessed = (submission == null ? commandProcessed :
+							(error ? submission.getListener().onNewErrorOutput(line) :
+							submission.getListener().onNewStandardOutput(line)));
+				} finally {
+					if (commandProcessed)
+						lock.notifyAll();
+				}
+			}
 		}
 	}
 	/**
@@ -162,6 +203,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 								task = null;
 								ProcessManager.this.cancel();
 							}
+							
 						};
 						timer.schedule(task, keepAliveTime);
 					}
@@ -178,47 +220,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			}
 		} else
 			return false;
-	}
-	/**
-	 * Starts listening to the specified channel.
-	 * 
-	 * @param reader The channel to listen to.
-	 * @param error Whether it is the error out or the standard out stream of the process.
-	 * @throws IOException If there is some problem with the stream.
-	 */
-	private void startListening(Reader reader, boolean error) throws IOException {
-		int c;
-		StringBuilder output = new StringBuilder();
-		while ((c = reader.read()) != -1) {
-			if (stop) {
-				// On Windows all output of the process has to be read for it to terminate.
-				while (reader.read() != -1);
-				break;
-			}
-			String line;
-			if (c == '\n') {
-				line = output.toString().trim();
-				output.setLength(0);
-			} else {
-				output.append((char) c);
-				if (reader.ready())
-					continue;
-				else
-					line = output.toString().trim();
-			}
-			if (line.isEmpty())
-				continue;
-			synchronized (lock) {
-				try {
-					commandProcessed = (submission == null ? commandProcessed :
-							(error ? submission.getListener().onNewErrorOutput(line) :
-							submission.getListener().onNewStandardOutput(line)));
-				} finally {
-					if (commandProcessed)
-						lock.notifyAll();
-				}
-			}
-		}
 	}
 	@Override
 	public synchronized void run() throws ProcessManagerException {
@@ -259,6 +260,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 							task = null;
 							ProcessManager.this.cancel();
 						}
+						
 					};
 					timer.schedule(task, keepAliveTime);
 				}
