@@ -21,11 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.pool2.PooledObject;
-import org.apache.commons.pool2.PooledObjectFactory;
-import org.apache.commons.pool2.impl.DefaultPooledObject;
-import org.apache.commons.pool2.impl.GenericObjectPool;
-
 /**
  * A class for maintaining and managing a pool of identical pre-started processes.
  * 
@@ -34,10 +29,12 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
  */
 public class PSPPool implements AutoCloseable {
 	
+	private final ProcessBuilder builder;
+	private final ProcessListener listener;
 	private final int minPoolSize;
 	private final int maxPoolSize;
 	private final int reserveSize;
-	private final GenericObjectPool<ProcessManager> managerPool;
+	private final long keepAliveTime;
 	private final ThreadPoolExecutor poolExecutor;
 	private final List<ProcessManager> activeProcesses;
 	private final Object poolLock;
@@ -50,6 +47,7 @@ public class PSPPool implements AutoCloseable {
 	private volatile boolean submissionSuccessful;
 	private volatile boolean verbose;
 	private volatile boolean close;
+	private ProcessManager spareProcessManager;
 
 	/**
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
@@ -78,68 +76,14 @@ public class PSPPool implements AutoCloseable {
 			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
 		if (builder == null)
 			throw new IllegalArgumentException("The process builder cannot be null.");
+		this.builder = builder;
+		this.listener = listener;
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
+		this.keepAliveTime = keepAliveTime;
 		this.verbose = verbose;
-		managerPool = new GenericObjectPool<>(new PooledObjectFactory<ProcessManager>() {
-
-			@Override
-			public PooledObject<ProcessManager> makeObject() throws Exception {
-				ProcessManager manager = new ProcessManager(builder, keepAliveTime);
-				if (listener != null)
-					manager.addListener(listener);
-				manager.addListener(new ProcessListener() {
-					
-					@Override
-					public void onStarted(ProcessManager manager) {
-						activeProcesses.add(manager);
-						if (verbose) {
-							logger.info("Process manager " + manager + " started executing.");
-							logPoolStats();
-						}
-						startupLatch.countDown();
-					}
-					@Override
-					public void onTermination(int resultCode) {
-						activeProcesses.remove(manager);
-						if (verbose) {
-							logger.info("Process manager " + manager + " stopped executing.");
-							logPoolStats();
-						}
-						synchronized (poolLock) {
-							if (doStartNewProcess(true)) {
-								startNewProcess();
-							}
-						}
-						try {
-							managerPool.returnObject(manager);
-						} catch (Exception e) {
-							if (verbose)
-								logger.log(Level.SEVERE, "Error deactivating process manager " + manager + ".");
-						}
-					}
-				});
-				return new DefaultPooledObject<ProcessManager>(manager);
-			}
-			@Override
-			public void activateObject(PooledObject<ProcessManager> p) throws Exception { }
-			@Override
-			public boolean validateObject(PooledObject<ProcessManager> p) {
-				return !p.getObject().isRunning();
-			}
-			@Override
-			public void passivateObject(PooledObject<ProcessManager> p) throws Exception { }
-			@Override
-			public void destroyObject(PooledObject<ProcessManager> p) throws Exception {
-				ProcessManager manager = p.getObject();
-				manager.clearListeners();
-				manager.close();
-			}
-			
-		});
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
-		managerPool.setMinIdle(actualMinSize);
 		poolExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
 		activeProcesses = new CopyOnWriteArrayList<>();
@@ -150,12 +94,6 @@ public class PSPPool implements AutoCloseable {
 		submissionSemaphore = new Semaphore(0);
 		numOfExecutingCommands = new AtomicInteger(0);
 		logger = Logger.getAnonymousLogger();
-		try {
-			managerPool.preparePool();
-		} catch (Exception e) {
-			if (verbose)
-				logger.log(Level.SEVERE, "Error while preparing the process managers.", e);
-		}
 		for (int i = 0; i < actualMinSize; i++) {
 			synchronized (poolLock) {
 				startNewProcess();
@@ -164,7 +102,7 @@ public class PSPPool implements AutoCloseable {
 		// Wait for the processes in the initial pool to start up.
 		try {
 			startupLatch.await();
-			// Allow the start up locks in the managers to be released.
+			// Allow the locks in the managers to be released.
 			Thread.sleep(10);
 		} catch (InterruptedException e) {
 			if (verbose)
@@ -189,28 +127,74 @@ public class PSPPool implements AutoCloseable {
 				"; submitted commands: " + (numOfExecutingCommands.get() + commandQueue.size()));
 	}
 	/**
-	 * Returns whether a new process should be started.
+	 * Adds a new {@link #ProcessManager} instance to the pool and starts it.
 	 * 
-	 * @param alreadyInPool Whether the manager whose process is to be started is already in the pool.
-	 * @return Whether a new process should be started.
+	 * @throws IOException If a new process cannot be created.
+	 * @return Whether the process was successfully started.
 	 */
-	private boolean doStartNewProcess(boolean alreadyInPool) {
-		int adjustment = alreadyInPool ? 0 : 1;
-		return !close && (poolExecutor.getActiveCount() + adjustment <= minPoolSize || (poolExecutor.getActiveCount() +
-				adjustment <= Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize)));
-	}
-	/**
-	 * Adds a new {@link #ProcessManager} instance to the process pool.
-	 * 
-	 * @throws IOException If the process cannot be started.
-	 * @throws RejectedExecutionException If the process manager cannot be added to the pool.
-	 */
-	private void startNewProcess() {
+	private boolean startNewProcess() throws IOException {
+		ProcessManager p;
+		if (spareProcessManager != null) {
+			p = spareProcessManager;
+			spareProcessManager = null;
+		} else {
+			p = new ProcessManager(builder, keepAliveTime);
+			if (listener != null)
+				p.addListener(listener);
+			p.addListener(new ProcessListener() {
+				
+				@Override
+				public void onStarted(ProcessManager manager) {
+					activeProcesses.add(manager);
+					if (verbose) {
+						logger.info("Process manager " + manager + " started executing.");
+						logPoolStats();
+					}
+					startupLatch.countDown();
+				}
+				@Override
+				public void onTermination(int resultCode) {
+					activeProcesses.remove(p);
+					if (verbose) {
+						logger.info("Process manager " + p + " stopped executing.");
+						logPoolStats();
+					}
+					try {
+						p.close();
+						if (verbose)
+							logger.info("Shutting down process manager " + p + ".");
+					} catch (Exception e) {
+						if (verbose)
+							logger.log(Level.SEVERE, "Error while shutting down process manager " + p + ".", e);
+					}
+					synchronized (poolLock) {
+						// Consider that the pool size is about to decrease as this process terminates.
+						if (!close && ((maxPoolSize > minPoolSize ? poolExecutor.getActiveCount() <= minPoolSize :
+								poolExecutor.getActiveCount() < minPoolSize) || (poolExecutor.getActiveCount() <
+								Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize + 1)))) {
+							try {
+								startNewProcess();
+							} catch (IOException e) {
+								if (verbose)
+									logger.log(Level.SEVERE, "Error while starting new process.", e);
+							}
+						}
+					}
+				}
+			});
+		}
+		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
+		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 
+		 * that takes care of this. */
 		try {
-			poolExecutor.execute(managerPool.borrowObject());
-		} catch (Exception e) {
+			poolExecutor.execute(p);
+			return true;
+		} catch (RejectedExecutionException e) {
+			// If the process cannot be submitted to the pool, store it in a variable to avoid wasting the instance.
+			spareProcessManager = p;
 			if (verbose)
-				logger.log(Level.WARNING, "Attempt to extend the pool failed.", e);
+				logger.log(Level.WARNING, "Failed to start new process due to the pool having reached its capacity.");
+			return false;
 		}
 	}
 	/**
@@ -220,6 +204,7 @@ public class PSPPool implements AutoCloseable {
 		Optional<CommandSubmission> optionalSubmission = Optional.empty();
 		while (!close) {
 			try {
+				// Wait until there is a command submitted.
 				if (!optionalSubmission.isPresent()) {
 					while (!(optionalSubmission = Optional.ofNullable(commandQueue.peek())).isPresent()) {
 						synchronized (this) {
@@ -233,6 +218,7 @@ public class PSPPool implements AutoCloseable {
 					}
 				}
 				CommandSubmission submission = optionalSubmission.get();
+				// Execute it in any of the available processes.
 				for (ProcessManager manager : activeProcesses) {
 					if (manager.isReady()) {
 						Future<?> future = commandExecutor.submit(() -> {
@@ -264,9 +250,17 @@ public class PSPPool implements AutoCloseable {
 						}
 					}
 				}
+				// Extend the pool if needed.
 				synchronized (poolLock) {
-					if (doStartNewProcess(false))
-						startNewProcess();
+					if (!close && (poolExecutor.getActiveCount() < minPoolSize || (poolExecutor.getActiveCount() <
+							Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize)))) {
+						try {
+							startNewProcess();
+						} catch (IOException e) {
+							if (verbose)
+								logger.log(Level.SEVERE, "Error while starting new process.", e);
+						}
+					}
 				}
 			} catch (Exception e) {
 				if (verbose)
@@ -289,6 +283,8 @@ public class PSPPool implements AutoCloseable {
 	public Future<Long> submitCommand(CommandSubmission submission) {
 		if (submission == null)
 			throw new IllegalArgumentException("The command cannot be null or empty.");
+		/* Wrap the original listener in a listener that handles the locks the main loop waits on to make sure that the command 
+		 * was accepted. */
 		CommandListener listener = new CommandListener() {
 			
 			@Override
@@ -311,13 +307,14 @@ public class PSPPool implements AutoCloseable {
 				submission.getListener().onFinished();
 				numOfExecutingCommands.decrementAndGet();
 			}
-			
 		};
 		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommand(), listener, submission.doCancelAfterwards());
 		commandQueue.add(internalSubmission);
+		// Notify the main loop that a command has been submitted.
 		synchronized (this) {
 			notifyAll();
 		}
+		// Return a Future holding the total execution time including the submission delay.
 		return new Future<Long>() {
 
 			private boolean cancelled;
@@ -371,7 +368,6 @@ public class PSPPool implements AutoCloseable {
 			public boolean isDone() {
 				return internalSubmission.isProcessed();
 			}
-			
 		};
 	}
 	@Override
