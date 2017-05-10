@@ -1,8 +1,6 @@
 language: java
 install: true
-script:
-  - ./mvnw install -DskipTests=false -Dmaven.javadoc.skip=false -B -V
-  - bash <(curl -s https://codecov.io/bash)
+script: bash <(curl -s https://codecov.io/bash)
 jdk: oraclejdk8
 cache:
     directories:
