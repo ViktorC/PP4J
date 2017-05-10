@@ -8,6 +8,11 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
+	<scm>
+		<connection>scm:git:git@github.com:ViktorC/PSPPool.git</connection>
+		<developerConnection>scm:git:git@github.com:ViktorC/PSPPool.git</developerConnection>
+		<url>https://github.com/ViktorC/PSPPool</url>
+	</scm>
 	<profiles>
 		<profile>
 			<id>java8-doclint-disabled</id>
