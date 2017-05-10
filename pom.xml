@@ -37,7 +37,7 @@
 				<configuration>
 					<noqualifier>all</noqualifier>
 					<additionalparam>${javadoc.opts}</additionalparam>
-					<reportOutputDirectory>${basedir}/../docs</reportOutputDirectory>
+					<reportOutputDirectory>${basedir}/docs</reportOutputDirectory>
 					<destDir>docs</destDir>
 				</configuration>
 				<executions>
