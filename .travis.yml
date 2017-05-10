@@ -1,13 +1,11 @@
-dist: trusty
-language: java
 jdk: oraclejdk8
 addons:
     sonarqube:
         organization: "viktorc-github"
         token:
             secure: $SONAR_TOKEN
-script:
-  - mvn clean install sonar:sonar
+install: true
+script: mvn clean install sonar:sonar
 cache:
     directories:
-    - $HOME/.m2
+        - $HOME/.m2
