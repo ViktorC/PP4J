@@ -32,8 +32,8 @@ public class PSPoolTest {
 			throws IllegalArgumentException, IOException, URISyntaxException {
 		// The tests are either run locally on my Windows machine or through Travis CI on Linux.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-		String programLocation = "\"" + new File(getClass().getResource(windows ? "win/test.exe" : "linux/test")
-				.toURI().getPath()).getAbsolutePath() + "\"";
+		String programLocation = new File(getClass().getResource(windows ? "win/test.exe" : "linux/test")
+				.toURI().getPath()).getAbsolutePath();
 		return new PSPPool(new ProcessBuilder(programLocation), new ProcessListener() {
 			
 			@Override
