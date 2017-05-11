@@ -8,7 +8,9 @@ addons:
         token:
             secure: $SONAR_TOKEN
 install: true
-script: mvn clean install sonar:sonar
+script:
+    - chmod 777 /home/travis/build/ViktorC/PSPPool/target/test-classes/net/viktorc/pspp/linux/test
+    - mvn clean install sonar:sonar
 cache:
     directories:
         - $HOME/.m2
