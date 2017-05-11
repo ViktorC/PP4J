@@ -11,7 +11,8 @@ install: true
 script:
     - chmod 777 /home/travis/build/ViktorC/PSPPool/target/test-classes/net/viktorc/pspp/linux/test
     - ls -l /home/travis/build/ViktorC/PSPPool/target/test-classes/net/viktorc/pspp/linux/test
-    - /home/travis/build/ViktorC/PSPPool/target/test-classes/net/viktorc/pspp/linux/test
+    - cd /home/travis/build/ViktorC/PSPPool/target/test-classes/net/viktorc/pspp/linux
+    - ./test
     - start
     - mvn clean install sonar:sonar
 cache:
