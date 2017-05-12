@@ -12,7 +12,7 @@ script:
     - echo $PWD
     - find build-script.sh
     - sudo chmod 777 build-script.sh
-    - sudo build-script.sh
+    - sudo ./build-script.sh
 cache:
     directories:
         - $HOME/.m2
