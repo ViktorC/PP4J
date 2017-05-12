@@ -10,7 +10,7 @@ addons:
 install: true
 script:
     - sudo chmod 777 build-script.sh
-    - sudo ./build-script.sh
+    - sudo build-script.sh
 cache:
     directories:
         - $HOME/.m2
