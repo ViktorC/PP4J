@@ -191,7 +191,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 						try {
 							lock.wait();
 						} catch (InterruptedException e) {
-							throw new ProcessManagerException(e);
+							Thread.currentThread().interrupt();
 						}
 					}
 				}

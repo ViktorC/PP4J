@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: net.viktorc.pspp.PSPoolTest
 -------------------------------------------------------------------------------
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 86.235 sec
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 86.347 sec
