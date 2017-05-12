@@ -108,6 +108,7 @@ public class PSPPool implements AutoCloseable {
 		} catch (InterruptedException e) {
 			if (verbose)
 				logger.log(Level.SEVERE, "Error while waiting for the pool to start up.", e);
+			Thread.currentThread().interrupt();
 		}
 		// Start the thread responsible for submitting commands.
 		(new Thread(this::mainLoop)).start();
@@ -212,12 +213,13 @@ public class PSPPool implements AutoCloseable {
 							try {
 								wait();
 							} catch (InterruptedException e) {
-								if (close)
-									return;
+								Thread.currentThread().interrupt();
 							}
 						}
 					}
 				}
+				if (close)
+					return;
 				CommandSubmission submission = optionalSubmission.get();
 				// Execute it in any of the available processes.
 				for (ProcessManager manager : activeProcesses) {
@@ -349,12 +351,8 @@ public class PSPPool implements AutoCloseable {
 				long start = System.nanoTime();
 				while (!internalSubmission.isProcessed() && !cancelled && timeoutNs > 0) {
 					synchronized (internalSubmission) {
-						try {
-							internalSubmission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
-							break;
-						} catch (InterruptedException e) {
-							timeoutNs -= (System.nanoTime() - start);
-						}
+						internalSubmission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
+						timeoutNs -= (System.nanoTime() - start);
 					}
 				}
 				if (cancelled)

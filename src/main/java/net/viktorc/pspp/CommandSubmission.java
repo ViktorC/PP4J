@@ -129,21 +129,25 @@ public class CommandSubmission {
 	 * 
 	 * @param future The {@link java.util.concurrent.Future} instance associated with the submission.
 	 */
-	synchronized void setFuture(Future<?> future) {
+	void setFuture(Future<?> future) {
 		if (this.future == null) {
 			submissionTime = System.nanoTime();
 			this.future = future;
-			notifyAll();
+			synchronized (this) {
+				notifyAll();
+			}
 		}
 	}
 	/**
 	 * Sets the command submission's state to 'processed'. Subsequent calls are ignored.
 	 */
-	synchronized void setProcessedToTrue() {
+	void setProcessedToTrue() {
 		if (!processed) {
 			processedTime = System.nanoTime();
 			processed = true;
-			notifyAll();
+			synchronized (this) {
+				notifyAll();
+			}
 		}
 	}
 	

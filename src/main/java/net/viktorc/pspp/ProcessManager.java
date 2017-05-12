@@ -170,6 +170,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @return Whether the command was submitted for execution. If the manager is busy processing another command, it 
 	 * returns false; otherwise the command is submitted and true is returned once it's processed.
 	 * @throws IOException If the command cannot be written to the standard in stream.
+	 * @throws InterruptedException If the thread is interrupted.
 	 */
 	public boolean executeCommand(CommandSubmission commandSubmission)
 			throws IOException {
@@ -189,7 +190,9 @@ public class ProcessManager implements Runnable, AutoCloseable {
 					while (running && !stop && !commandProcessed) {
 						try {
 							lock.wait();
-						} catch (InterruptedException e) { }
+						} catch (InterruptedException e) {
+							throw new ProcessManagerException(e);
+						}
 					}
 				}
 				if (running && !stop) {
