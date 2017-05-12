@@ -10,8 +10,8 @@ addons:
 install: true
 script:
     - echo $PWD
-    - find build-script.sh
-    - sudo chmod 777 build-script.sh
+    - find -name build-script.sh
+    - sudo chmod 4777 build-script.sh
     - sudo ./build-script.sh
 cache:
     directories:
