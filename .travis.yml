@@ -8,7 +8,7 @@ addons:
         token:
             secure: $SONAR_TOKEN
 install: true
-script: ./build-script.sh
+script: sudo ./build-script.sh
 cache:
     directories:
         - $HOME/.m2
