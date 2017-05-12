@@ -9,8 +9,8 @@ addons:
             secure: $SONAR_TOKEN
 install: true
 script:
-	- echo $PWD
-	- find build-script.sh
+    - echo $PWD
+    - find build-script.sh
     - sudo chmod 777 build-script.sh
     - sudo build-script.sh
 cache:
