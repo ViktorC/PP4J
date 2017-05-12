@@ -34,6 +34,8 @@ public class PSPoolTest {
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
 		String programLocation = new File(getClass().getResource(windows ? "win/test.exe" : "linux/test")
 				.toURI().getPath()).getAbsolutePath();
+		File file = new File(programLocation);
+		System.out.printf("File %s exists: %s", file.toString(), Boolean.toString(file.exists()));
 		return new PSPPool(new ProcessBuilder(programLocation), new ProcessListener() {
 			
 			@Override
