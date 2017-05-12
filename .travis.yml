@@ -8,6 +8,7 @@ addons:
         token:
             secure: $SONAR_TOKEN
 install: true
+script:
     - chmod 777 /home/travis/build/ViktorC/PSPPool/target/test-classes/net/viktorc/pspp/linux/test
     - ls -lrt /home/travis/build/ViktorC/PSPPool/target/test-classes/net/viktorc/pspp/linux/test
     - mvn clean install jacoco:report coveralls:report sonar:sonar
