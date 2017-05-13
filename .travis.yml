@@ -17,7 +17,7 @@ notifications:
     email: false
 deploy:
     provider: pages
-    local_dir: /home/travis/build/ViktorC/PSPPool/docs
+    local_dir: $TRAVIS_BUILD_DIR/ViktorC/PSPPool/docs
     skip_cleanup: true
     github_token: $GITHUB_TOKEN
     on:
@@ -25,7 +25,7 @@ deploy:
 deploy:
     provider: releases
     api_key: $GITHUB_TOKEN
-    file: /home/travis/build/ViktorC/PSPPool/target/pspp*.jar
+    file: $TRAVIS_BUILD_DIR/ViktorC/PSPPool/target/pspp*.jar
     skip_cleanup: true
     on:
         tags: true
