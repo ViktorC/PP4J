@@ -1,6 +1,8 @@
 package net.viktorc.pspp;
 
 /**
+ * TEST!
+ * 
  * A listener that allows for the processing of the outputs of a process. It is temporarily subscribed to a 
  * {@link net.viktorc.pspp.ProcessManager} instance when the {@link net.viktorc.pspp.ProcessManager#executeCommand(CommandSubmission) executeCommand} 
  * method is called. It listens to the standard out and error out streams of the process and the respective method 
