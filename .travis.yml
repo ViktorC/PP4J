@@ -15,3 +15,17 @@ cache:
         - $HOME/.sonar/cache
 notifications:
     email: false
+deploy:
+    provider: pages
+    local_dir: /home/travis/build/ViktorC/PSPPool/docs
+    skip_cleanup: true
+    github_token: $GITHUB_TOKEN
+    on:
+        branch: master
+deploy:
+    provider: releases
+    api_key: $GITHUB_TOKEN
+    file: /home/travis/build/ViktorC/PSPPool/target/pspp*.jar
+    skip_cleanup: true
+    on:
+        tags: true
