@@ -22,10 +22,3 @@ deploy:
     github_token: $GITHUB_TOKEN
     on:
         branch: master
-    provider: releases
-    api_key: $GITHUB_TOKEN
-    file_glob: true
-    file: /home/travis/build/ViktorC/PSPPool/target/pspp*.jar
-    skip_cleanup: true
-    on:
-        tags: true
