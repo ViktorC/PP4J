@@ -14,17 +14,6 @@
 		<developerConnection>scm:git:git@github.com:ViktorC/PSPPool.git</developerConnection>
 		<url>https://github.com/ViktorC/PSPPool</url>
 	</scm>
-	<profiles>
-		<profile>
-			<id>java8-doclint-disabled</id>
-			<activation>
-				<jdk>[1.8,)</jdk>
-			</activation>
-			<properties>
-				<javadoc.opts>-Xdoclint:none</javadoc.opts>
-			</properties>
-		</profile>
-	</profiles>
 	<build>
 		<sourceDirectory>src/main/java</sourceDirectory>
 		<testSourceDirectory>src/test/java</testSourceDirectory>
