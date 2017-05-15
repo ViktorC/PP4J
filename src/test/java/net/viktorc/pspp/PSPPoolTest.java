@@ -37,6 +37,8 @@ public class PSPPoolTest {
 		String programLocation = new File(getClass().getResource(windows ? "win/test.exe" : "linux/test")
 				.toURI().getPath()).getAbsolutePath();
 		File file = new File(programLocation);
+		System.out.println(programLocation);
+		System.out.println("Exists: " + file.exists());
 		// For testing on Travis CI
 		file.setExecutable(true);
 		return new PSPPool(new ProcessBuilder(programLocation), new ProcessListener() {
