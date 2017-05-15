@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A test class for the process pool.
@@ -66,6 +67,7 @@ public class PSPPoolTest {
 			public boolean terminate(ProcessManager manager) {
 				if (manuallyTerminate) {
 					try {
+						AtomicBoolean success = new AtomicBoolean(true);
 						manager.executeSubmission(new CommandSubmission(new Command("stop", new CommandListener() {
 							
 							@Override
@@ -74,15 +76,16 @@ public class PSPPoolTest {
 							}
 							@Override
 							public boolean onNewErrorOutput(String errorOutput) {
+								success.set(false);
 								return true;
 							}
 						})));
-						return false;
+						return success.get();
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
 				}
-				return true;
+				return false;
 			}
 			@Override
 			public void onTermination(int resultCode) { }
@@ -174,7 +177,7 @@ public class PSPPoolTest {
 			System.out.println("-------------------------------------------------------------------------------------");
 			System.out.printf("minPoolSize: %d; maxPoolSize: %d; reserveSize: %d; keepAliveTime: %d;%n" +
 					"verifyStartup: %s; manuallyTerminate: %s; reuse: %s; procTimes: %s;%n" +
-					"requests: %d; requestPerSec: %.2f; failTime: %.4f%n",
+					"requests: %d; requestPerSec: %.3f; failTime: %.3f%n",
 					minPoolSize, maxPoolSize, reserveSize, keepAliveTime, Boolean.toString(verifyStartup),
 					Boolean.toString(manuallyTerminate), Boolean.toString(reuse), Arrays.toString(procTimes),
 					requests, requestPerSe, (float) (((double) failTime)/1000));
@@ -185,7 +188,7 @@ public class PSPPoolTest {
 					boolean fail = time == null || time/1000000 >= failTime;
 					if (fail)
 						pass = false;
-					System.out.printf("Time: %.4f %s%n", (float) (((double) time)/1000000000), fail ? "FAIL" : "");
+					System.out.printf("Time: %.3f %s%n", (float) (((double) time)/1000000000), fail ? "FAIL" : "");
 				}
 				return pass;
 			} else {
@@ -199,15 +202,15 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test01() {
-		Assert.assertTrue(test("Test 1", 0, 100, 0, 0, true, false, true, new int[] { 5 }, 100, 10, 6200));
+		Assert.assertTrue(test("Test 1", 0, 100, 0, 0, true, false, true, new int[] { 5 }, 100, 10, 6100));
 	}
 	@Test
 	public void test02() {
-		Assert.assertTrue(test("Test 2", 50, 150, 20, 0, false, false, true, new int[] { 5 }, 100, 20, 5100));
+		Assert.assertTrue(test("Test 2", 50, 150, 20, 0, false, false, true, new int[] { 5 }, 100, 20, 5080));
 	}
 	@Test
 	public void test03() {
-		Assert.assertTrue(test("Test 3", 10, 25, 5, 15000, true, false, true, new int[] { 5 }, 20, 2, 5010));
+		Assert.assertTrue(test("Test 3", 10, 25, 5, 15000, true, false, true, new int[] { 5 }, 20, 2, 5008));
 	}
 	@Test
 	public void test04() {
@@ -215,7 +218,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test05() {
-		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 5, 10050));
+		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 5, 10060));
 	}
 	@Test
 	public void test06() {
@@ -237,57 +240,5 @@ public class PSPPoolTest {
 	public void test10() {
 		Assert.assertTrue(test("Test 10", 10, 50, 5, 15000, false, false, false, new int[] { 5, 3, 2 }, 50, 5, 10060));
 	}
-	public static void main(String[] args) {
-		PSPPoolTest test = new PSPPoolTest();
-		try {
-		test.test01();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test02();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test03();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test04();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test05();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test06();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test07();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test08();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test09();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-		try {
-		test.test10();
-		} catch (Throwable e) {
-			e.printStackTrace();
-		}
-	}
+	
 }

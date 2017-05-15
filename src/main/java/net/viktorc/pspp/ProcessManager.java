@@ -237,7 +237,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 						submissionListener.onFinishedProcessing();
 				} finally {
 					submission.setProcessedToTrue();
-					System.out.println("i");
 					lock.unlock();
 				}
 			}
