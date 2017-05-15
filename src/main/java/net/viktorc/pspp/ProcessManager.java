@@ -5,11 +5,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
-import java.util.Queue;
+import java.util.List;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,7 +32,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	private final ExecutorService executor;
 	private final ReentrantLock lock;
 	private final ProcessBuilder builder;
-	private final Queue<ProcessListener> listeners;
 	private final long keepAliveTime;
 	private final Timer timer;
 	private final long id;
@@ -42,25 +40,41 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
 	private TimerTask task;
-	private volatile CommandSubmission submission;
-	private volatile boolean commandProcessed;
+	private volatile ProcessListener listener;
+	private volatile Command command;
 	private volatile boolean running;
 	private volatile boolean stop;
+	private volatile boolean startedUp;
+	private volatile boolean commandProcessed;
 	
 	/**
 	 * Constructs a manager for the specified process without actually starting the process.
 	 * 
 	 * @param builder The process builder.
+	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
+	 * less, the life-cycle of the processes will not be limited.
+	 * @param listener A process listener to manage the instance.
 	 * @throws IOException If the process command is invalid.
 	 */
-	public ProcessManager(ProcessBuilder builder, long keepAliveTime) throws IOException {
+	protected ProcessManager(ProcessBuilder builder, long keepAliveTime, ProcessListener listener) throws IOException {
 		executor = Executors.newFixedThreadPool(2);
 		lock = new ReentrantLock();
 		this.builder = builder;
-		listeners = new ConcurrentLinkedQueue<>();
 		this.keepAliveTime = keepAliveTime;
 		timer = keepAliveTime > 0 ? new Timer() : null;
 		id = (new Random()).nextLong();
+		this.listener = listener;
+	}
+	/**
+	 * Constructs a manager for the specified process without actually starting the process.
+	 * 
+	 * @param builder The process builder.
+	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
+	 * less, the life-cycle of the processes will not be limited.
+	 * @throws IOException If the process command is invalid.
+	 */
+	protected ProcessManager(ProcessBuilder builder, long keepAliveTime) throws IOException {
+		this(builder, keepAliveTime, null);
 	}
 	/**
 	 * Returns the 64 bit ID number of the instance.
@@ -69,28 +83,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 */
 	public long getId() {
 		return id;
-	}
-	/**
-	 * Subscribes a process listener to the manager instance.
-	 * 
-	 * @param listener The instance of {@link net.viktorc.pspp.ProcessListener} to add.
-	 */
-	protected void addListener(ProcessListener listener) {
-		listeners.add(listener);
-	}
-	/**
-	 * Removes a process listener from the manager instance if it is already subscribed.
-	 * 
-	 * @param listener The instance of {@link net.viktorc.pspp.ProcessListener} to remove.
-	 */
-	protected void removeListener(ProcessListener listener) {
-		listeners.remove(listener);
-	}
-	/**
-	 * Removes all subscribed listeners.
-	 */
-	protected void clearListeners() {
-		listeners.clear();
 	}
 	/**
 	 * Returns whether the process is currently running.
@@ -109,14 +101,25 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		return running && !stop && (!lock.isLocked() || lock.isHeldByCurrentThread());
 	}
 	/**
+	 * Sets the listener of the process.
+	 * 
+	 * @param listener The listener of the process.
+	 */
+	protected void setListener(ProcessListener listener) {
+		this.listener = listener;
+	}
+	/**
 	 * It prompts the currently running process, if there is one, to terminate.
 	 */
 	protected void cancel() {
 		lock.lock();
 		try {
-			stop = true;
-			if (process != null)
-				process.destroy();
+			if (listener == null || !listener.terminate(this)) {
+				stop = true;
+				if (process != null)
+					process.destroy();
+			} else
+				stop = true;
 		} finally {
 			lock.unlock();
 		}
@@ -150,53 +153,69 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			}
 			if (line.isEmpty())
 				continue;
-			synchronized (lock) {
-				try {
-					commandProcessed = (submission == null ? commandProcessed :
-							(error ? submission.getListener().onNewErrorOutput(line) :
-							submission.getListener().onNewStandardOutput(line)));
-				} finally {
-					if (commandProcessed)
-						lock.notifyAll();
+			if (startedUp) {
+				synchronized (lock) {
+					try {
+						commandProcessed = (command == null || command.getListener() == null ?
+								commandProcessed : (error ? command.getListener().onNewErrorOutput(line) :
+								command.getListener().onNewStandardOutput(line)));
+					} finally {
+						if (commandProcessed)
+							lock.notifyAll();
+					}
+				}
+			} else {
+				startedUp = listener.isStartedUp(line, !error);
+				if (startedUp) {
+					synchronized (ProcessManager.this) {
+						ProcessManager.this.notifyAll();
+					}
 				}
 			}
 		}
 	}
 	/**
-	 * Attempts to write the specified command followed by a new line to the standard in stream of the process and blocks 
-	 * until it is processed.
+	 * Attempts to write the specified commands to the standard in stream of the process and blocks until they are 
+	 * processed.
 	 * 
-	 * @param commandSubmission The command to execute including a listener for new output lines.
-	 * @return Whether the command was submitted for execution. If the manager is busy processing another command, it 
-	 * returns false; otherwise the command is submitted and true is returned once it's processed.
-	 * @throws IOException If the command cannot be written to the standard in stream.
-	 * @throws InterruptedException If the thread is interrupted.
+	 * @param commandSubmission The submitted command(s) to execute.
+	 * @return Whether the submission was executed. If the manager is busy processing an other submission, 
+	 * it returns false; otherwise the submission is executed and true is returned once it's processed.
+	 * @throws IOException If a command cannot be written to the standard in stream.
+	 * @throws ProcessManagerException If the thread is interrupted while executing the commands.
 	 */
-	public boolean executeCommand(CommandSubmission commandSubmission)
+	public boolean executeSubmission(CommandSubmission commandSubmission)
 			throws IOException {
 		if (running && !stop && lock.tryLock()) {
+			CommandSubmission submission = commandSubmission;
+			CommandSubmissionListener submissionListener = commandSubmission.getSubmissionListener();
 			try {
 				if (task != null) {
 					task.cancel();
 					task = null;
 				}
-				submission = commandSubmission;
-				commandProcessed = false;
-				stdInWriter.write(submission.getCommand());
-				stdInWriter.newLine();
-				stdInWriter.flush();
-				submission.getListener().onSubmitted();
+				if (submissionListener != null)
+					submissionListener.onStartedProcessing();
+				List<Command> commands = submission.getCommands();
 				synchronized (lock) {
-					while (running && !stop && !commandProcessed) {
-						try {
-							lock.wait();
-						} catch (InterruptedException e) {
-							Thread.currentThread().interrupt();
+					for (int i = 0; i < commands.size() && running && !stop && !submission.isCancelled(); i++) {
+						command = commands.get(i);
+						commandProcessed = command.getListener() == null;
+						stdInWriter.write(command.getInstruction());
+						stdInWriter.newLine();
+						stdInWriter.flush();
+						while (running && !stop && !commandProcessed) {
+							try {
+								lock.wait();
+							} catch (InterruptedException e) {
+								throw new ProcessManagerException(e);
+							}
 						}
+						command = null;
 					}
 				}
 				if (running && !stop) {
-					if (submission.doCancelAfterwards())
+					if (submission.doTerminateProcessAfterwards())
 						cancel();
 					else if (timer != null && task == null) {
 						task = new TimerTask() {
@@ -213,16 +232,20 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				}
 				return true;
 			} finally {
-				submission.getListener().onFinished();
-				submission.setProcessedToTrue();
-				submission = null;
-				lock.unlock();
+				try {
+					if (submissionListener != null)
+						submissionListener.onFinishedProcessing();
+				} finally {
+					submission.setProcessedToTrue();
+					System.out.println("i");
+					lock.unlock();
+				}
 			}
 		} else
 			return false;
 	}
 	@Override
-	public synchronized void run() throws ProcessManagerException {
+	public synchronized void run() {
 		running = true;
 		stop = false;
 		AtomicInteger rc = new AtomicInteger(0);
@@ -234,6 +257,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				stdOutReader = new InputStreamReader(process.getInputStream());
 				errOutReader = new InputStreamReader(process.getErrorStream());
 				stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+				startedUp = listener == null || listener.isStartedUp(null, true);
 				executor.submit(() -> {
 					try {
 						startListening(stdOutReader, false);
@@ -248,10 +272,11 @@ public class ProcessManager implements Runnable, AutoCloseable {
 						throw new ProcessManagerException(e);
 					}
 				});
-				// TODO Consume initial output or let the process listener process it.
-				// Execute the onStarted listener methods.
-				for (ProcessListener l : listeners)
-					l.onStarted(this);
+				while (!startedUp)
+					wait();
+				// Execute the onStartup listener method.
+				if (listener != null)
+					listener.onStartup(this);
 				if (timer != null && task == null) {
 					task = new TimerTask() {
 						
@@ -278,6 +303,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				task.cancel();
 				task = null;
 			}
+			process = null;
 			if (stdOutReader != null) {
 				try {
 					stdOutReader.close();
@@ -297,17 +323,18 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			synchronized (lock) {
 				lock.notifyAll();
 			}
-			// Execute the onTermination listener methods.
-			for (ProcessListener l : listeners)
-				l.onTermination(rc.get());
+			// Execute the onTermination listener method.
+			if (listener != null)
+				listener.onTermination(rc.get());
 		}
 	}
 	@Override
 	public void close() throws Exception {
 		if (timer != null)
 			timer.cancel();
-		submission = null;
-		cancel();
+		command = null;
+		if (running && !stop)
+			cancel();
 		executor.shutdown();
 	}
 	@Override

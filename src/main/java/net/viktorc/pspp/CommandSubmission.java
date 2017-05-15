@@ -1,6 +1,10 @@
 package net.viktorc.pspp;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 /**
  * A class that holds all information necessary for executing and processing commands in {@link net.viktorc.pspp.ProcessManager} instances.
@@ -10,83 +14,152 @@ import java.util.concurrent.Future;
  */
 public class CommandSubmission {
 	
-	private final String command;
-	private final boolean cancelAfterwards;
-	private final long creationTime;
-	private CommandListener listener;
-	private Long submissionTime;
+	private final List<Command> commands;
+	private final CommandSubmissionListener submissionListener;
+	private final boolean terminateProcessAfterwards;
+	private final long receivedTime;
+	private Long submittedTime;
 	private Long processedTime;
 	private boolean processed;
+	private volatile boolean cancel;
 	private volatile Future<?> future;
 	
 	/**
 	 * Constructs an instance according to the specified parameters.
 	 * 
-	 * @param command The command to write to the process' standard in.
-	 * @param listener An instance of {@link net.viktorc.pspp.CommandListener} for consuming the subsequent outputs of the process and 
-	 * for determining whether the process has finished processing the command and is ready for new commands based on 
-	 * these outputs. If it is null, the process manager will not accept any other command for the rest of the current 
-	 * progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
-	 * @param cancelAfterwards Whether the process should be cancelled after the execution of the command.
-	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
+	 * @param commands A list of commands to execute. It should not contain null references.
+	 * @param submissionListener A listener for the submission. If it is null, it is simply ignored.
+	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
+	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public CommandSubmission(String command, CommandListener listener, boolean cancelAfterwards) {
-		if (command == null)
-			throw new IllegalArgumentException("The command cannot be null or empty.");
-		if (listener == null)
-			throw new IllegalArgumentException("The command listener cannot be null.");
-		this.command = command;
-		this.listener = listener;
-		this.cancelAfterwards = cancelAfterwards;
-		creationTime = System.nanoTime();
+	public CommandSubmission(List<Command> commands, CommandSubmissionListener submissionListener, boolean terminateProcessAfterwards) {
+		if (commands == null || commands.isEmpty())
+			throw new IllegalArgumentException("The commands cannot be null.");
+		if (commands.isEmpty())
+			throw new IllegalArgumentException("The commands cannot be empty.");
+		if (!commands.stream().filter(c -> c == null).collect(Collectors.toList()).isEmpty())
+			throw new IllegalArgumentException("The commands cannot include null references.");
+		this.commands = commands;
+		this.submissionListener = submissionListener;
+		this.terminateProcessAfterwards = terminateProcessAfterwards;
+		receivedTime = System.nanoTime();
 	}
 	/**
-	 * Constructs an instance according to the specified parameters. The process will not be forcibly cancelled after 
-	 * the execution of the command.
+	 * Constructs an instance according to the specified parameters.
 	 * 
-	 * @param command The command to write to the process' standard in.
-	 * @param listener An instance of {@link net.viktorc.pspp.CommandListener} for consuming the subsequent outputs of the process and 
-	 * for determining whether the process has finished processing the command and is ready for new commands based on 
-	 * these outputs. If it is null, the process manager will not accept any other command for the rest of the current 
-	 * progress' life cycle and the cancelAfterwards parameter is rendered ineffective.
-	 * @throws IllegalArgumentException If the command is null or empty or if the command listener is null.
+	 * @param commands A list of commands to execute. It should not contain null references.
+	 * @param submissionListener A listener for the submission. If it is null, it is simply ignored.
+	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public CommandSubmission(String command, CommandListener listener) {
-		this(command, listener, false);
+	public CommandSubmission(List<Command> commands, CommandSubmissionListener submissionListener) {
+		this(commands, submissionListener, false);
 	}
 	/**
-	 * Returns the command to write to the process' standard in.
+	 * Constructs an instance according to the specified parameters.
 	 * 
-	 * @return The command to write to the process' standard in.
+	 * @param commands A list of commands to execute. It should not contain null references.
+	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
+	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public String getCommand() {
-		return command;
+	public CommandSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
+		this(commands, null, terminateProcessAfterwards);
 	}
 	/**
-	 * Returns the {@link net.viktorc.pspp.CommandListener} instance for consuming the subsequent outputs of the process and for 
-	 * determining whether the process has finished processing the command and is ready for new commands based on 
-	 * these outputs.
+	 * Constructs an instance according to the specified parameters.
 	 * 
-	 * @return The {@link net.viktorc.pspp.CommandListener} instance associated with the command.
+	 * @param commands A list of commands to execute. It should not contain null references.
+	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public CommandListener getListener() {
-		return listener;
+	public CommandSubmission(List<Command> commands) {
+		this(commands, false);
 	}
 	/**
-	 * Returns whether the process should be cancelled after the execution of the command.
+	 * Constructs an instance according to the specified parameters.
 	 * 
-	 * @return Whether the process should be cancelled after the execution of the command.
+	 * @param command A command to execute.
+	 * @param submissionListener A listener for the submission. If it is null, it is simply ignored.
+	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
+	 * @throws IllegalArgumentException If the command is null.
 	 */
-	public boolean doCancelAfterwards() {
-		return cancelAfterwards;
+	public CommandSubmission(Command command, CommandSubmissionListener submissionListener, boolean terminateProcessAfterwards) {
+		this(Arrays.asList(command), submissionListener, terminateProcessAfterwards);
+	}
+	/**
+	 * Constructs an instance according to the specified parameters.
+	 * 
+	 * @param command A command to execute.
+	 * @param submissionListener A listener for the submission. If it is null, it is simply ignored.
+	 * @throws IllegalArgumentException If the command is null.
+	 */
+	public CommandSubmission(Command command, CommandSubmissionListener submissionListener) {
+		this(Arrays.asList(command), submissionListener);
+	}
+	/**
+	 * Constructs an instance according to the specified parameters.
+	 * 
+	 * @param command A command to execute.
+	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
+	 * @throws IllegalArgumentException If the command is null.
+	 */
+	public CommandSubmission(Command command, boolean terminateProcessAfterwards) {
+		this(Arrays.asList(command), terminateProcessAfterwards);
+	}
+	/**
+	 * Constructs an instance according to the specified parameters.
+	 * 
+	 * @param command A command to execute.
+	 * @throws IllegalArgumentException If the command is null.
+	 */
+	public CommandSubmission(Command command) {
+		this(Arrays.asList(command));
+	}
+	/**
+	 * Returns the commands to execute.
+	 * 
+	 * @return The commands to execute.
+	 */
+	public List<Command> getCommands() {
+		return new ArrayList<>(commands);
+	}
+	/**
+	 * Returns the submission listener associated with the instance or null if there is none.
+	 * 
+	 * @return The submission listener associated with the instance or null if there is none.
+	 */
+	public CommandSubmissionListener getSubmissionListener() {
+		return submissionListener;
+	}
+	/**
+	 * Returns whether the process should be terminated after the execution of the command.
+	 * 
+	 * @return Whether the process should be terminated after the execution of the command.
+	 */
+	public boolean doTerminateProcessAfterwards() {
+		return terminateProcessAfterwards;
+	}
+	/**
+	 * Prompts the {@link net.viktorc.pspp.ProcessManager} handling the submission to ignore the commands in the submission that 
+	 * have not yet been written to the standard in of the process. Canceling the submission does not affect the command 
+	 * currently being processed.
+	 */
+	public void cancel() {
+		cancel = true;
+	}
+	/**
+	 * Returns whether the submission has been cancelled.
+	 * 
+	 * @return Whether the submission has been cancelled.
+	 */
+	public boolean isCancelled() {
+		return cancel;
 	}
 	/**
 	 * Returns the time when the instance was constructed in nanoseconds.
 	 * 
 	 * @return The time when the instance was constructed in nanoseconds.
 	 */
-	long getCreationTime() {
-		return creationTime;
+	long getReceivedTime() {
+		return receivedTime;
 	}
 	/**
 	 * Returns the time when the command was submitted in nanoseconds or null if it has not been 
@@ -94,8 +167,8 @@ public class CommandSubmission {
 	 * 
 	 * @return The time when the command was submitted in nanoseconds or null.
 	 */
-	Long getSubmissionTime() {
-		return submissionTime;
+	Long getSubmittedTime() {
+		return submittedTime;
 	}
 	/**
 	 * Returns the time when the command was processed in nanoseconds or null if it has not been 
@@ -131,7 +204,7 @@ public class CommandSubmission {
 	 */
 	void setFuture(Future<?> future) {
 		if (this.future == null) {
-			submissionTime = System.nanoTime();
+			submittedTime = System.nanoTime();
 			this.future = future;
 			synchronized (this) {
 				notifyAll();
@@ -149,6 +222,10 @@ public class CommandSubmission {
 				notifyAll();
 			}
 		}
+	}
+	@Override
+	public String toString() {
+		return String.join("; ", commands.stream().map(c -> c.getInstruction()).collect(Collectors.toList()));
 	}
 	
 }
