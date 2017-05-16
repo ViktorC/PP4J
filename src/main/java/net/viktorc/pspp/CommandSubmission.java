@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class CommandSubmission {
 	
 	private final List<Command> commands;
-	private final CommandSubmissionListener submissionListener;
+	private final SubmissionListener submissionListener;
 	private final boolean terminateProcessAfterwards;
 	private final long receivedTime;
 	private Long submittedTime;
@@ -32,7 +32,7 @@ public class CommandSubmission {
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
 	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public CommandSubmission(List<Command> commands, CommandSubmissionListener submissionListener, boolean terminateProcessAfterwards) {
+	public CommandSubmission(List<Command> commands, SubmissionListener submissionListener, boolean terminateProcessAfterwards) {
 		if (commands == null || commands.isEmpty())
 			throw new IllegalArgumentException("The commands cannot be null.");
 		if (commands.isEmpty())
@@ -62,7 +62,7 @@ public class CommandSubmission {
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
 	 * @throws IllegalArgumentException If the command is null.
 	 */
-	public CommandSubmission(Command command, CommandSubmissionListener submissionListener, boolean terminateProcessAfterwards) {
+	public CommandSubmission(Command command, SubmissionListener submissionListener, boolean terminateProcessAfterwards) {
 		this(Arrays.asList(command), submissionListener, terminateProcessAfterwards);
 	}
 	/**
@@ -88,7 +88,7 @@ public class CommandSubmission {
 	 * 
 	 * @return The submission listener associated with the instance or null if there is none.
 	 */
-	public CommandSubmissionListener getSubmissionListener() {
+	public SubmissionListener getSubmissionListener() {
 		return submissionListener;
 	}
 	/**

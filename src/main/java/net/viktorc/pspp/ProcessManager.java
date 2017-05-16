@@ -174,7 +174,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			throws IOException {
 		if (running && !stop && lock.tryLock()) {
 			CommandSubmission submission = commandSubmission;
-			CommandSubmissionListener submissionListener = commandSubmission.getSubmissionListener();
+			SubmissionListener submissionListener = commandSubmission.getSubmissionListener();
 			try {
 				if (task != null) {
 					task.cancel();

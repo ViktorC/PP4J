@@ -298,8 +298,8 @@ public class PSPPool implements AutoCloseable {
 	public Future<Long> submit(CommandSubmission submission) {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
-		CommandSubmissionListener submissionListener = submission.getSubmissionListener();
-		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommands(), new CommandSubmissionListener() {
+		SubmissionListener submissionListener = submission.getSubmissionListener();
+		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommands(), new SubmissionListener() {
 			
 			@Override
 			public void onStartedProcessing() {

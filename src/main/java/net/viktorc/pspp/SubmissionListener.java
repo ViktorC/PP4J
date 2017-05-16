@@ -7,7 +7,7 @@ package net.viktorc.pspp;
  * @author A6714
  *
  */
-public interface CommandSubmissionListener {
+public interface SubmissionListener {
 
 	/**
 	 * A method that is executed once the processing of the submitted commands has begun.

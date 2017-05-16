@@ -15,7 +15,7 @@ package net.viktorc.pspp;
  * @author A6714
  *
  */
-public interface CommandListener {
+public interface OutputListener {
 
 	/**
 	 * A method called every time a new line is printed to the standard out stream of the process after a command 
