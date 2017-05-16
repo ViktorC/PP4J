@@ -40,8 +40,7 @@ public interface ProcessListener {
 	 * close resources or to exit the process in an orderly way and avoid the need to forcibly terminate 
 	 * it at all. The return value of the method determines whether there is a need to forcibly terminate
 	 * the process. If true is returned, the termination is assumed to have been successful and the 
-	 * process is not forcibly terminated afterwards. If it returns false, the process is attempted to 
-	 * be forcibly cancelled.
+	 * process is not forcibly terminated afterwards. If it returns false, the process is killed.
 	 * 
 	 * @param manager The {@link net.viktorc.pspp.ProcessManager} instance to which the listener is 
 	 * subscribed. It serves as a handle for sending commands to the underlying process to terminate it 

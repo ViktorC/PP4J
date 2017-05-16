@@ -236,7 +236,7 @@ public class PSPPool implements AutoCloseable {
 					if (manager.isReady()) {
 						Future<?> future = commandExecutor.submit(() -> {
 							try {
-								if (manager.executeSubmission(submission)) {
+								if (manager.execute(submission)) {
 									if (verbose)
 										logger.info(String.format("Command(s) %s processed; submission delay: %.3f;" +
 												" execution time: %.3f.%n", submission,
@@ -290,7 +290,7 @@ public class PSPPool implements AutoCloseable {
 	 * delay in nanoseconds.
 	 * @throws IllegalArgumentException If the submission is null.
 	 */
-	public Future<Long> submitCommand(CommandSubmission submission) {
+	public Future<Long> submit(CommandSubmission submission) {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
 		CommandSubmissionListener submissionListener = submission.getSubmissionListener();

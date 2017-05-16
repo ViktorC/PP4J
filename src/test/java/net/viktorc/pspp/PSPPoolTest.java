@@ -44,7 +44,7 @@ public class PSPPoolTest {
 			@Override
 			public void onStartup(ProcessManager manager) {
 				try {
-					manager.executeSubmission(new CommandSubmission(new Command("start", new CommandListener() {
+					manager.execute(new CommandSubmission(new Command("start", new CommandListener() {
 						
 						@Override
 						public boolean onNewStandardOutput(String standardOutput) {
@@ -68,7 +68,7 @@ public class PSPPoolTest {
 				if (manuallyTerminate) {
 					try {
 						AtomicBoolean success = new AtomicBoolean(true);
-						manager.executeSubmission(new CommandSubmission(new Command("stop", new CommandListener() {
+						manager.execute(new CommandSubmission(new Command("stop", new CommandListener() {
 							
 							@Override
 							public boolean onNewStandardOutput(String standardOutput) {
@@ -137,7 +137,7 @@ public class PSPPoolTest {
 						}
 					}));
 				}
-				futures.add(procPool.submitCommand(new CommandSubmission(commands, !reuse)));
+				futures.add(procPool.submit(new CommandSubmission(commands, !reuse)));
 			}
 			List<Long> times = new ArrayList<>();
 			for (Future<Long> future : futures)

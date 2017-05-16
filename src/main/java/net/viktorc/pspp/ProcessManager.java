@@ -184,7 +184,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @throws IOException If a command cannot be written to the standard in stream.
 	 * @throws ProcessManagerException If the thread is interrupted while executing the commands.
 	 */
-	public boolean executeSubmission(CommandSubmission commandSubmission)
+	public boolean execute(CommandSubmission commandSubmission)
 			throws IOException {
 		if (running && !stop && lock.tryLock()) {
 			CommandSubmission submission = commandSubmission;
