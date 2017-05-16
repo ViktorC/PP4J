@@ -68,7 +68,7 @@ public class PSPPool implements AutoCloseable {
 	 * pool size.
 	 */
 	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize,
-			int reserveSize, long keepAliveTime) throws IOException, IllegalArgumentException {
+			int reserveSize, long keepAliveTime) throws IOException {
 		if (builder == null)
 			throw new IllegalArgumentException("The process builder cannot be null.");
 		if (listener == null)

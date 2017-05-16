@@ -44,7 +44,7 @@ public class PSPPoolTest {
 			public void onStartup(ProcessManager manager) {
 				try {
 					manager.execute(new CommandSubmission(new Command("start",
-							new SimpleCommandListener((l, s) -> "ok".equals(s), (l, s) -> true))));
+							new SimpleCommandListener((l, s) -> "ok".equals(s), (l, s) -> true)), false));
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -62,7 +62,7 @@ public class PSPPoolTest {
 								new SimpleCommandListener((l, s) -> "bye".equals(s), (l, s) -> {
 									success.set(false);
 									return true;
-								}))))) {
+								})), false))) {
 							return success.get();
 						}
 					} catch (IOException e) {

@@ -48,30 +48,11 @@ public class CommandSubmission {
 	 * Constructs an instance according to the specified parameters.
 	 * 
 	 * @param commands A list of commands to execute. It should not contain null references.
-	 * @param submissionListener A listener for the submission. If it is null, it is simply ignored.
-	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
-	 */
-	public CommandSubmission(List<Command> commands, CommandSubmissionListener submissionListener) {
-		this(commands, submissionListener, false);
-	}
-	/**
-	 * Constructs an instance according to the specified parameters.
-	 * 
-	 * @param commands A list of commands to execute. It should not contain null references.
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
 	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
 	public CommandSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
 		this(commands, null, terminateProcessAfterwards);
-	}
-	/**
-	 * Constructs an instance according to the specified parameters.
-	 * 
-	 * @param commands A list of commands to execute. It should not contain null references.
-	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
-	 */
-	public CommandSubmission(List<Command> commands) {
-		this(commands, false);
 	}
 	/**
 	 * Constructs an instance according to the specified parameters.
@@ -88,30 +69,11 @@ public class CommandSubmission {
 	 * Constructs an instance according to the specified parameters.
 	 * 
 	 * @param command A command to execute.
-	 * @param submissionListener A listener for the submission. If it is null, it is simply ignored.
-	 * @throws IllegalArgumentException If the command is null.
-	 */
-	public CommandSubmission(Command command, CommandSubmissionListener submissionListener) {
-		this(Arrays.asList(command), submissionListener);
-	}
-	/**
-	 * Constructs an instance according to the specified parameters.
-	 * 
-	 * @param command A command to execute.
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
 	 * @throws IllegalArgumentException If the command is null.
 	 */
 	public CommandSubmission(Command command, boolean terminateProcessAfterwards) {
 		this(Arrays.asList(command), terminateProcessAfterwards);
-	}
-	/**
-	 * Constructs an instance according to the specified parameters.
-	 * 
-	 * @param command A command to execute.
-	 * @throws IllegalArgumentException If the command is null.
-	 */
-	public CommandSubmission(Command command) {
-		this(Arrays.asList(command));
 	}
 	/**
 	 * Returns the commands to execute.
