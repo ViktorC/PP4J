@@ -3,7 +3,6 @@ package net.viktorc.pspp;
 import org.junit.Assert;
 import org.junit.Test;
 
-import net.viktorc.pspp.CommandListener;
 import net.viktorc.pspp.CommandSubmission;
 import net.viktorc.pspp.PSPPool;
 import net.viktorc.pspp.ProcessListener;
@@ -44,17 +43,8 @@ public class PSPPoolTest {
 			@Override
 			public void onStartup(ProcessManager manager) {
 				try {
-					manager.execute(new CommandSubmission(new Command("start", new CommandListener() {
-						
-						@Override
-						public boolean onNewStandardOutput(String standardOutput) {
-							return "ok".equals(standardOutput);
-						}
-						@Override
-						public boolean onNewErrorOutput(String errorOutput) {
-							return true;
-						}
-					})));
+					manager.execute(new CommandSubmission(new Command("start",
+							new SimpleCommandListener(s -> "ok".equals(s), s -> true))));
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -68,18 +58,11 @@ public class PSPPoolTest {
 				if (manuallyTerminate) {
 					try {
 						AtomicBoolean success = new AtomicBoolean(true);
-						manager.execute(new CommandSubmission(new Command("stop", new CommandListener() {
-							
-							@Override
-							public boolean onNewStandardOutput(String standardOutput) {
-								return "bye".equals(standardOutput);
-							}
-							@Override
-							public boolean onNewErrorOutput(String errorOutput) {
-								success.set(false);
-								return true;
-							}
-						})));
+						manager.execute(new CommandSubmission(new Command("stop",
+								new SimpleCommandListener(s -> "bye".equals(s), s -> {
+									success.set(false);
+									return true;
+								}))));
 						return success.get();
 					} catch (IOException e) {
 						e.printStackTrace();
@@ -125,17 +108,7 @@ public class PSPPoolTest {
 				List<Command> commands = new ArrayList<>();
 				for (int procTime : procTimes) {
 					commands.add(new Command("process " + procTime,
-						new CommandListener() {
-						
-						@Override
-						public boolean onNewStandardOutput(String standardOutput) {
-							return standardOutput.equals("ready");
-						}
-						@Override
-						public boolean onNewErrorOutput(String errorOutput) {
-							return true;
-						}
-					}));
+							new SimpleCommandListener(s -> "ready".equals(s), s -> true)));
 				}
 				futures.add(procPool.submit(new CommandSubmission(commands, !reuse)));
 			}

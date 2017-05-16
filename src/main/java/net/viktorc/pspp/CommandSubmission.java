@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 /**
  * A class that holds all information necessary for executing and processing commands in {@link net.viktorc.pspp.ProcessManager} instances.
  * 
- * @author Viktor
+ * @author A6714
  *
  */
 public class CommandSubmission {

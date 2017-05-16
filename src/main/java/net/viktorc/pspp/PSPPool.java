@@ -63,11 +63,16 @@ public class PSPPool implements AutoCloseable {
 	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
 	 * life-cycle of the processes will not be limited.
 	 * @throws IOException If the process cannot be started.
-	 * @throws IllegalArgumentException If the minimum pool size is less than 0, or the maximum pool size is less than the 
-	 * minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size, or the listener is null.
+	 * @throws IllegalArgumentException If the builder or the listener is null, or the minimum pool size is less than 0, or the 
+	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
+	 * pool size.
 	 */
 	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize,
 			int reserveSize, long keepAliveTime) throws IOException, IllegalArgumentException {
+		if (builder == null)
+			throw new IllegalArgumentException("The process builder cannot be null.");
+		if (listener == null)
+			throw new IllegalArgumentException("The process listener cannot be null.");
 		if (minPoolSize < 0)
 			throw new IllegalArgumentException("The minimum pool size has to be greater than 0.");
 		if (maxPoolSize < 1 || maxPoolSize < minPoolSize)
@@ -75,8 +80,6 @@ public class PSPPool implements AutoCloseable {
 					"minimum pool size.");
 		if (reserveSize < 0 || reserveSize > maxPoolSize)
 			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
-		if (builder == null)
-			throw new IllegalArgumentException("The process builder cannot be null.");
 		this.builder = builder;
 		this.listener = listener;
 		this.minPoolSize = minPoolSize;
@@ -103,8 +106,6 @@ public class PSPPool implements AutoCloseable {
 		// Wait for the processes in the initial pool to start up.
 		try {
 			startupLatch.await();
-			// Allow the locks in the managers to be released.
-			Thread.sleep(10);
 		} catch (InterruptedException e) {
 			if (verbose)
 				logger.log(Level.SEVERE, "Error while waiting for the pool to start up.", e);
@@ -140,8 +141,10 @@ public class PSPPool implements AutoCloseable {
 			procManager = spareProcessManager;
 			spareProcessManager = null;
 		} else {
-			procManager = new ProcessManager(builder, keepAliveTime, null);
-			ProcessListener procListener = new ProcessListener() {
+			procManager = new ProcessManager(builder, new ProcessListener() {
+				
+				// The process manager to which the listener is subscribed.
+				private ProcessManager manager;
 				
 				@Override
 				public boolean isStartedUp(String output, boolean standard) {
@@ -149,6 +152,8 @@ public class PSPPool implements AutoCloseable {
 				}
 				@Override
 				public void onStartup(ProcessManager manager) {
+					// Store the reference to the manager for later use in the onTermination method.
+					this.manager = manager;
 					listener.onStartup(manager);
 					activeProcesses.add(manager);
 					if (verbose) {
@@ -164,18 +169,20 @@ public class PSPPool implements AutoCloseable {
 				@Override
 				public void onTermination(int resultCode) {
 					listener.onTermination(resultCode);
-					activeProcesses.remove(procManager);
+					if (manager == null)
+						return;
+					activeProcesses.remove(manager);
 					if (verbose) {
-						logger.info("Process manager " + procManager + " stopped executing.");
+						logger.info("Process manager " + manager + " stopped executing.");
 						logPoolStats();
 					}
 					try {
-						procManager.close();
+						manager.close();
 						if (verbose)
-							logger.info("Shutting down process manager " + procManager + ".");
+							logger.info("Shutting down process manager " + manager + ".");
 					} catch (Exception e) {
 						if (verbose)
-							logger.log(Level.SEVERE, "Error while shutting down process manager " + procManager + ".", e);
+							logger.log(Level.SEVERE, "Error while shutting down process manager " + manager + ".", e);
 					}
 					synchronized (poolLock) {
 						// Consider that the pool size is about to decrease as this process terminates.
@@ -191,9 +198,7 @@ public class PSPPool implements AutoCloseable {
 						}
 					}
 				}
-				
-			};
-			procManager.setListener(procListener);
+			}, keepAliveTime);
 		}
 		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
 		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 

@@ -4,7 +4,7 @@ package net.viktorc.pspp;
  * An interface for listeners for the {@link net.viktorc.pspp.ProcessManager} class. It defines a method to 
  * execute right after the starting of the process and method to call right after its termination. Moreover, 
  * it defines a method to execute before the forced termination of the process. Its implementation should be 
- * stateless as the same {@link net.viktorc.pspp.ProcessListener} instance is used for every 
+ * stateless as the methods of the same {@link net.viktorc.pspp.ProcessListener} instance is used for every 
  * {@link net.viktorc.pspp.ProcessManager} of a {@link net.viktorc.pspp.PSPPool} instance.
  * 
  * @author A6714

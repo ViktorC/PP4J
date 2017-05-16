@@ -32,6 +32,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	private final ExecutorService executor;
 	private final ReentrantLock lock;
 	private final ProcessBuilder builder;
+	private final ProcessListener listener;
 	private final long keepAliveTime;
 	private final Timer timer;
 	private final long id;
@@ -40,7 +41,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
 	private TimerTask task;
-	private volatile ProcessListener listener;
 	private volatile Command command;
 	private volatile boolean running;
 	private volatile boolean stop;
@@ -55,26 +55,20 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * less, the life-cycle of the processes will not be limited.
 	 * @param listener A process listener to manage the instance.
 	 * @throws IOException If the process command is invalid.
+	 * @throws IllegalArgumentException If the builder or the listener is null.
 	 */
-	protected ProcessManager(ProcessBuilder builder, long keepAliveTime, ProcessListener listener) throws IOException {
+	protected ProcessManager(ProcessBuilder builder, ProcessListener listener, long keepAliveTime) throws IOException {
+		if (builder == null)
+			throw new IllegalArgumentException("The process builder cannot be null.");
+		if (listener == null)
+			throw new IllegalArgumentException("The process listener cannot be null.");
 		executor = Executors.newFixedThreadPool(2);
 		lock = new ReentrantLock();
 		this.builder = builder;
+		this.listener = listener;
 		this.keepAliveTime = keepAliveTime;
 		timer = keepAliveTime > 0 ? new Timer() : null;
 		id = (new Random()).nextLong();
-		this.listener = listener;
-	}
-	/**
-	 * Constructs a manager for the specified process without actually starting the process.
-	 * 
-	 * @param builder The process builder.
-	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
-	 * less, the life-cycle of the processes will not be limited.
-	 * @throws IOException If the process command is invalid.
-	 */
-	protected ProcessManager(ProcessBuilder builder, long keepAliveTime) throws IOException {
-		this(builder, keepAliveTime, null);
 	}
 	/**
 	 * Returns the 64 bit ID number of the instance.
@@ -99,14 +93,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 */
 	protected boolean isReady() {
 		return running && !stop && (!lock.isLocked() || lock.isHeldByCurrentThread());
-	}
-	/**
-	 * Sets the listener of the process.
-	 * 
-	 * @param listener The listener of the process.
-	 */
-	protected void setListener(ProcessListener listener) {
-		this.listener = listener;
 	}
 	/**
 	 * It prompts the currently running process, if there is one, to terminate.
