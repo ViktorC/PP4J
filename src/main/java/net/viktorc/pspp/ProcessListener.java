@@ -22,7 +22,7 @@ public interface ProcessListener {
 	 * until it returns true.
 	 * 
 	 * @param output A line of output produced by the process.
-	 * @param standard Whether this line has been output to the standard out or the error out.
+	 * @param standard Whether this line has been output to the standard out or to the error out.
 	 * @return Whether the process is to be considered started up.
 	 */
 	boolean isStartedUp(String output, boolean standard);
@@ -39,11 +39,11 @@ public interface ProcessListener {
 	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
 	 * close resources or to exit the process in an orderly way and avoid the need to forcibly terminate 
 	 * it at all. The return value of the method determines whether there is a need to forcibly terminate
-	 * the command. If true is returned, the termination is assumed to have been successful and the 
+	 * the process. If true is returned, the termination is assumed to have been successful and the 
 	 * process is not forcibly terminated afterwards. If it returns false, the process is attempted to 
 	 * be forcibly cancelled.
 	 * 
-	 * @param manager  The {@link net.viktorc.pspp.ProcessManager} instance to which the listener is 
+	 * @param manager The {@link net.viktorc.pspp.ProcessManager} instance to which the listener is 
 	 * subscribed. It serves as a handle for sending commands to the underlying process to terminate it 
 	 * in an orderly way.
 	 * @return Whether the process has been successfully terminated or it should be forcibly cancelled.
