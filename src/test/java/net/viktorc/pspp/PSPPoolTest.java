@@ -44,7 +44,7 @@ public class PSPPoolTest {
 			public void onStartup(ProcessManager manager) {
 				try {
 					manager.execute(new CommandSubmission(new Command("start",
-							new SimpleCommandListener(s -> "ok".equals(s), s -> true))));
+							new SimpleCommandListener((l, s) -> "ok".equals(s), (l, s) -> true))));
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -58,12 +58,13 @@ public class PSPPoolTest {
 				if (manuallyTerminate) {
 					try {
 						AtomicBoolean success = new AtomicBoolean(true);
-						manager.execute(new CommandSubmission(new Command("stop",
-								new SimpleCommandListener(s -> "bye".equals(s), s -> {
+						if (manager.execute(new CommandSubmission(new Command("stop",
+								new SimpleCommandListener((l, s) -> "bye".equals(s), (l, s) -> {
 									success.set(false);
 									return true;
-								}))));
-						return success.get();
+								}))))) {
+							return success.get();
+						}
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -108,7 +109,7 @@ public class PSPPoolTest {
 				List<Command> commands = new ArrayList<>();
 				for (int procTime : procTimes) {
 					commands.add(new Command("process " + procTime,
-							new SimpleCommandListener(s -> "ready".equals(s), s -> true)));
+							new SimpleCommandListener((l, s) -> "ready".equals(s), (l, s) -> true)));
 				}
 				futures.add(procPool.submit(new CommandSubmission(commands, !reuse)));
 			}
