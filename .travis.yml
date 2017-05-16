@@ -8,7 +8,7 @@ addons:
         token:
             secure: $SONAR_TOKEN
 install: true
-script: mvn clean -DskipTests sonar:sonar
+script: mvn clean install -DskipTests sonar:sonar
 cache:
     directories:
         - $HOME/.m2
