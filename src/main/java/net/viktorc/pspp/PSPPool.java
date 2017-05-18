@@ -348,6 +348,7 @@ public class PSPPool implements AutoCloseable {
 	private class SubmissionFuture implements Future<Long> {
 		
 		final CommandSubmission submission;
+		boolean cancel;
 		
 		/**
 		 * Constructs a {@link java.util.concurrent.Future} for the specified submission.
@@ -366,6 +367,7 @@ public class PSPPool implements AutoCloseable {
 				if (submissionFuture != null)
 					submissionFuture.cancel(true);
 			}
+			cancel = true;
 			synchronized (submission) {
 				submission.notifyAll();
 			}
@@ -374,11 +376,11 @@ public class PSPPool implements AutoCloseable {
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
 			synchronized (submission) {
-				while (!submission.isProcessed() && !submission.isCancelled()) {
+				while (!submission.isProcessed() && !cancel) {
 					submission.wait();
 				}
 			}
-			if (submission.isCancelled())
+			if (cancel)
 				throw new CancellationException();
 			return submission.getProcessedTime() - submission.getReceivedTime();
 		}
@@ -388,13 +390,12 @@ public class PSPPool implements AutoCloseable {
 			long timeoutNs = unit.toNanos(timeout);
 			long start = System.nanoTime();
 			synchronized (submission) {
-				while (!submission.isProcessed() && !submission.isCancelled() &&
-						timeoutNs > 0) {
+				while (!submission.isProcessed() && !cancel && timeoutNs > 0) {
 					submission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
 					timeoutNs -= (System.nanoTime() - start);
 				}
 			}
-			if (submission.isCancelled())
+			if (cancel)
 				throw new CancellationException();
 			if (timeoutNs <= 0)
 				throw new TimeoutException();
@@ -403,7 +404,7 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public boolean isCancelled() {
-			return submission.isCancelled();
+			return cancel;
 		}
 		@Override
 		public boolean isDone() {

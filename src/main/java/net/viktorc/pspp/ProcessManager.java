@@ -143,8 +143,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				synchronized (lock) {
 					try {
 						commandProcessed = (command == null || command.getListener() == null ?
-								commandProcessed : (error ? command.getListener().onNewErrorOutput(line) :
-								command.getListener().onNewStandardOutput(line)));
+								commandProcessed : (error ? command.getListener().onErrorOutput(command, line) :
+								command.getListener().onStandardOutput(command, line)));
 					} finally {
 						if (commandProcessed)
 							lock.notifyAll();
@@ -183,8 +183,10 @@ public class ProcessManager implements Runnable, AutoCloseable {
 					subListener.onStartedProcessing();
 				List<Command> commands = commandSubmission.getCommands();
 				synchronized (lock) {
-					for (int i = 0; i < commands.size() && running && !stop && !commandSubmission.isCancelled(); i++) {
+					for (int i = 0; i < commands.size() && running && !stop; i++) {
 						command = commands.get(i);
+						if (command.doSkip())
+							continue;
 						commandProcessed = command.getListener() == null;
 						stdInWriter.write(command.getInstruction());
 						stdInWriter.newLine();

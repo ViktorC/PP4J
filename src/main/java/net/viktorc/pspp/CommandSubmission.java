@@ -23,7 +23,6 @@ public class CommandSubmission {
 	private Long submittedTime;
 	private Long processedTime;
 	private boolean processed;
-	private volatile boolean cancel;
 	private volatile Future<?> future;
 	
 	/**
@@ -105,15 +104,8 @@ public class CommandSubmission {
 	 * currently being processed.
 	 */
 	void cancel() {
-		cancel = true;
-	}
-	/**
-	 * Returns whether the submission has been cancelled.
-	 * 
-	 * @return Whether the submission has been cancelled.
-	 */
-	boolean isCancelled() {
-		return cancel;
+		for (Command c : commands)
+			c.setSkip(true);
 	}
 	/**
 	 * Returns the time when the instance was constructed in nanoseconds.

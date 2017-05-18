@@ -21,21 +21,25 @@ public interface OutputListener {
 	 * A method called every time a new line is printed to the standard out stream of the process after a command 
 	 * has been sent to it and it has not finished processing it up until now.
 	 * 
-	 * @param standardOutput The new line of output printed to the standard out of the process.
+	 * @param command The {@link net.viktorc.pspp.Command} instance the listener belongs to, i.e. the command that 
+	 * induced the output.
+	 * @param standardOutputLine The new line of output printed to the standard out of the process.
 	 * @return Whether this line of output denotes that the process has finished processing the previously sent 
 	 * command. The {@link net.viktorc.pspp.ProcessManager} instance will not accept new commands until the 
 	 * processing of the command is completed.
 	 */
-	boolean onNewStandardOutput(String standardOutput);
+	boolean onStandardOutput(Command command, String standardOutputLine);
 	/**
 	 * A method called every time a new line is printed to the error out stream of the process after a command 
 	 * has been sent to it and it has not finished processing it up until now.
 	 * 
-	 * @param errorOutput The new line of output printed to the error out of the process.
+	 * @param command The {@link net.viktorc.pspp.Command} instance the listener belongs to, i.e. the command that 
+	 * induced the output.
+	 * @param errorOutputLine The new line of output printed to the error out of the process.
 	 * @return Whether this line of output denotes that the process has finished processing the previously sent 
 	 * command. The {@link net.viktorc.pspp.ProcessManager} instance will not accept new commands until the 
 	 * processing of the command is completed.
 	 */
-	boolean onNewErrorOutput(String errorOutput);
+	boolean onErrorOutput(Command command, String errorOutputLine);
 	
 }

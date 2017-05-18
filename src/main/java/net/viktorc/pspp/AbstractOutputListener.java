@@ -2,46 +2,25 @@ package net.viktorc.pspp;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiPredicate;
 
 /**
- * A simple implementation of the {@link net.viktorc.pspp.OutputListener} interface that stores every line output to 
+ * A simple abstract implementation of the {@link net.viktorc.pspp.OutputListener} interface that stores every line output to 
  * the standard out and error out of the process in lists of strings.
  * 
  * @author A6714
  *
  */
-public class SimpleOutputListener implements OutputListener {
+public abstract class AbstractOutputListener implements OutputListener {
 
 	private final List<String> stdOutLines;
 	private final List<String> errOutLines;
-	private final BiPredicate<SimpleOutputListener,String> stdPred;
-	private final BiPredicate<SimpleOutputListener,String> errPred;
 	
 	/**
-	 * Constructs a simple command listener. The parameters are used to implement the
-	 * {@link net.viktorc.pspp.OutputListener#onNewStandardOutput(String) onNewStandardOutput} and 
-	 * {@link net.viktorc.pspp.OutputListener#onNewErrorOutput(String) onNewErrorOutput} methods of the 
-	 * {@link net.viktorc.pspp.OutputListener} interface.
-	 * 
-	 * @param stdPred A {@link java.util.function.BiPredicate} to determine if the {@link net.viktorc.pspp.Command} 
-	 * has been processed based on the standard output of the underlying process. Its first argument is the 
-	 * command listener itself (for retrieving previous outputs) and its second argument is the last line output 
-	 * to the standard out of the process.
-	 * @param errPred A {@link java.util.function.BiPredicate} to determine if the {@link net.viktorc.pspp.Command} 
-	 * has been processed based on the error output of the underlying process. Its first argument is the 
-	 * command listener itself (for retrieving previous outputs) and its second argument is the last line output 
-	 * to the error out of the process.
-	 * @throws IllegalArgumentException If either of the predicates is null.
+	 * Constructs a simple abstract command listener.
 	 */
-	public SimpleOutputListener(BiPredicate<SimpleOutputListener,String> stdPred,
-			BiPredicate<SimpleOutputListener,String> errPred) {
-		if (stdPred == null || errPred == null)
-			throw new IllegalArgumentException("The predicates cannot be null");
+	public AbstractOutputListener() {
 		this.stdOutLines = new ArrayList<>();
 		this.errOutLines = new ArrayList<>();
-		this.stdPred = stdPred;
-		this.errPred = errPred;
 	}
 	/**
 	 * Returns a list of lines output to the standard out of the underlying process after the instruction of the 
@@ -87,15 +66,23 @@ public class SimpleOutputListener implements OutputListener {
 		stdOutLines.clear();
 		errOutLines.clear();
 	}
+	/**
+	 * See {@link net.viktorc.pspp.OutputListener#onStandardOutput(Command, String)}.
+	 */
+	public abstract boolean onNewStandardOutput(Command command, String newStandardOutputLine);
+	/**
+	 * See {@link net.viktorc.pspp.OutputListener#onErrorOutput(Command, String)}.
+	 */
+	public abstract boolean onNewErrorOutput(Command command, String newErrorOutputLine);
 	@Override
-	public final boolean onNewStandardOutput(String standardOutput) {
+	public final boolean onStandardOutput(Command command, String standardOutput) {
 		stdOutLines.add(standardOutput);
-		return stdPred.test(this, standardOutput);
+		return onNewStandardOutput(command, standardOutput);
 	}
 	@Override
-	public final boolean onNewErrorOutput(String errorOutput) {
+	public final boolean onErrorOutput(Command command, String errorOutput) {
 		errOutLines.add(errorOutput);
-		return errPred.test(this, errorOutput);
+		return onNewErrorOutput(command, errorOutput);
 	}
-
+	
 }

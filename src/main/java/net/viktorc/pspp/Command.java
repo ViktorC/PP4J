@@ -11,6 +11,7 @@ public class Command {
 
 	private final String instruction;
 	private final OutputListener listener;
+	private volatile boolean skip;
 	
 	/**
 	 * Constructs an instance according to the specified parameters.
@@ -29,7 +30,9 @@ public class Command {
 		this.listener = listener;
 	}
 	/**
-	 * Constructs an instance according to the specified parameters.
+	 * Constructs an instance according to the specified parameters. The {@link net.viktorc.pspp.ProcessManager} instance 
+	 * the command is executed on will assume that the command should induce no response from the underlying process and 
+	 * that the process is instantly ready for new commands.
 	 * 
 	 * @param instruction The instruction to write to the process' standard in.
 	 * @throws IllegalArgumentException If the instruction is null.
@@ -54,6 +57,25 @@ public class Command {
 	 */
 	public OutputListener getListener() {
 		return listener;
+	}
+	/**
+	 * Returns whether the execution of the command should be skipped.
+	 * 
+	 * @return Whether the execution of the command should be skipped.
+	 */
+	public boolean doSkip() {
+		return skip;
+	}
+	/**
+	 * Sets whether the execution of the command should be skipped. If set to true, the command will not be executed, even if 
+	 * it has already been submitted, as long as the instruction has not been sent to a process. If the instruction has already 
+	 * been written to the standard in of a process and the command is currently being executed, calling this method has no 
+	 * effect.
+	 * 
+	 * @param skip Whether the execution of the command should be skipped.
+	 */
+	public void setSkip(boolean skip) {
+		this.skip = skip;
 	}
 	
 }

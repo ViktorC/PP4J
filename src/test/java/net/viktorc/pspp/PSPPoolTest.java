@@ -44,7 +44,18 @@ public class PSPPoolTest {
 			public void onStartup(ProcessManager manager) {
 				try {
 					manager.execute(new CommandSubmission(new Command("start",
-							new SimpleOutputListener((l, s) -> "ok".equals(s), (l, s) -> true)), false));
+							new AbstractOutputListener() {
+								
+								@Override
+								public boolean onNewStandardOutput(Command command, String newStandardOutputLine) {
+									return "ok".equals(newStandardOutputLine);
+								}
+								@Override
+								public boolean onNewErrorOutput(Command command, String newErrorOutputLine) {
+									return true;
+								}
+								
+							}), false));
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -59,10 +70,20 @@ public class PSPPoolTest {
 					try {
 						AtomicBoolean success = new AtomicBoolean(true);
 						if (manager.execute(new CommandSubmission(new Command("stop",
-								new SimpleOutputListener((l, s) -> "bye".equals(s), (l, s) -> {
-									success.set(false);
-									return true;
-								})), false))) {
+								new AbstractOutputListener() {
+									
+									@Override
+									public boolean onNewStandardOutput(Command command, String newStandardOutputLine) {
+										return "bye".equals(newStandardOutputLine);
+									}
+									
+									@Override
+									public boolean onNewErrorOutput(Command command, String newErrorOutputLine) {
+										success.set(true);
+										return true;
+									}
+									
+								}), false))) {
 							return success.get();
 						}
 					} catch (IOException e) {
@@ -109,7 +130,18 @@ public class PSPPoolTest {
 				List<Command> commands = new ArrayList<>();
 				for (int procTime : procTimes) {
 					commands.add(new Command("process " + procTime,
-							new SimpleOutputListener((l, s) -> "ready".equals(s), (l, s) -> true)));
+							new AbstractOutputListener() {
+								
+								@Override
+								public boolean onNewStandardOutput(Command command, String newStandardOutputLine) {
+									return "ready".equals(newStandardOutputLine);
+								}
+								@Override
+								public boolean onNewErrorOutput(Command command, String newErrorOutputLine) {
+									return true;
+								}
+								
+							}));
 				}
 				futures.add(procPool.submit(new CommandSubmission(commands, !reuse)));
 			}
