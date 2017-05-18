@@ -3,6 +3,8 @@ package net.viktorc.pspp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
@@ -15,8 +17,8 @@ import java.util.stream.Collectors;
 public class CommandSubmission {
 	
 	private final List<Command> commands;
-	private final SubmissionListener submissionListener;
 	private final boolean terminateProcessAfterwards;
+	private final Queue<SubmissionListener> submissionListeners;
 	private final long receivedTime;
 	private Long submittedTime;
 	private Long processedTime;
@@ -28,42 +30,20 @@ public class CommandSubmission {
 	 * Constructs an instance according to the specified parameters.
 	 * 
 	 * @param commands A list of commands to execute. It should not contain null references.
-	 * @param submissionListener A listener for the submission. If it is null, it is simply ignored.
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
 	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public CommandSubmission(List<Command> commands, SubmissionListener submissionListener, boolean terminateProcessAfterwards) {
+	public CommandSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
 		if (commands == null || commands.isEmpty())
 			throw new IllegalArgumentException("The commands cannot be null.");
 		if (commands.isEmpty())
 			throw new IllegalArgumentException("The commands cannot be empty.");
 		if (!commands.stream().filter(c -> c == null).collect(Collectors.toList()).isEmpty())
 			throw new IllegalArgumentException("The commands cannot include null references.");
-		this.commands = commands;
-		this.submissionListener = submissionListener;
+		this.commands = new ArrayList<>(commands);
 		this.terminateProcessAfterwards = terminateProcessAfterwards;
+		submissionListeners = new ConcurrentLinkedQueue<>();
 		receivedTime = System.nanoTime();
-	}
-	/**
-	 * Constructs an instance according to the specified parameters.
-	 * 
-	 * @param commands A list of commands to execute. It should not contain null references.
-	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
-	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
-	 */
-	public CommandSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
-		this(commands, null, terminateProcessAfterwards);
-	}
-	/**
-	 * Constructs an instance according to the specified parameters.
-	 * 
-	 * @param command A command to execute.
-	 * @param submissionListener A listener for the submission. If it is null, it is simply ignored.
-	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
-	 * @throws IllegalArgumentException If the command is null.
-	 */
-	public CommandSubmission(Command command, SubmissionListener submissionListener, boolean terminateProcessAfterwards) {
-		this(Arrays.asList(command), submissionListener, terminateProcessAfterwards);
 	}
 	/**
 	 * Constructs an instance according to the specified parameters.
@@ -84,14 +64,6 @@ public class CommandSubmission {
 		return new ArrayList<>(commands);
 	}
 	/**
-	 * Returns the submission listener associated with the instance or null if there is none.
-	 * 
-	 * @return The submission listener associated with the instance or null if there is none.
-	 */
-	public SubmissionListener getSubmissionListener() {
-		return submissionListener;
-	}
-	/**
 	 * Returns whether the process should be terminated after the execution of the command.
 	 * 
 	 * @return Whether the process should be terminated after the execution of the command.
@@ -100,11 +72,39 @@ public class CommandSubmission {
 		return terminateProcessAfterwards;
 	}
 	/**
+	 * Subscribes a listener to the submission instance. Listeners added to the submission after it 
+	 * has already been submitted have no effect.
+	 * 
+	 * @param listener The listener to subscribe to the submission.
+	 */
+	public void addSubmissionListener(SubmissionListener listener) {
+		submissionListeners.add(listener);
+	}
+	/**
+	 * Removes the specified listener from the list of subscribed listeners if found. The value returned 
+	 * denotes whether the listener was subscribed. Removing listeners after the submission has already 
+	 * been submitted has no effect.
+	 * 
+	 * @param listener The listener to remove.
+	 * @return Whether the listener was subscribed and thus removed.
+	 */
+	public boolean removeSubmissionListener(SubmissionListener listener) {
+		return submissionListeners.remove(listener);
+	}
+	/**
+	 * Returns a list of the subscribed submission listeners.
+	 * 
+	 * @return A list of the listeners subscribed to the submission instance.
+	 */
+	List<SubmissionListener> getSubmissionListeners() {
+		return new ArrayList<>(submissionListeners);
+	}
+	/**
 	 * Prompts the {@link net.viktorc.pspp.ProcessManager} handling the submission to ignore the commands in the submission that 
 	 * have not yet been written to the standard in of the process. Canceling the submission does not affect the command 
 	 * currently being processed.
 	 */
-	public void cancel() {
+	void cancel() {
 		cancel = true;
 	}
 	/**
@@ -112,7 +112,7 @@ public class CommandSubmission {
 	 * 
 	 * @return Whether the submission has been cancelled.
 	 */
-	public boolean isCancelled() {
+	boolean isCancelled() {
 		return cancel;
 	}
 	/**

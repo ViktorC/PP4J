@@ -98,6 +98,7 @@ public class PSPPool implements AutoCloseable {
 		submissionSemaphore = new Semaphore(0);
 		numOfExecutingCommands = new AtomicInteger(0);
 		logger = Logger.getAnonymousLogger();
+		verbose = true;
 		for (int i = 0; i < actualMinSize; i++) {
 			synchronized (poolLock) {
 				startNewProcess();
@@ -115,7 +116,7 @@ public class PSPPool implements AutoCloseable {
 		(new Thread(this::mainLoop)).start();
 	}
 	/**
-	 * Sets whether the pool should log to the console.
+	 * Sets whether the pool should log to the console. Logging is enabled by default.
 	 * 
 	 * @param on Whether the pool should log to the console.
 	 */
@@ -198,6 +199,7 @@ public class PSPPool implements AutoCloseable {
 						}
 					}
 				}
+				
 			}, keepAliveTime);
 		}
 		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
@@ -298,86 +300,31 @@ public class PSPPool implements AutoCloseable {
 	public Future<Long> submit(CommandSubmission submission) {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
-		SubmissionListener submissionListener = submission.getSubmissionListener();
-		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommands(), new SubmissionListener() {
+		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommands(),
+				submission.doTerminateProcessAfterwards());
+		for (SubmissionListener subListener : submission.getSubmissionListeners())
+			internalSubmission.addSubmissionListener(subListener);
+		internalSubmission.addSubmissionListener(new SubmissionListener() {
 			
 			@Override
 			public void onStartedProcessing() {
 				submissionSuccessful = true;
 				submissionSemaphore.release();
-				if (submissionListener != null)
-					submissionListener.onStartedProcessing();
 				numOfExecutingCommands.incrementAndGet();
 			}
-			
 			@Override
 			public void onFinishedProcessing() {
-				if (submissionListener != null)
-					submissionListener.onFinishedProcessing();
 				numOfExecutingCommands.decrementAndGet();
 			}
-		}, submission.doTerminateProcessAfterwards());
+			
+		});
 		commandQueue.add(internalSubmission);
 		// Notify the main loop that a command has been submitted.
 		synchronized (this) {
 			notifyAll();
 		}
 		// Return a Future holding the total execution time including the submission delay.
-		return new Future<Long>() {
-
-			private boolean cancelled;
-			
-			@Override
-			public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-				commandQueue.remove(internalSubmission);
-				submission.cancel();
-				if (mayInterruptIfRunning) {
-					Future<?> submissionFuture = internalSubmission.getFuture();
-					if (submissionFuture != null)
-						submissionFuture.cancel(true);
-				}
-				cancelled = true;
-				synchronized (internalSubmission) {
-					internalSubmission.notifyAll();
-				}
-				return true;
-			}
-			@Override
-			public Long get() throws InterruptedException, ExecutionException, CancellationException {
-				synchronized (internalSubmission) {
-					while (!internalSubmission.isProcessed() && !cancelled) {
-						internalSubmission.wait();
-					}
-				}
-				if (cancelled)
-					throw new CancellationException();
-				return internalSubmission.getProcessedTime() - internalSubmission.getReceivedTime();
-			}
-			@Override
-			public Long get(long timeout, TimeUnit unit)
-					throws InterruptedException, ExecutionException, TimeoutException, CancellationException {
-				long timeoutNs = unit.toNanos(timeout);
-				long start = System.nanoTime();
-				synchronized (internalSubmission) {
-					while (!internalSubmission.isProcessed() && !cancelled && timeoutNs > 0) {
-						internalSubmission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
-						timeoutNs -= (System.nanoTime() - start);
-					}
-				}
-				if (cancelled)
-					throw new CancellationException();
-				return timeoutNs <= 0 ? null : internalSubmission.getProcessedTime() -
-						internalSubmission.getReceivedTime();
-			}
-			@Override
-			public boolean isCancelled() {
-				return cancelled;
-			}
-			@Override
-			public boolean isDone() {
-				return internalSubmission.isProcessed();
-			}
-		};
+		return new SubmissionFuture(internalSubmission);
 	}
 	@Override
 	public void close() throws Exception {
@@ -389,6 +336,80 @@ public class PSPPool implements AutoCloseable {
 		for (ProcessManager p : activeProcesses)
 			p.close();
 		poolExecutor.shutdown();
+	}
+	
+	/**
+	 * An implementation of {@link java.util.concurrent.Future} that returns the time it took to process the 
+	 * submission.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class SubmissionFuture implements Future<Long> {
+		
+		final CommandSubmission submission;
+		
+		/**
+		 * Constructs a {@link java.util.concurrent.Future} for the specified submission.
+		 * 
+		 * @param submission The submission to get a {@link java.util.concurrent.Future} for.
+		 */
+		SubmissionFuture(CommandSubmission submission) {
+			this.submission = submission;
+		}
+		@Override
+		public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+			commandQueue.remove(submission);
+			submission.cancel();
+			if (mayInterruptIfRunning) {
+				Future<?> submissionFuture = submission.getFuture();
+				if (submissionFuture != null)
+					submissionFuture.cancel(true);
+			}
+			synchronized (submission) {
+				submission.notifyAll();
+			}
+			return true;
+		}
+		@Override
+		public Long get() throws InterruptedException, ExecutionException, CancellationException {
+			synchronized (submission) {
+				while (!submission.isProcessed() && !submission.isCancelled()) {
+					submission.wait();
+				}
+			}
+			if (submission.isCancelled())
+				throw new CancellationException();
+			return submission.getProcessedTime() - submission.getReceivedTime();
+		}
+		@Override
+		public Long get(long timeout, TimeUnit unit)
+				throws InterruptedException, ExecutionException, TimeoutException, CancellationException {
+			long timeoutNs = unit.toNanos(timeout);
+			long start = System.nanoTime();
+			synchronized (submission) {
+				while (!submission.isProcessed() && !submission.isCancelled() &&
+						timeoutNs > 0) {
+					submission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
+					timeoutNs -= (System.nanoTime() - start);
+				}
+			}
+			if (submission.isCancelled())
+				throw new CancellationException();
+			if (timeoutNs <= 0)
+				throw new TimeoutException();
+			return timeoutNs <= 0 ? null : submission.getProcessedTime() -
+					submission.getReceivedTime();
+		}
+		@Override
+		public boolean isCancelled() {
+			return submission.isCancelled();
+		}
+		@Override
+		public boolean isDone() {
+			return submission.isProcessed();
+		}
+		
 	}
 	
 }

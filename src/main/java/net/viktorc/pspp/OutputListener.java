@@ -2,7 +2,7 @@ package net.viktorc.pspp;
 
 /**
  * A listener that allows for the processing of the outputs of a process. It is temporarily subscribed to a 
- * {@link net.viktorc.pspp.ProcessManager} instance when the {@link net.viktorc.pspp.ProcessManager#execute(CommandSubmission) executeCommand} 
+ * {@link net.viktorc.pspp.ProcessManager} instance when the {@link net.viktorc.pspp.ProcessManager#execute(CommandSubmission) execute} 
  * method is called. It listens to the standard out and error out streams of the process and the respective method 
  * is invoked every time a new line is printed to one of these streams. Besides possible processing activities, 
  * these methods are also responsible for determining when the process finished processing the command. E.g. if a 

@@ -173,18 +173,17 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	public boolean execute(CommandSubmission commandSubmission)
 			throws IOException {
 		if (running && !stop && lock.tryLock()) {
-			CommandSubmission submission = commandSubmission;
-			SubmissionListener submissionListener = commandSubmission.getSubmissionListener();
+			List<SubmissionListener> submissionListeners = commandSubmission.getSubmissionListeners();
 			try {
 				if (task != null) {
 					task.cancel();
 					task = null;
 				}
-				if (submissionListener != null)
-					submissionListener.onStartedProcessing();
-				List<Command> commands = submission.getCommands();
+				for (SubmissionListener subListener : submissionListeners)
+					subListener.onStartedProcessing();
+				List<Command> commands = commandSubmission.getCommands();
 				synchronized (lock) {
-					for (int i = 0; i < commands.size() && running && !stop && !submission.isCancelled(); i++) {
+					for (int i = 0; i < commands.size() && running && !stop && !commandSubmission.isCancelled(); i++) {
 						command = commands.get(i);
 						commandProcessed = command.getListener() == null;
 						stdInWriter.write(command.getInstruction());
@@ -201,7 +200,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 					}
 				}
 				if (running && !stop) {
-					if (submission.doTerminateProcessAfterwards())
+					if (commandSubmission.doTerminateProcessAfterwards())
 						cancel();
 					else if (timer != null && task == null) {
 						task = new TimerTask() {
@@ -219,10 +218,10 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				return true;
 			} finally {
 				try {
-					if (submissionListener != null)
-						submissionListener.onFinishedProcessing();
+					for (SubmissionListener subListener : submissionListeners)
+						subListener.onFinishedProcessing();
 				} finally {
-					submission.setProcessedToTrue();
+					commandSubmission.setProcessedToTrue();
 					lock.unlock();
 				}
 			}
