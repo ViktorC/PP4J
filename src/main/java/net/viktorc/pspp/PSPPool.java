@@ -37,7 +37,8 @@ public class PSPPool implements AutoCloseable {
 	private final int reserveSize;
 	private final long keepAliveTime;
 	private final ThreadPoolExecutor poolExecutor;
-	private final List<ProcessManager> activeProcesses;
+	private final List<ProcessManager> activeManagers;
+	private final Queue<ProcessManager> inactiveManagers;
 	private final Object poolLock;
 	private final CountDownLatch startupLatch;
 	private final ExecutorService commandExecutor;
@@ -48,7 +49,6 @@ public class PSPPool implements AutoCloseable {
 	private volatile boolean submissionSuccessful;
 	private volatile boolean verbose;
 	private volatile boolean close;
-	private ProcessManager spareProcessManager;
 
 	/**
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
@@ -90,7 +90,8 @@ public class PSPPool implements AutoCloseable {
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		poolExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
-		activeProcesses = new CopyOnWriteArrayList<>();
+		activeManagers = new CopyOnWriteArrayList<>();
+		inactiveManagers = new ConcurrentLinkedQueue<>();
 		poolLock = new Object();
 		startupLatch = new CountDownLatch(actualMinSize);
 		commandExecutor = Executors.newCachedThreadPool();
@@ -127,7 +128,7 @@ public class PSPPool implements AutoCloseable {
 	 * Logs the number of active, queued, and currently executing processes.
 	 */
 	private void logPoolStats() {
-		logger.info("Total processes: " + poolExecutor.getActiveCount() + "; acitve processes: " + activeProcesses.size() +
+		logger.info("Total processes: " + poolExecutor.getActiveCount() + "; acitve processes: " + activeManagers.size() +
 				"; submitted commands: " + (numOfExecutingCommands.get() + commandQueue.size()));
 	}
 	/**
@@ -137,11 +138,11 @@ public class PSPPool implements AutoCloseable {
 	 * @return Whether the process was successfully started.
 	 */
 	private boolean startNewProcess() throws IOException {
-		ProcessManager procManager;
-		if (spareProcessManager != null) {
-			procManager = spareProcessManager;
-			spareProcessManager = null;
-		} else {
+		ProcessManager procManager = null;
+		if (!inactiveManagers.isEmpty())
+			procManager = inactiveManagers.poll();
+		if (procManager == null || !procManager.isReady()) {
+			logger.info("Constructing a new process manager instance.");
 			procManager = new ProcessManager(builder, new ProcessListener() {
 				
 				// The process manager to which the listener is subscribed.
@@ -156,7 +157,7 @@ public class PSPPool implements AutoCloseable {
 					// Store the reference to the manager for later use in the onTermination method.
 					this.manager = manager;
 					listener.onStartup(manager);
-					activeProcesses.add(manager);
+					activeManagers.add(manager);
 					if (verbose) {
 						logger.info("Process manager " + manager + " started executing.");
 						logPoolStats();
@@ -172,7 +173,7 @@ public class PSPPool implements AutoCloseable {
 					listener.onTermination(resultCode);
 					if (manager == null)
 						return;
-					activeProcesses.remove(manager);
+					activeManagers.remove(manager);
 					if (verbose) {
 						logger.info("Process manager " + manager + " stopped executing.");
 						logPoolStats();
@@ -198,6 +199,7 @@ public class PSPPool implements AutoCloseable {
 							}
 						}
 					}
+					inactiveManagers.add(manager);
 				}
 				
 			}, keepAliveTime);
@@ -210,7 +212,7 @@ public class PSPPool implements AutoCloseable {
 			return true;
 		} catch (RejectedExecutionException e) {
 			// If the process cannot be submitted to the pool, store it in a variable to avoid wasting the instance.
-			spareProcessManager = procManager;
+			inactiveManagers.add(procManager);
 			if (verbose)
 				logger.log(Level.WARNING, "Failed to start new process due to the pool having reached its capacity.");
 			return false;
@@ -239,7 +241,7 @@ public class PSPPool implements AutoCloseable {
 					return;
 				CommandSubmission submission = optionalSubmission.get();
 				// Execute it in any of the available processes.
-				for (ProcessManager manager : activeProcesses) {
+				for (ProcessManager manager : activeManagers) {
 					if (manager.isReady()) {
 						Future<?> future = commandExecutor.submit(() -> {
 							try {
@@ -333,7 +335,7 @@ public class PSPPool implements AutoCloseable {
 			notifyAll();
 		}
 		commandExecutor.shutdown();
-		for (ProcessManager p : activeProcesses)
+		for (ProcessManager p : activeManagers)
 			p.close();
 		poolExecutor.shutdown();
 	}
