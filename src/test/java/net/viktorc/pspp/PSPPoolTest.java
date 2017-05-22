@@ -38,7 +38,7 @@ public class PSPPoolTest {
 		File file = new File(programLocation);
 		// For testing on Travis CI
 		file.setExecutable(true);
-		return new PSPPool(new ProcessBuilder(programLocation), new ProcessListener() {
+		PSPPool pool = new PSPPool(new ProcessBuilder(programLocation), new ProcessListener() {
 			
 			@Override
 			public void onStartup(ProcessManager manager) {
@@ -94,7 +94,8 @@ public class PSPPoolTest {
 			}
 			@Override
 			public void onTermination(int resultCode) { }
-		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime);
+		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
+		return pool;
 	}
 	/**
 	 * Submits the specified number of commands with the specified frequency to a the test process pool 
@@ -212,11 +213,11 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test02() {
-		Assert.assertTrue(test("Test 2", 50, 150, 20, 0, false, false, true, new int[] { 5 }, 100, 20, 5080));
+		Assert.assertTrue(test("Test 2", 50, 150, 20, 0, false, false, true, new int[] { 5 }, 100, 20, 5100));
 	}
 	@Test
 	public void test03() {
-		Assert.assertTrue(test("Test 3", 10, 25, 5, 15000, true, false, true, new int[] { 5 }, 20, 2, 5008));
+		Assert.assertTrue(test("Test 3", 10, 25, 5, 15000, true, false, true, new int[] { 5 }, 20, 2, 5030));
 	}
 	@Test
 	public void test04() {
@@ -224,27 +225,35 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test05() {
-		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 5, 10060));
+		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 5, 10100));
 	}
 	@Test
 	public void test06() {
-		Assert.assertTrue(test("Test 6", 0, 100, 0, 0, false, false, false, new int[] { 5 }, 100, 10, 6200));
+		Assert.assertTrue(test("Test 6", 100, 250, 20, 0, true, true, true, new int[] { 5 }, 800, 40, 6000));
 	}
 	@Test
 	public void test07() {
-		Assert.assertTrue(test("Test 7", 50, 150, 10, 0, true, false, false, new int[] { 5 }, 100, 20, 5600));
+		Assert.assertTrue(test("Test 7", 0, 100, 0, 0, false, false, false, new int[] { 5 }, 100, 10, 6700));
 	}
 	@Test
 	public void test08() {
-		Assert.assertTrue(test("Test 8", 10, 25, 5, 15000, false, false, false, new int[] { 5 }, 20, 2, 5010));
+		Assert.assertTrue(test("Test 8", 50, 150, 10, 0, true, false, false, new int[] { 5 }, 100, 20, 5600));
 	}
 	@Test
 	public void test09() {
-		Assert.assertTrue(test("Test 9", 50, 150, 10, 0, true, true, false, new int[] { 5 }, 100, 20, 5600));
+		Assert.assertTrue(test("Test 9", 10, 25, 5, 15000, false, false, false, new int[] { 5 }, 20, 2, 5050));
 	}
 	@Test
 	public void test10() {
-		Assert.assertTrue(test("Test 10", 10, 50, 5, 15000, false, false, false, new int[] { 5, 3, 2 }, 50, 5, 10080));
+		Assert.assertTrue(test("Test 10", 50, 150, 10, 0, true, true, false, new int[] { 5 }, 100, 20, 5600));
+	}
+	@Test
+	public void test11() {
+		Assert.assertTrue(test("Test 11", 10, 50, 5, 15000, false, false, false, new int[] { 5, 3, 2 }, 50, 5, 10150));
+	}
+	@Test
+	public void test12() {
+		Assert.assertTrue(test("Test 12", 50, 150, 20, 0, true, true, false, new int[] { 5 }, 800, 40, 16500));
 	}
 	
 }

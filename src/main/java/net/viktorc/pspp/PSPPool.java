@@ -36,9 +36,9 @@ public class PSPPool implements AutoCloseable {
 	private final int maxPoolSize;
 	private final int reserveSize;
 	private final long keepAliveTime;
+	private final boolean verbose;
 	private final ThreadPoolExecutor poolExecutor;
-	private final List<ProcessManager> activeManagers;
-	private final Queue<ProcessManager> inactiveManagers;
+	private final List<ProcessManager> activeProcesses;
 	private final Object poolLock;
 	private final CountDownLatch startupLatch;
 	private final ExecutorService commandExecutor;
@@ -47,9 +47,74 @@ public class PSPPool implements AutoCloseable {
 	private final AtomicInteger numOfExecutingCommands;
 	private final Logger logger;
 	private volatile boolean submissionSuccessful;
-	private volatile boolean verbose;
 	private volatile boolean close;
+	private ProcessManager spareProcessManager;
 
+	/**
+	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
+	 * is dynamically adjusted based on the number of requests and running processes.
+	 * 
+	 * @param builder The process builder for building the pooled processes.
+	 * @param listener A {@link net.viktorc.pspp.ProcessListener} instance that is added to each process in the pool. It should 
+	 * be stateless as the same instance is used for all processes.
+	 * @param minPoolSize The minimum size of the process pool.
+	 * @param maxPoolSize The maximum size of the process pool.
+	 * @param reserveSize The number of available processes to keep in the pool.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
+	 * life-cycle of the processes will not be limited.
+	 * @param verbose Whether events relating to the management of the pool should be logged.
+	 * @throws IOException If the process cannot be started.
+	 * @throws IllegalArgumentException If the builder or the listener is null, or the minimum pool size is less than 0, or the 
+	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
+	 * pool size.
+	 */
+	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize,
+			int reserveSize, long keepAliveTime, boolean verbose) throws IOException {
+		if (builder == null)
+			throw new IllegalArgumentException("The process builder cannot be null.");
+		if (listener == null)
+			throw new IllegalArgumentException("The process listener cannot be null.");
+		if (minPoolSize < 0)
+			throw new IllegalArgumentException("The minimum pool size has to be greater than 0.");
+		if (maxPoolSize < 1 || maxPoolSize < minPoolSize)
+			throw new IllegalArgumentException("The maximum pool size has to be at least 1 and at least as great as the " +
+					"minimum pool size.");
+		if (reserveSize < 0 || reserveSize > maxPoolSize)
+			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
+		this.builder = builder;
+		this.listener = listener;
+		this.minPoolSize = minPoolSize;
+		this.maxPoolSize = maxPoolSize;
+		this.reserveSize = reserveSize;
+		this.keepAliveTime = keepAliveTime;
+		int actualMinSize = Math.max(minPoolSize, reserveSize);
+		poolExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
+				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
+		activeProcesses = new CopyOnWriteArrayList<>();
+		poolLock = new Object();
+		startupLatch = new CountDownLatch(actualMinSize);
+		commandExecutor = Executors.newCachedThreadPool();
+		commandQueue = new ConcurrentLinkedQueue<>();
+		submissionSemaphore = new Semaphore(0);
+		numOfExecutingCommands = new AtomicInteger(0);
+		logger = Logger.getAnonymousLogger();
+		this.verbose = verbose;
+		for (int i = 0; i < actualMinSize; i++) {
+			synchronized (poolLock) {
+				startNewProcess();
+			}
+		}
+		// Wait for the processes in the initial pool to start up.
+		try {
+			startupLatch.await();
+		} catch (InterruptedException e) {
+			if (verbose)
+				logger.log(Level.SEVERE, "Error while waiting for the pool to start up.", e);
+			Thread.currentThread().interrupt();
+		}
+		// Start the thread responsible for submitting commands.
+		(new Thread(this::mainLoop)).start();
+	}
 	/**
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
@@ -69,66 +134,52 @@ public class PSPPool implements AutoCloseable {
 	 */
 	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize,
 			int reserveSize, long keepAliveTime) throws IOException {
-		if (builder == null)
-			throw new IllegalArgumentException("The process builder cannot be null.");
-		if (listener == null)
-			throw new IllegalArgumentException("The process listener cannot be null.");
-		if (minPoolSize < 0)
-			throw new IllegalArgumentException("The minimum pool size has to be greater than 0.");
-		if (maxPoolSize < 1 || maxPoolSize < minPoolSize)
-			throw new IllegalArgumentException("The maximum pool size has to be at least 1 and at least as great as the " +
-					"minimum pool size.");
-		if (reserveSize < 0 || reserveSize > maxPoolSize)
-			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
-		this.builder = builder;
-		this.listener = listener;
-		this.minPoolSize = minPoolSize;
-		this.maxPoolSize = maxPoolSize;
-		this.reserveSize = reserveSize;
-		this.keepAliveTime = keepAliveTime;
-		this.verbose = verbose;
-		int actualMinSize = Math.max(minPoolSize, reserveSize);
-		poolExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
-				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
-		activeManagers = new CopyOnWriteArrayList<>();
-		inactiveManagers = new ConcurrentLinkedQueue<>();
-		poolLock = new Object();
-		startupLatch = new CountDownLatch(actualMinSize);
-		commandExecutor = Executors.newCachedThreadPool();
-		commandQueue = new ConcurrentLinkedQueue<>();
-		submissionSemaphore = new Semaphore(0);
-		numOfExecutingCommands = new AtomicInteger(0);
-		logger = Logger.getAnonymousLogger();
-		verbose = true;
-		for (int i = 0; i < actualMinSize; i++) {
-			synchronized (poolLock) {
-				startNewProcess();
-			}
-		}
-		// Wait for the processes in the initial pool to start up.
-		try {
-			startupLatch.await();
-		} catch (InterruptedException e) {
-			if (verbose)
-				logger.log(Level.SEVERE, "Error while waiting for the pool to start up.", e);
-			Thread.currentThread().interrupt();
-		}
-		// Start the thread responsible for submitting commands.
-		(new Thread(this::mainLoop)).start();
+		this(builder, listener, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
 	}
 	/**
-	 * Sets whether the pool should log to the console. Logging is enabled by default.
+	 * Executes the command(s) on any of the available processes in the pool. It blocks until the command could successfully be 
+	 * submitted for execution.
 	 * 
-	 * @param on Whether the pool should log to the console.
+	 * @param submission The command submission including all information necessary for executing and processing the command(s).
+	 * @return A {@link java.util.concurrent.Future} instance of the time it took to execute the command including the submission 
+	 * delay in nanoseconds.
+	 * @throws IllegalArgumentException If the submission is null.
 	 */
-	public void setLogging(boolean on) {
-		verbose = on;
+	public Future<Long> submit(CommandSubmission submission) {
+		if (submission == null)
+			throw new IllegalArgumentException("The submission cannot be null or empty.");
+		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommands(),
+				submission.doTerminateProcessAfterwards());
+		for (SubmissionListener subListener : submission.getSubmissionListeners())
+			internalSubmission.addSubmissionListener(subListener);
+		internalSubmission.addSubmissionListener(new SubmissionListener() {
+			
+			@Override
+			public void onStartedProcessing() {
+				submissionSuccessful = true;
+				submissionSemaphore.release();
+				numOfExecutingCommands.incrementAndGet();
+			}
+			@Override
+			public void onFinishedProcessing() {
+				numOfExecutingCommands.decrementAndGet();
+			}
+			
+		});
+		commandQueue.add(internalSubmission);
+		// Notify the main loop that a command has been submitted.
+		synchronized (this) {
+			notifyAll();
+		}
+		// Return a Future holding the total execution time including the submission delay.
+		return new SubmissionFuture(internalSubmission);
 	}
+
 	/**
 	 * Logs the number of active, queued, and currently executing processes.
 	 */
 	private void logPoolStats() {
-		logger.info("Total processes: " + poolExecutor.getActiveCount() + "; acitve processes: " + activeManagers.size() +
+		logger.info("Total processes: " + poolExecutor.getActiveCount() + "; acitve processes: " + activeProcesses.size() +
 				"; submitted commands: " + (numOfExecutingCommands.get() + commandQueue.size()));
 	}
 	/**
@@ -138,11 +189,11 @@ public class PSPPool implements AutoCloseable {
 	 * @return Whether the process was successfully started.
 	 */
 	private boolean startNewProcess() throws IOException {
-		ProcessManager procManager = null;
-		if (!inactiveManagers.isEmpty())
-			procManager = inactiveManagers.poll();
-		if (procManager == null || !procManager.isReady()) {
-			logger.info("Constructing a new process manager instance.");
+		ProcessManager procManager;
+		if (spareProcessManager != null) {
+			procManager = spareProcessManager;
+			spareProcessManager = null;
+		} else {
 			procManager = new ProcessManager(builder, new ProcessListener() {
 				
 				// The process manager to which the listener is subscribed.
@@ -157,7 +208,7 @@ public class PSPPool implements AutoCloseable {
 					// Store the reference to the manager for later use in the onTermination method.
 					this.manager = manager;
 					listener.onStartup(manager);
-					activeManagers.add(manager);
+					activeProcesses.add(manager);
 					if (verbose) {
 						logger.info("Process manager " + manager + " started executing.");
 						logPoolStats();
@@ -173,7 +224,7 @@ public class PSPPool implements AutoCloseable {
 					listener.onTermination(resultCode);
 					if (manager == null)
 						return;
-					activeManagers.remove(manager);
+					activeProcesses.remove(manager);
 					if (verbose) {
 						logger.info("Process manager " + manager + " stopped executing.");
 						logPoolStats();
@@ -199,7 +250,6 @@ public class PSPPool implements AutoCloseable {
 							}
 						}
 					}
-					inactiveManagers.add(manager);
 				}
 				
 			}, keepAliveTime);
@@ -212,7 +262,7 @@ public class PSPPool implements AutoCloseable {
 			return true;
 		} catch (RejectedExecutionException e) {
 			// If the process cannot be submitted to the pool, store it in a variable to avoid wasting the instance.
-			inactiveManagers.add(procManager);
+			spareProcessManager = procManager;
 			if (verbose)
 				logger.log(Level.WARNING, "Failed to start new process due to the pool having reached its capacity.");
 			return false;
@@ -241,7 +291,7 @@ public class PSPPool implements AutoCloseable {
 					return;
 				CommandSubmission submission = optionalSubmission.get();
 				// Execute it in any of the available processes.
-				for (ProcessManager manager : activeManagers) {
+				for (ProcessManager manager : activeProcesses) {
 					if (manager.isReady()) {
 						Future<?> future = commandExecutor.submit(() -> {
 							try {
@@ -290,44 +340,6 @@ public class PSPPool implements AutoCloseable {
 			}
 		}
 	}
-	/**
-	 * Executes the command(s) on any of the available processes in the pool. It blocks until the command could successfully be 
-	 * submitted for execution.
-	 * 
-	 * @param submission The command submission including all information necessary for executing and processing the command(s).
-	 * @return A {@link java.util.concurrent.Future} instance of the time it took to execute the command including the submission 
-	 * delay in nanoseconds.
-	 * @throws IllegalArgumentException If the submission is null.
-	 */
-	public Future<Long> submit(CommandSubmission submission) {
-		if (submission == null)
-			throw new IllegalArgumentException("The submission cannot be null or empty.");
-		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommands(),
-				submission.doTerminateProcessAfterwards());
-		for (SubmissionListener subListener : submission.getSubmissionListeners())
-			internalSubmission.addSubmissionListener(subListener);
-		internalSubmission.addSubmissionListener(new SubmissionListener() {
-			
-			@Override
-			public void onStartedProcessing() {
-				submissionSuccessful = true;
-				submissionSemaphore.release();
-				numOfExecutingCommands.incrementAndGet();
-			}
-			@Override
-			public void onFinishedProcessing() {
-				numOfExecutingCommands.decrementAndGet();
-			}
-			
-		});
-		commandQueue.add(internalSubmission);
-		// Notify the main loop that a command has been submitted.
-		synchronized (this) {
-			notifyAll();
-		}
-		// Return a Future holding the total execution time including the submission delay.
-		return new SubmissionFuture(internalSubmission);
-	}
 	@Override
 	public void close() throws Exception {
 		close = true;
@@ -335,7 +347,7 @@ public class PSPPool implements AutoCloseable {
 			notifyAll();
 		}
 		commandExecutor.shutdown();
-		for (ProcessManager p : activeManagers)
+		for (ProcessManager p : activeProcesses)
 			p.close();
 		poolExecutor.shutdown();
 	}
@@ -350,7 +362,7 @@ public class PSPPool implements AutoCloseable {
 	private class SubmissionFuture implements Future<Long> {
 		
 		final CommandSubmission submission;
-		boolean cancel;
+		volatile boolean cancel;
 		
 		/**
 		 * Constructs a {@link java.util.concurrent.Future} for the specified submission.
