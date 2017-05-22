@@ -38,12 +38,12 @@ public class PSPPool implements AutoCloseable {
 	private final long keepAliveTime;
 	private final boolean verbose;
 	private final ThreadPoolExecutor poolExecutor;
+	private final ExecutorService commandExecutorService;
 	private final List<ProcessManager> activeProcesses;
-	private final Object poolLock;
-	private final CountDownLatch startupLatch;
-	private final ExecutorService commandExecutor;
 	private final Queue<CommandSubmission> commandQueue;
+	private final CountDownLatch startupLatch;
 	private final Semaphore submissionSemaphore;
+	private final Object poolLock;
 	private final AtomicInteger numOfExecutingCommands;
 	private final Logger logger;
 	private volatile boolean submissionSuccessful;
@@ -90,12 +90,12 @@ public class PSPPool implements AutoCloseable {
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		poolExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
+		commandExecutorService = Executors.newCachedThreadPool();
 		activeProcesses = new CopyOnWriteArrayList<>();
-		poolLock = new Object();
-		startupLatch = new CountDownLatch(actualMinSize);
-		commandExecutor = Executors.newCachedThreadPool();
 		commandQueue = new ConcurrentLinkedQueue<>();
+		startupLatch = new CountDownLatch(actualMinSize);
 		submissionSemaphore = new Semaphore(0);
+		poolLock = new Object();
 		numOfExecutingCommands = new AtomicInteger(0);
 		logger = Logger.getAnonymousLogger();
 		this.verbose = verbose;
@@ -252,7 +252,7 @@ public class PSPPool implements AutoCloseable {
 					}
 				}
 				
-			}, keepAliveTime);
+			}, keepAliveTime, commandExecutorService);
 		}
 		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
 		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 
@@ -293,7 +293,7 @@ public class PSPPool implements AutoCloseable {
 				// Execute it in any of the available processes.
 				for (ProcessManager manager : activeProcesses) {
 					if (manager.isReady()) {
-						Future<?> future = commandExecutor.submit(() -> {
+						Future<?> future = commandExecutorService.submit(() -> {
 							try {
 								if (manager.execute(submission)) {
 									if (verbose)
@@ -346,9 +346,9 @@ public class PSPPool implements AutoCloseable {
 		synchronized (this) {
 			notifyAll();
 		}
-		commandExecutor.shutdown();
 		for (ProcessManager p : activeProcesses)
 			p.close();
+		commandExecutorService.shutdown();
 		poolExecutor.shutdown();
 	}
 	

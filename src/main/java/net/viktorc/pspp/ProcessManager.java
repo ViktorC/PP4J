@@ -30,6 +30,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -99;
 	
 	private final ExecutorService executor;
+	private final boolean internalExecutor;
 	private final ReentrantLock lock;
 	private final ProcessBuilder builder;
 	private final ProcessListener listener;
@@ -54,21 +55,40 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
 	 * less, the life-cycle of the processes will not be limited.
 	 * @param listener A process listener to manage the instance.
+	 * @param executorService A thread pool for the threads listening to the standard out and error out of the underlying process. 
+	 * If it is null, the manager's own thread pool is created. If the manager uses an external thread pool, it is not closed upon 
+	 * calling {@link #close() close}.
 	 * @throws IOException If the process command is invalid.
 	 * @throws IllegalArgumentException If the builder or the listener is null.
 	 */
-	protected ProcessManager(ProcessBuilder builder, ProcessListener listener, long keepAliveTime) throws IOException {
+	protected ProcessManager(ProcessBuilder builder, ProcessListener listener, long keepAliveTime, ExecutorService executorService)
+			throws IOException {
 		if (builder == null)
 			throw new IllegalArgumentException("The process builder cannot be null.");
 		if (listener == null)
 			throw new IllegalArgumentException("The process listener cannot be null.");
-		executor = Executors.newFixedThreadPool(2);
+		internalExecutor = executorService == null;
+		this.executor = internalExecutor ? Executors.newFixedThreadPool(2) : executorService;
 		lock = new ReentrantLock();
 		this.builder = builder;
 		this.listener = listener;
 		this.keepAliveTime = keepAliveTime;
 		timer = keepAliveTime > 0 ? new Timer() : null;
 		id = (new Random()).nextLong();
+	}
+	/**
+	 * Constructs a manager for the specified process without actually starting the process.
+	 * 
+	 * @param builder The process builder.
+	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
+	 * less, the life-cycle of the processes will not be limited.
+	 * @param listener A process listener to manage the instance.
+	 * @throws IOException If the process command is invalid.
+	 * @throws IllegalArgumentException If the builder or the listener is null.
+	 */
+	protected ProcessManager(ProcessBuilder builder, ProcessListener listener, long keepAliveTime)
+		throws IOException {
+		this(builder, listener, keepAliveTime, null);
 	}
 	/**
 	 * Returns the 64 bit ID number of the instance.
@@ -321,7 +341,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		command = null;
 		if (running && !stop)
 			cancel();
-		executor.shutdown();
+		if (internalExecutor)
+			executor.shutdown();
 	}
 	@Override
 	public String toString() {

@@ -209,7 +209,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test01() {
-		Assert.assertTrue(test("Test 1", 0, 100, 0, 0, true, false, true, new int[] { 5 }, 100, 10, 6100));
+		Assert.assertTrue(test("Test 1", 0, 100, 0, 0, true, false, true, new int[] { 5 }, 100, 10, 6200));
 	}
 	@Test
 	public void test02() {
@@ -217,7 +217,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test03() {
-		Assert.assertTrue(test("Test 3", 10, 25, 5, 15000, true, false, true, new int[] { 5 }, 20, 2, 5030));
+		Assert.assertTrue(test("Test 3", 10, 25, 5, 15000, true, false, true, new int[] { 5 }, 20, 2, 5100));
 	}
 	@Test
 	public void test04() {
@@ -225,7 +225,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test05() {
-		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 5, 10100));
+		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 5, 10200));
 	}
 	@Test
 	public void test06() {
@@ -241,7 +241,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test09() {
-		Assert.assertTrue(test("Test 9", 10, 25, 5, 15000, false, false, false, new int[] { 5 }, 20, 2, 5050));
+		Assert.assertTrue(test("Test 9", 10, 25, 5, 15000, false, false, false, new int[] { 5 }, 20, 2, 5100));
 	}
 	@Test
 	public void test10() {
@@ -249,7 +249,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test11() {
-		Assert.assertTrue(test("Test 11", 10, 50, 5, 15000, false, false, false, new int[] { 5, 3, 2 }, 50, 5, 10150));
+		Assert.assertTrue(test("Test 11", 10, 50, 5, 15000, false, false, false, new int[] { 5, 3, 2 }, 50, 5, 10200));
 	}
 	@Test
 	public void test12() {
