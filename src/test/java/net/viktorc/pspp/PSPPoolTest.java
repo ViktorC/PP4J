@@ -3,7 +3,7 @@ package net.viktorc.pspp;
 import org.junit.Assert;
 import org.junit.Test;
 
-import net.viktorc.pspp.CommandSubmission;
+import net.viktorc.pspp.Submission;
 import net.viktorc.pspp.PSPPool;
 import net.viktorc.pspp.ProcessListener;
 import net.viktorc.pspp.ProcessManager;
@@ -26,8 +26,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class PSPPoolTest {
 	
 	/**
-	 * Creates a test process pool according to the specified parameters. See 
-	 * {@link net.viktorc.pspp.PSPPool#PSPPool(ProcessBuilder, ProcessListener, int, int, int, long)}.
+	 * Creates a test process pool according to the specified parameters.
+	 * 
+	 * @param minPoolSize The minimum pool size.
+	 * @param maxPoolSize The maximum pool size.
+	 * @param reserveSize The process reserve size.
+	 * @param keepAliveTime The time after which idled processes are killed.
+	 * @param verifyStartup Whether the startup should be verified.
+	 * @param manuallyTerminate Whether the process should be terminated in an orderly way or forcibly.
 	 */
 	private PSPPool getPool(int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime, boolean verifyStartup,
 			boolean manuallyTerminate) throws IllegalArgumentException, IOException, URISyntaxException {
@@ -43,19 +49,18 @@ public class PSPPoolTest {
 			@Override
 			public void onStartup(ProcessManager manager) {
 				try {
-					manager.execute(new CommandSubmission(new Command("start",
-							new AbstractOutputListener() {
-								
-								@Override
-								public boolean onNewStandardOutput(Command command, String newStandardOutputLine) {
-									return "ok".equals(newStandardOutputLine);
-								}
-								@Override
-								public boolean onNewErrorOutput(Command command, String newErrorOutputLine) {
-									return true;
-								}
-								
-							}), false));
+					manager.execute(new Submission(new SimpleCommand("start") {
+						
+						@Override
+						protected boolean onNewStandardOutput(String standardOutputLine) {
+							return "ok".equals(standardOutputLine);
+						}
+						@Override
+						protected boolean onNewErrorOutput(String errorOutputLine) {
+							return true;
+						}
+						
+					}, false));
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -69,21 +74,19 @@ public class PSPPoolTest {
 				if (manuallyTerminate) {
 					try {
 						AtomicBoolean success = new AtomicBoolean(true);
-						if (manager.execute(new CommandSubmission(new Command("stop",
-								new AbstractOutputListener() {
-									
-									@Override
-									public boolean onNewStandardOutput(Command command, String newStandardOutputLine) {
-										return "bye".equals(newStandardOutputLine);
-									}
-									
-									@Override
-									public boolean onNewErrorOutput(Command command, String newErrorOutputLine) {
-										success.set(true);
-										return true;
-									}
-									
-								}), false))) {
+						if (manager.execute(new Submission(new SimpleCommand("stop") {
+								
+								@Override
+								protected boolean onNewStandardOutput(String standardOutputLine) {
+									return "bye".equals(standardOutputLine);
+								}
+								@Override
+								protected boolean onNewErrorOutput(String errorOutputLine) {
+									success.set(true);
+									return true;
+								}
+								
+							}, false))) {
 							return success.get();
 						}
 					} catch (IOException e) {
@@ -130,21 +133,20 @@ public class PSPPoolTest {
 				}
 				List<Command> commands = new ArrayList<>();
 				for (int procTime : procTimes) {
-					commands.add(new Command("process " + procTime,
-							new AbstractOutputListener() {
-								
-								@Override
-								public boolean onNewStandardOutput(Command command, String newStandardOutputLine) {
-									return "ready".equals(newStandardOutputLine);
-								}
-								@Override
-								public boolean onNewErrorOutput(Command command, String newErrorOutputLine) {
-									return true;
-								}
-								
-							}));
+					commands.add(new SimpleCommand("process " + procTime) {
+						
+						@Override
+						protected boolean onNewStandardOutput(String standardOutputLine) {
+							return "ready".equals(standardOutputLine);
+						}
+						@Override
+						protected boolean onNewErrorOutput(String errorOutputLine) {
+							return true;
+						}
+						
+					});
 				}
-				futures.add(procPool.submit(new CommandSubmission(commands, !reuse)));
+				futures.add(procPool.submit(new Submission(commands, !reuse)));
 			}
 			List<Long> times = new ArrayList<>();
 			for (Future<Long> future : futures)
@@ -253,7 +255,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test12() {
-		Assert.assertTrue(test("Test 12", 50, 150, 20, 0, true, true, false, new int[] { 5 }, 800, 40, 16500));
+		Assert.assertTrue(test("Test 12", 50, 250, 20, 0, true, true, false, new int[] { 5 }, 800, 40, 6000));
 	}
 	
 }

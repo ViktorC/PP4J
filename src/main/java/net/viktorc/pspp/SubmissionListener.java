@@ -1,7 +1,7 @@
 package net.viktorc.pspp;
 
 /**
- * A listener interface for {@link net.viktorc.pspp.CommandSubmission} instances. It provides methods to call 
+ * A listener interface for {@link net.viktorc.pspp.Submission} instances. It provides methods to call 
  * once the processing of the submitted commands has started or finished.
  * 
  * @author A6714

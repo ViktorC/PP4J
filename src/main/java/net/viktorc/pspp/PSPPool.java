@@ -40,7 +40,7 @@ public class PSPPool implements AutoCloseable {
 	private final ThreadPoolExecutor poolExecutor;
 	private final ExecutorService commandExecutorService;
 	private final List<ProcessManager> activeProcesses;
-	private final Queue<CommandSubmission> commandQueue;
+	private final Queue<Submission> commandQueue;
 	private final CountDownLatch startupLatch;
 	private final Semaphore submissionSemaphore;
 	private final Object poolLock;
@@ -145,10 +145,10 @@ public class PSPPool implements AutoCloseable {
 	 * delay in nanoseconds.
 	 * @throws IllegalArgumentException If the submission is null.
 	 */
-	public Future<Long> submit(CommandSubmission submission) {
+	public Future<Long> submit(Submission submission) {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
-		CommandSubmission internalSubmission = new CommandSubmission(submission.getCommands(),
+		Submission internalSubmission = new Submission(submission.getCommands(),
 				submission.doTerminateProcessAfterwards());
 		for (SubmissionListener subListener : submission.getSubmissionListeners())
 			internalSubmission.addSubmissionListener(subListener);
@@ -272,7 +272,7 @@ public class PSPPool implements AutoCloseable {
 	 * A method that handles the submission of commands from the queue to the processes.
 	 */
 	private void mainLoop() {
-		Optional<CommandSubmission> optionalSubmission = Optional.empty();
+		Optional<Submission> optionalSubmission = Optional.empty();
 		while (!close) {
 			try {
 				// Wait until there is a command submitted.
@@ -289,7 +289,7 @@ public class PSPPool implements AutoCloseable {
 				}
 				if (close)
 					return;
-				CommandSubmission submission = optionalSubmission.get();
+				Submission submission = optionalSubmission.get();
 				// Execute it in any of the available processes.
 				for (ProcessManager manager : activeProcesses) {
 					if (manager.isReady()) {
@@ -361,27 +361,24 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private class SubmissionFuture implements Future<Long> {
 		
-		final CommandSubmission submission;
-		volatile boolean cancel;
+		final Submission submission;
 		
 		/**
 		 * Constructs a {@link java.util.concurrent.Future} for the specified submission.
 		 * 
 		 * @param submission The submission to get a {@link java.util.concurrent.Future} for.
 		 */
-		SubmissionFuture(CommandSubmission submission) {
+		SubmissionFuture(Submission submission) {
 			this.submission = submission;
 		}
 		@Override
 		public synchronized boolean cancel(boolean mayInterruptIfRunning) {
 			commandQueue.remove(submission);
-			submission.cancel();
-			if (mayInterruptIfRunning) {
-				Future<?> submissionFuture = submission.getFuture();
-				if (submissionFuture != null)
-					submissionFuture.cancel(true);
-			}
-			cancel = true;
+			Future<?> submissionFuture = submission.getFuture();
+			if (submissionFuture != null)
+				submissionFuture.cancel(true);
+			else
+				return false;
 			synchronized (submission) {
 				submission.notifyAll();
 			}
@@ -390,11 +387,11 @@ public class PSPPool implements AutoCloseable {
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
 			synchronized (submission) {
-				while (!submission.isProcessed() && !cancel) {
+				while (!submission.isProcessed() && !submission.getFuture().isCancelled()) {
 					submission.wait();
 				}
 			}
-			if (cancel)
+			if (submission.getFuture().isCancelled())
 				throw new CancellationException();
 			return submission.getProcessedTime() - submission.getReceivedTime();
 		}
@@ -404,12 +401,12 @@ public class PSPPool implements AutoCloseable {
 			long timeoutNs = unit.toNanos(timeout);
 			long start = System.nanoTime();
 			synchronized (submission) {
-				while (!submission.isProcessed() && !cancel && timeoutNs > 0) {
+				while (!submission.isProcessed() && !submission.getFuture().isCancelled() && timeoutNs > 0) {
 					submission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
 					timeoutNs -= (System.nanoTime() - start);
 				}
 			}
-			if (cancel)
+			if (submission.getFuture().isCancelled())
 				throw new CancellationException();
 			if (timeoutNs <= 0)
 				throw new TimeoutException();
@@ -418,7 +415,7 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public boolean isCancelled() {
-			return cancel;
+			return submission.getFuture().isCancelled();
 		}
 		@Override
 		public boolean isDone() {

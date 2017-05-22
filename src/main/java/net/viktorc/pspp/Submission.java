@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * @author A6714
  *
  */
-public class CommandSubmission {
+public class Submission {
 	
 	private final List<Command> commands;
 	private final boolean terminateProcessAfterwards;
@@ -32,7 +32,7 @@ public class CommandSubmission {
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
 	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public CommandSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
+	public Submission(List<Command> commands, boolean terminateProcessAfterwards) {
 		if (commands == null || commands.isEmpty())
 			throw new IllegalArgumentException("The commands cannot be null.");
 		if (commands.isEmpty())
@@ -51,7 +51,7 @@ public class CommandSubmission {
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
 	 * @throws IllegalArgumentException If the command is null.
 	 */
-	public CommandSubmission(Command command, boolean terminateProcessAfterwards) {
+	public Submission(Command command, boolean terminateProcessAfterwards) {
 		this(Arrays.asList(command), terminateProcessAfterwards);
 	}
 	/**
@@ -99,15 +99,6 @@ public class CommandSubmission {
 		return new ArrayList<>(submissionListeners);
 	}
 	/**
-	 * Prompts the {@link net.viktorc.pspp.ProcessManager} handling the submission to ignore the commands in the submission that 
-	 * have not yet been written to the standard in of the process. Canceling the submission does not affect the command 
-	 * currently being processed.
-	 */
-	void cancel() {
-		for (Command c : commands)
-			c.setSkip(true);
-	}
-	/**
 	 * Returns the time when the instance was constructed in nanoseconds.
 	 * 
 	 * @return The time when the instance was constructed in nanoseconds.
@@ -151,30 +142,26 @@ public class CommandSubmission {
 		return future;
 	}
 	/**
-	 * Sets the {@link java.util.concurrent.Future} instance associated with the submission and the submission time. If the 
-	 * {@link java.util.concurrent.Future} instance is not null, subsequent calls are ignored.
+	 * Sets the {@link java.util.concurrent.Future} instance associated with the submission and the submission time.
 	 * 
 	 * @param future The {@link java.util.concurrent.Future} instance associated with the submission.
 	 */
 	void setFuture(Future<?> future) {
-		if (this.future == null) {
-			submittedTime = System.nanoTime();
-			this.future = future;
-			synchronized (this) {
-				notifyAll();
-			}
+		submittedTime = System.nanoTime();
+		processed = false;
+		this.future = future;
+		synchronized (this) {
+			notifyAll();
 		}
 	}
 	/**
 	 * Sets the command submission's state to 'processed'. Subsequent calls are ignored.
 	 */
 	void setProcessedToTrue() {
-		if (!processed) {
-			processedTime = System.nanoTime();
-			processed = true;
-			synchronized (this) {
-				notifyAll();
-			}
+		processedTime = System.nanoTime();
+		processed = true;
+		synchronized (this) {
+			notifyAll();
 		}
 	}
 	@Override

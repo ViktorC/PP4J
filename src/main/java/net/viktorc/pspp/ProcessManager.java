@@ -5,12 +5,14 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -121,11 +123,10 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		lock.lock();
 		try {
 			if (listener == null || !listener.terminate(this)) {
-				stop = true;
 				if (process != null)
 					process.destroy();
-			} else
-				stop = true;
+			}
+			stop = true;
 		} finally {
 			lock.unlock();
 		}
@@ -141,11 +142,6 @@ public class ProcessManager implements Runnable, AutoCloseable {
 		int c;
 		StringBuilder output = new StringBuilder();
 		while ((c = reader.read()) != -1) {
-			if (stop) {
-				// On Windows all output of the process has to be read for it to terminate.
-				while (reader.read() != -1);
-				break;
-			}
 			String line;
 			if (c == '\n') {
 				line = output.toString().trim();
@@ -162,9 +158,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 			if (startedUp) {
 				synchronized (lock) {
 					try {
-						commandProcessed = (command == null || command.getListener() == null ?
-								commandProcessed : (error ? command.getListener().onErrorOutput(command, line) :
-								command.getListener().onStandardOutput(command, line)));
+						commandProcessed = (command == null || (error ? command.onErrorOutput(line) :
+								command.onStandardOutput(line)));
 					} finally {
 						if (commandProcessed)
 							lock.notifyAll();
@@ -190,7 +185,7 @@ public class ProcessManager implements Runnable, AutoCloseable {
 	 * @throws IOException If a command cannot be written to the standard in stream.
 	 * @throws ProcessManagerException If the thread is interrupted while executing the commands.
 	 */
-	public boolean execute(CommandSubmission commandSubmission)
+	public boolean execute(Submission commandSubmission)
 			throws IOException {
 		if (running && !stop && lock.tryLock()) {
 			List<SubmissionListener> submissionListeners = commandSubmission.getSubmissionListeners();
@@ -202,12 +197,16 @@ public class ProcessManager implements Runnable, AutoCloseable {
 				for (SubmissionListener subListener : submissionListeners)
 					subListener.onStartedProcessing();
 				List<Command> commands = commandSubmission.getCommands();
+				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>() : null;
 				synchronized (lock) {
 					for (int i = 0; i < commands.size() && running && !stop; i++) {
 						command = commands.get(i);
-						if (command.doSkip())
+						Future<?> submissionFuture = commandSubmission.getFuture();
+						if (submissionFuture != null && submissionFuture.isCancelled())
+							break;
+						if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
 							continue;
-						commandProcessed = command.getListener() == null;
+						commandProcessed = !command.generatesOutput();
 						stdInWriter.write(command.getInstruction());
 						stdInWriter.newLine();
 						stdInWriter.flush();
@@ -218,6 +217,8 @@ public class ProcessManager implements Runnable, AutoCloseable {
 								throw new ProcessManagerException(e);
 							}
 						}
+						if (i < commands.size() - 1)
+							processedCommands.add(command);
 						command = null;
 					}
 				}
