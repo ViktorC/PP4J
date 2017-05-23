@@ -3,10 +3,8 @@ package net.viktorc.pspp;
 import org.junit.Assert;
 import org.junit.Test;
 
-import net.viktorc.pspp.Submission;
 import net.viktorc.pspp.PSPPool;
-import net.viktorc.pspp.ProcessListener;
-import net.viktorc.pspp.ProcessManager;
+import net.viktorc.pspp.ProcessShell;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,51 +42,36 @@ public class PSPPoolTest {
 		File file = new File(programLocation);
 		// For testing on Travis CI
 		file.setExecutable(true);
-		PSPPool pool = new PSPPool(new ProcessBuilder(programLocation), new ProcessListener() {
+		PSPPool pool = new PSPPool(new AbstractProcessManager(new ProcessBuilder(programLocation)) {
 			
 			@Override
-			public void onStartup(ProcessManager manager) {
+			public boolean startsUpInstantly() {
+				return !verifyStartup;
+			}
+			@Override
+			public boolean isStartedUp(String output, boolean standard) {
+				return standard && "hi".equals(output);
+			}
+			@Override
+			public void onStartup(ProcessShell manager) {
 				try {
-					manager.execute(new Submission(new SimpleCommand("start") {
-						
-						@Override
-						protected boolean onNewStandardOutput(String standardOutputLine) {
-							return "ok".equals(standardOutputLine);
-						}
-						@Override
-						protected boolean onNewErrorOutput(String errorOutputLine) {
-							return true;
-						}
-						
-					}, false));
+					manager.execute(new SimpleSubmission(new SimpleCommand("start",
+							(s, o) -> "ok".equals(o), (s, o) -> true), false));
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			}
 			@Override
-			public boolean isStartedUp(String output, boolean standard) {
-				return !verifyStartup || standard && "hi".equals(output);
-			}
-			@Override
-			public boolean terminate(ProcessManager manager) {
+			public boolean terminate(ProcessShell manager) {
 				if (manuallyTerminate) {
 					try {
 						AtomicBoolean success = new AtomicBoolean(true);
-						if (manager.execute(new Submission(new SimpleCommand("stop") {
-								
-								@Override
-								protected boolean onNewStandardOutput(String standardOutputLine) {
-									return "bye".equals(standardOutputLine);
-								}
-								@Override
-								protected boolean onNewErrorOutput(String errorOutputLine) {
-									success.set(true);
+						if (manager.execute(new SimpleSubmission(new SimpleCommand("stop", (s, o) -> "bye".equals(o),
+								(s, o) -> {
+									success.set(false);
 									return true;
-								}
-								
-							}, false))) {
+								}), false)))
 							return success.get();
-						}
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -96,8 +79,11 @@ public class PSPPoolTest {
 				return false;
 			}
 			@Override
-			public void onTermination(int resultCode) { }
-		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
+			public void onTermination(int resultCode) {
+				
+			}
+			
+		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime);
 		return pool;
 	}
 	/**
@@ -132,21 +118,9 @@ public class PSPPoolTest {
 					return null;
 				}
 				List<Command> commands = new ArrayList<>();
-				for (int procTime : procTimes) {
-					commands.add(new SimpleCommand("process " + procTime) {
-						
-						@Override
-						protected boolean onNewStandardOutput(String standardOutputLine) {
-							return "ready".equals(standardOutputLine);
-						}
-						@Override
-						protected boolean onNewErrorOutput(String errorOutputLine) {
-							return true;
-						}
-						
-					});
-				}
-				futures.add(procPool.submit(new Submission(commands, !reuse)));
+				for (int procTime : procTimes)
+					commands.add(new SimpleCommand("process " + procTime, (s, o) -> "ready".equals(o), (s, o) -> true));
+				futures.add(procPool.submit(new SimpleSubmission(commands, !reuse)));
 			}
 			List<Long> times = new ArrayList<>();
 			for (Future<Long> future : futures)

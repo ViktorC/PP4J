@@ -21,6 +21,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 /**
  * A class for maintaining and managing a pool of identical pre-started processes.
@@ -30,8 +31,7 @@ import java.util.logging.Logger;
  */
 public class PSPPool implements AutoCloseable {
 	
-	private final ProcessBuilder builder;
-	private final ProcessListener listener;
+	private final ProcessManager handler;
 	private final int minPoolSize;
 	private final int maxPoolSize;
 	private final int reserveSize;
@@ -39,8 +39,8 @@ public class PSPPool implements AutoCloseable {
 	private final boolean verbose;
 	private final ThreadPoolExecutor poolExecutor;
 	private final ExecutorService commandExecutorService;
-	private final List<ProcessManager> activeProcesses;
-	private final Queue<Submission> commandQueue;
+	private final List<ProcessShell> activeProcesses;
+	private final Queue<InternalSubmission> commandQueue;
 	private final CountDownLatch startupLatch;
 	private final Semaphore submissionSemaphore;
 	private final Object poolLock;
@@ -48,15 +48,14 @@ public class PSPPool implements AutoCloseable {
 	private final Logger logger;
 	private volatile boolean submissionSuccessful;
 	private volatile boolean close;
-	private ProcessManager spareProcessManager;
+	private ProcessShell spareProcessManager;
 
 	/**
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
 	 * 
-	 * @param builder The process builder for building the pooled processes.
-	 * @param listener A {@link net.viktorc.pspp.ProcessListener} instance that is added to each process in the pool. It should 
-	 * be stateless as the same instance is used for all processes.
+	 * @param handler A {@link net.viktorc.pspp.ProcessManager} instance that handles each process' life cycle in the pool. It 
+	 * should be stateless as the same instance is used for all processes.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
@@ -64,16 +63,14 @@ public class PSPPool implements AutoCloseable {
 	 * life-cycle of the processes will not be limited.
 	 * @param verbose Whether events relating to the management of the pool should be logged.
 	 * @throws IOException If the process cannot be started.
-	 * @throws IllegalArgumentException If the builder or the listener is null, or the minimum pool size is less than 0, or the 
+	 * @throws IllegalArgumentException If the handler is null, or the minimum pool size is less than 0, or the 
 	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
 	 * pool size.
 	 */
-	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize,
-			int reserveSize, long keepAliveTime, boolean verbose) throws IOException {
-		if (builder == null)
-			throw new IllegalArgumentException("The process builder cannot be null.");
-		if (listener == null)
-			throw new IllegalArgumentException("The process listener cannot be null.");
+	public PSPPool(ProcessManager handler, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime, boolean verbose)
+			throws IOException {
+		if (handler == null)
+			throw new IllegalArgumentException("The process handler cannot be null.");
 		if (minPoolSize < 0)
 			throw new IllegalArgumentException("The minimum pool size has to be greater than 0.");
 		if (maxPoolSize < 1 || maxPoolSize < minPoolSize)
@@ -81,8 +78,7 @@ public class PSPPool implements AutoCloseable {
 					"minimum pool size.");
 		if (reserveSize < 0 || reserveSize > maxPoolSize)
 			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
-		this.builder = builder;
-		this.listener = listener;
+		this.handler = handler;
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
@@ -119,9 +115,8 @@ public class PSPPool implements AutoCloseable {
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
 	 * 
-	 * @param builder The process builder for building the pooled processes.
-	 * @param listener A {@link net.viktorc.pspp.ProcessListener} instance that is added to each process in the pool. It should 
-	 * be stateless as the same instance is used for all processes.
+	 * @param handler A {@link net.viktorc.pspp.ProcessManager} instance that handles each process' life cycle in the pool. It 
+	 * should be stateless as the same instance is used for all processes.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
@@ -132,9 +127,9 @@ public class PSPPool implements AutoCloseable {
 	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
 	 * pool size.
 	 */
-	public PSPPool(ProcessBuilder builder, ProcessListener listener, int minPoolSize, int maxPoolSize,
-			int reserveSize, long keepAliveTime) throws IOException {
-		this(builder, listener, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
+	public PSPPool(ProcessManager handler, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime)
+			throws IOException {
+		this(handler, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
 	}
 	/**
 	 * Executes the command(s) on any of the available processes in the pool. It blocks until the command could successfully be 
@@ -148,31 +143,14 @@ public class PSPPool implements AutoCloseable {
 	public Future<Long> submit(Submission submission) {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
-		Submission internalSubmission = new Submission(submission.getCommands(),
-				submission.doTerminateProcessAfterwards());
-		for (SubmissionListener subListener : submission.getSubmissionListeners())
-			internalSubmission.addSubmissionListener(subListener);
-		internalSubmission.addSubmissionListener(new SubmissionListener() {
-			
-			@Override
-			public void onStartedProcessing() {
-				submissionSuccessful = true;
-				submissionSemaphore.release();
-				numOfExecutingCommands.incrementAndGet();
-			}
-			@Override
-			public void onFinishedProcessing() {
-				numOfExecutingCommands.decrementAndGet();
-			}
-			
-		});
+		InternalSubmission internalSubmission = new InternalSubmission(submission);
 		commandQueue.add(internalSubmission);
 		// Notify the main loop that a command has been submitted.
 		synchronized (this) {
 			notifyAll();
 		}
 		// Return a Future holding the total execution time including the submission delay.
-		return new SubmissionFuture(internalSubmission);
+		return new InternalSubmissionFuture(internalSubmission);
 	}
 
 	/**
@@ -183,77 +161,18 @@ public class PSPPool implements AutoCloseable {
 				"; submitted commands: " + (numOfExecutingCommands.get() + commandQueue.size()));
 	}
 	/**
-	 * Adds a new {@link net.viktorc.pspp.ProcessManager} instance to the pool and starts it.
+	 * Adds a new {@link net.viktorc.pspp.ProcessShell} instance to the pool and starts it.
 	 * 
 	 * @throws IOException If a new process cannot be created.
 	 * @return Whether the process was successfully started.
 	 */
 	private boolean startNewProcess() throws IOException {
-		ProcessManager procManager;
+		ProcessShell procManager;
 		if (spareProcessManager != null) {
 			procManager = spareProcessManager;
 			spareProcessManager = null;
-		} else {
-			procManager = new ProcessManager(builder, new ProcessListener() {
-				
-				// The process manager to which the listener is subscribed.
-				private ProcessManager manager;
-				
-				@Override
-				public boolean isStartedUp(String output, boolean standard) {
-					return listener.isStartedUp(output, standard);
-				}
-				@Override
-				public void onStartup(ProcessManager manager) {
-					// Store the reference to the manager for later use in the onTermination method.
-					this.manager = manager;
-					listener.onStartup(manager);
-					activeProcesses.add(manager);
-					if (verbose) {
-						logger.info("Process manager " + manager + " started executing.");
-						logPoolStats();
-					}
-					startupLatch.countDown();
-				}
-				@Override
-				public boolean terminate(ProcessManager manager) {
-					return listener.terminate(manager);
-				}
-				@Override
-				public void onTermination(int resultCode) {
-					listener.onTermination(resultCode);
-					if (manager == null)
-						return;
-					activeProcesses.remove(manager);
-					if (verbose) {
-						logger.info("Process manager " + manager + " stopped executing.");
-						logPoolStats();
-					}
-					try {
-						manager.close();
-						if (verbose)
-							logger.info("Shutting down process manager " + manager + ".");
-					} catch (Exception e) {
-						if (verbose)
-							logger.log(Level.SEVERE, "Error while shutting down process manager " + manager + ".", e);
-					}
-					synchronized (poolLock) {
-						// Consider that the pool size is about to decrease as this process terminates.
-						if (!close && ((maxPoolSize > minPoolSize ? poolExecutor.getActiveCount() <= minPoolSize :
-								poolExecutor.getActiveCount() < minPoolSize) || (poolExecutor.getActiveCount() <
-								Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize + 1)))) {
-							try {
-								startNewProcess();
-							} catch (IOException e) {
-								if (verbose)
-									logger.log(Level.SEVERE, "Error while starting new process.", e);
-							}
-						}
-					}
-				}
-				
-			}, keepAliveTime, commandExecutorService);
-		}
+		} else
+			procManager = new ProcessShell(new PooledProcessHandler(), keepAliveTime, commandExecutorService);
 		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
 		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 
 		 * that takes care of this. */
@@ -272,7 +191,7 @@ public class PSPPool implements AutoCloseable {
 	 * A method that handles the submission of commands from the queue to the processes.
 	 */
 	private void mainLoop() {
-		Optional<Submission> optionalSubmission = Optional.empty();
+		Optional<InternalSubmission> optionalSubmission = Optional.empty();
 		while (!close) {
 			try {
 				// Wait until there is a command submitted.
@@ -289,9 +208,9 @@ public class PSPPool implements AutoCloseable {
 				}
 				if (close)
 					return;
-				Submission submission = optionalSubmission.get();
+				InternalSubmission submission = optionalSubmission.get();
 				// Execute it in any of the available processes.
-				for (ProcessManager manager : activeProcesses) {
+				for (ProcessShell manager : activeProcesses) {
 					if (manager.isReady()) {
 						Future<?> future = commandExecutorService.submit(() -> {
 							try {
@@ -346,52 +265,244 @@ public class PSPPool implements AutoCloseable {
 		synchronized (this) {
 			notifyAll();
 		}
-		for (ProcessManager p : activeProcesses)
+		for (ProcessShell p : activeProcesses)
 			p.close();
 		commandExecutorService.shutdown();
 		poolExecutor.shutdown();
 	}
 	
 	/**
+	 * An implementation of the {@link net.viktorc.pspp.ProcessManager} interface for managing the life cycle of 
+	 * individual pooled processes.
+	 * 
+	 * @author A6714
+	 *
+	 */
+	private class PooledProcessHandler implements ProcessManager {
+		
+		// The process manager to which the listener is subscribed.
+		private ProcessShell manager;
+		
+		@Override
+		public Process start() throws IOException {
+			return handler.start();
+		}
+		@Override
+		public boolean startsUpInstantly() {
+			return handler.startsUpInstantly();
+		}
+		@Override
+		public boolean isStartedUp(String output, boolean standard) {
+			return handler.isStartedUp(output, standard);
+		}
+		@Override
+		public void onStartup(ProcessShell manager) {
+			// Store the reference to the manager for later use in the onTermination method.
+			this.manager = manager;
+			handler.onStartup(manager);
+			activeProcesses.add(manager);
+			if (verbose) {
+				logger.info("Process manager " + manager + " started executing.");
+				logPoolStats();
+			}
+			startupLatch.countDown();
+		}
+		@Override
+		public boolean terminate(ProcessShell manager) {
+			return handler.terminate(manager);
+		}
+		@Override
+		public void onTermination(int resultCode) {
+			handler.onTermination(resultCode);
+			if (manager == null)
+				return;
+			activeProcesses.remove(manager);
+			if (verbose) {
+				logger.info("Process manager " + manager + " stopped executing.");
+				logPoolStats();
+			}
+			try {
+				manager.close();
+				if (verbose)
+					logger.info("Shutting down process manager " + manager + ".");
+			} catch (Exception e) {
+				if (verbose)
+					logger.log(Level.SEVERE, "Error while shutting down process manager " + manager + ".", e);
+			}
+			synchronized (poolLock) {
+				// Consider that the pool size is about to decrease as this process terminates.
+				if (!close && ((maxPoolSize > minPoolSize ? poolExecutor.getActiveCount() <= minPoolSize :
+						poolExecutor.getActiveCount() < minPoolSize) || (poolExecutor.getActiveCount() <
+						Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize + 1)))) {
+					try {
+						startNewProcess();
+					} catch (IOException e) {
+						if (verbose)
+							logger.log(Level.SEVERE, "Error while starting new process.", e);
+					}
+				}
+			}
+		}
+		
+	}
+	
+	/**
+	 * An implementation of the {@link net.viktorc.pspp.Submission} interface for wrapping submissions into 'internal' submissions 
+	 * to keep track of the number of commands being executed at a time and to establish a mechanism for canceling submitted commands 
+	 * via the {@link java.util.concurrent.Future} returned by the {@link net.viktorc.pspp.PSPPool#submit(Submission) submit} 
+	 * method.
+	 * 
+	 * @author A6714
+	 *
+	 */
+	private class InternalSubmission implements Submission {
+		
+		final Submission submission;
+		final long receivedTime;
+		Long submittedTime;
+		Long processedTime;
+		boolean processed;
+		volatile Future<?> future;
+		
+		/**
+		 * Constructs an instance according to the specified parameters.
+		 * 
+		 * @param submission The submission to wrap into an internal submission with extended features.
+		 * @throws IllegalArgumentException If the submission is null.
+		 */
+		InternalSubmission(Submission submission) {
+			if (submission == null)
+				throw new IllegalArgumentException("The submission cannot be null.");
+			this.submission = submission;
+			receivedTime = System.nanoTime();
+		}
+		/**
+		 * Returns the time when the instance was constructed in nanoseconds.
+		 * 
+		 * @return The time when the instance was constructed in nanoseconds.
+		 */
+		long getReceivedTime() {
+			return receivedTime;
+		}
+		/**
+		 * Returns the time when the command was submitted in nanoseconds or null if it has not been 
+		 * submitted yet.
+		 * 
+		 * @return The time when the command was submitted in nanoseconds or null.
+		 */
+		Long getSubmittedTime() {
+			return submittedTime;
+		}
+		/**
+		 * Returns the time when the command was processed in nanoseconds or null if it has not been 
+		 * processed yet.
+		 * 
+		 * @return The time when the command was processed in nanoseconds or null.
+		 */
+		Long getProcessedTime() {
+			return processedTime;
+		}
+		/**
+		 * Returns whether the command has already been processed.
+		 * 
+		 * @return Whether the command has already been processed.
+		 */
+		boolean isProcessed() {
+			return processed;
+		}
+		/**
+		 * Returns the {@link java.util.concurrent.Future} instance associated with the submission or null if it has not been
+		 * submitted yet.
+		 * 
+		 * @return The {@link java.util.concurrent.Future} instance associated with the command or null.
+		 */
+		Future<?> getFuture() {
+			return future;
+		}
+		/**
+		 * Sets the {@link java.util.concurrent.Future} instance associated with the submission and the submission time.
+		 * 
+		 * @param future The {@link java.util.concurrent.Future} instance associated with the submission.
+		 */
+		void setFuture(Future<?> future) {
+			submittedTime = System.nanoTime();
+			this.future = future;
+		}
+		@Override
+		public List<Command> getCommands() {
+			return submission.getCommands();
+		}
+		@Override
+		public boolean doTerminateProcessAfterwards() {
+			return submission.doTerminateProcessAfterwards();
+		}
+		@Override
+		public boolean isCancelled() {
+			return submission.isCancelled() || (future != null && future.isCancelled());
+		}
+		@Override
+		public void onStartedProcessing() {
+			submission.onStartedProcessing();
+			submissionSuccessful = true;
+			submissionSemaphore.release();
+			numOfExecutingCommands.incrementAndGet();
+		}
+		@Override
+		public void onFinishedProcessing() {
+			submission.onFinishedProcessing();
+			processedTime = System.nanoTime();
+			processed = true;
+			synchronized (this) {
+				notifyAll();
+			}
+			numOfExecutingCommands.decrementAndGet();
+		}
+		@Override
+		public String toString() {
+			return String.join("; ", submission.getCommands().stream().map(c -> c.getInstruction()).collect(Collectors.toList()));
+		}
+		
+	}
+	
+	/**
 	 * An implementation of {@link java.util.concurrent.Future} that returns the time it took to process the 
 	 * submission.
 	 * 
-	 * @author Viktor
+	 * @author A6714
 	 *
 	 */
-	private class SubmissionFuture implements Future<Long> {
+	private class InternalSubmissionFuture implements Future<Long> {
 		
-		final Submission submission;
+		final InternalSubmission submission;
 		
 		/**
 		 * Constructs a {@link java.util.concurrent.Future} for the specified submission.
 		 * 
 		 * @param submission The submission to get a {@link java.util.concurrent.Future} for.
 		 */
-		SubmissionFuture(Submission submission) {
+		InternalSubmissionFuture(InternalSubmission submission) {
 			this.submission = submission;
 		}
 		@Override
 		public synchronized boolean cancel(boolean mayInterruptIfRunning) {
 			commandQueue.remove(submission);
-			Future<?> submissionFuture = submission.getFuture();
-			if (submissionFuture != null)
-				submissionFuture.cancel(true);
-			else
-				return false;
-			synchronized (submission) {
-				submission.notifyAll();
+			Future<?> future = submission.getFuture();
+			if (future != null && future.cancel(mayInterruptIfRunning)) {
+				synchronized (submission) {
+					submission.notifyAll();
+				}
+				return true;
 			}
-			return true;
+			return false;
 		}
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
 			synchronized (submission) {
-				while (!submission.isProcessed() && !submission.getFuture().isCancelled()) {
+				while (!submission.isProcessed() && !submission.isCancelled()) {
 					submission.wait();
 				}
 			}
-			if (submission.getFuture().isCancelled())
+			if (submission.isCancelled())
 				throw new CancellationException();
 			return submission.getProcessedTime() - submission.getReceivedTime();
 		}
@@ -401,12 +512,12 @@ public class PSPPool implements AutoCloseable {
 			long timeoutNs = unit.toNanos(timeout);
 			long start = System.nanoTime();
 			synchronized (submission) {
-				while (!submission.isProcessed() && !submission.getFuture().isCancelled() && timeoutNs > 0) {
+				while (!submission.isProcessed() && !submission.isCancelled() && timeoutNs > 0) {
 					submission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
 					timeoutNs -= (System.nanoTime() - start);
 				}
 			}
-			if (submission.getFuture().isCancelled())
+			if (submission.isCancelled())
 				throw new CancellationException();
 			if (timeoutNs <= 0)
 				throw new TimeoutException();
@@ -415,7 +526,7 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public boolean isCancelled() {
-			return submission.getFuture().isCancelled();
+			return submission.isCancelled();
 		}
 		@Override
 		public boolean isDone() {

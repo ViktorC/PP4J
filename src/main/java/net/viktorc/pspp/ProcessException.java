@@ -1,13 +1,13 @@
 package net.viktorc.pspp;
 
 /**
- * An exception thrown by the {@link net.viktorc.pspp.ProcessManager} class if an 
+ * An exception thrown by the {@link net.viktorc.pspp.ProcessShell} class if an 
  * unexpected error occurs that solicits that instantaneous termination of the process.
  * 
  * @author A6714
  *
  */
-public class ProcessManagerException extends RuntimeException {
+public class ProcessException extends RuntimeException {
 
 	/**
 	 * 
@@ -19,7 +19,7 @@ public class ProcessManagerException extends RuntimeException {
 	 * 
 	 * @param e The source exception.
 	 */
-	public ProcessManagerException(Exception e) {
+	public ProcessException(Exception e) {
 		super(e);
 	}
 

@@ -1,353 +1,77 @@
 package net.viktorc.pspp;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * A class for starting, managing, and interacting with processes. The process is started by calling the 
- * {@link #run() run} method.
+ * An interface that defines methods that allow for the managing of the life cycle of pooled processes. It 
+ * defines methods that start the process, determine and handle its startup behavior, and allow for its 
+ * orderly termination. Implementations of this interface should be stateless as the methods of the same 
+ * instance are used for the handling of all the pooled processes in a {@link net.viktorc.pspp.PSPPool} 
+ * instance.
  * 
  * @author A6714
  *
  */
-public class ProcessManager implements Runnable, AutoCloseable {
-
-	/**
-	 * If the process cannot be started or an exception occurs which would make it impossible to retrieve the actual 
-	 * result code of the process.
-	 */
-	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -99;
-	
-	private final ExecutorService executor;
-	private final boolean internalExecutor;
-	private final ReentrantLock lock;
-	private final ProcessBuilder builder;
-	private final ProcessListener listener;
-	private final long keepAliveTime;
-	private final Timer timer;
-	private final long id;
-	private Process process;
-	private Reader stdOutReader;
-	private Reader errOutReader;
-	private BufferedWriter stdInWriter;
-	private TimerTask task;
-	private volatile Command command;
-	private volatile boolean running;
-	private volatile boolean stop;
-	private volatile boolean startedUp;
-	private volatile boolean commandProcessed;
+public interface ProcessManager {
 	
 	/**
-	 * Constructs a manager for the specified process without actually starting the process.
+	 * A method that starts a new process. The process created should be always the same and it should be 
+	 * always be started only upon the call of this method.
 	 * 
-	 * @param builder The process builder.
-	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
-	 * less, the life-cycle of the processes will not be limited.
-	 * @param listener A process listener to manage the instance.
-	 * @param executorService A thread pool for the threads listening to the standard out and error out of the underlying process. 
-	 * If it is null, the manager's own thread pool is created. If the manager uses an external thread pool, it is not closed upon 
-	 * calling {@link #close() close}.
-	 * @throws IOException If the process command is invalid.
-	 * @throws IllegalArgumentException If the builder or the listener is null.
+	 * @return A new process.
+	 * @throws IOException If the process cannot be started.
 	 */
-	protected ProcessManager(ProcessBuilder builder, ProcessListener listener, long keepAliveTime, ExecutorService executorService)
-			throws IOException {
-		if (builder == null)
-			throw new IllegalArgumentException("The process builder cannot be null.");
-		if (listener == null)
-			throw new IllegalArgumentException("The process listener cannot be null.");
-		internalExecutor = executorService == null;
-		this.executor = internalExecutor ? Executors.newFixedThreadPool(2) : executorService;
-		lock = new ReentrantLock();
-		this.builder = builder;
-		this.listener = listener;
-		this.keepAliveTime = keepAliveTime;
-		timer = keepAliveTime > 0 ? new Timer() : null;
-		id = (new Random()).nextLong();
-	}
+	Process start() throws IOException;
 	/**
-	 * Constructs a manager for the specified process without actually starting the process.
+	 * A method that denotes whether the process should be considered started up instantly or if it is only 
+	 * started up once a certain output has been printed to one of its out streams. If it returns true, the 
+	 * process is instantly considered started up and ready as soon as it is running, and the method 
+	 * {@link #onStartup(ProcessShell) onStartup} is executed. If it returns false, the method 
+	 * {@link #isStartedUp(String, boolean) isStartedUp} determines when the process is considered started 
+	 * up.
 	 * 
-	 * @param builder The process builder.
-	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
-	 * less, the life-cycle of the processes will not be limited.
-	 * @param listener A process listener to manage the instance.
-	 * @throws IOException If the process command is invalid.
-	 * @throws IllegalArgumentException If the builder or the listener is null.
+	 * @return Whether the process instantly start up as soon as it is run or if it is started up and ready 
+	 * only when a certain output has been written to one of its output streams.
 	 */
-	protected ProcessManager(ProcessBuilder builder, ProcessListener listener, long keepAliveTime)
-		throws IOException {
-		this(builder, listener, keepAliveTime, null);
-	}
+	boolean startsUpInstantly();
 	/**
-	 * Returns the 64 bit ID number of the instance.
+	 * Handles the output of the underlying process after it has been started. The return value of the method 
+	 * determines whether the process is to be considered started up and ready for the execution of the method 
+	 * {@link #onStartup(ProcessShell) onStartup}. It is only ever called if {@link #startsUpInstantly() startsUpInstantly} 
+	 * returns false.
 	 * 
-	 * @return The ID of the instance.
+	 * @param outputLine A line of output produced by the process.
+	 * @param standard Whether this line has been output to the standard out or to the error out.
+	 * @return Whether the process is to be considered started up.
 	 */
-	public long getId() {
-		return id;
-	}
+	boolean isStartedUp(String outputLine, boolean standard);
 	/**
-	 * Returns whether the process is currently running.
+	 * A method called right after the process is started. Its main purpose is to allow for startup 
+	 * activities such as the execution of commands.
 	 * 
-	 * @return Whether the process is currently running.
+	 * @param shell The {@link net.viktorc.pspp.ProcessShell} instance in which the process is executed. 
+	 * It serves as a handle for sending commands to the underlying process after the startup if needed.
 	 */
-	protected boolean isRunning() {
-		return running;
-	}
+	void onStartup(ProcessShell shell);
 	/**
-	 * Returns whether the manager is ready process new commands.
+	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
+	 * close resources or to exit the process in an orderly way and avoid the need to forcibly terminate 
+	 * it at all. The return value of the method determines whether there is a need to forcibly terminate
+	 * the process. If true is returned, the termination is assumed to have been successful and the 
+	 * process is not forcibly terminated afterwards. If it returns false, the process is killed.
 	 * 
-	 * @return Whether the manager is ready to process commands.
+	 * @param shell  The {@link net.viktorc.pspp.ProcessShell} instance in which the process is executed. 
+	 * It serves as a handle for sending commands to the underlying process to terminate it in an orderly 
+	 * way.
+	 * @return Whether the process has been successfully terminated or it should be forcibly cancelled.
 	 */
-	protected boolean isReady() {
-		return running && !stop && (!lock.isLocked() || lock.isHeldByCurrentThread());
-	}
+	boolean terminate(ProcessShell shell);
 	/**
-	 * It prompts the currently running process, if there is one, to terminate.
-	 */
-	protected void cancel() {
-		lock.lock();
-		try {
-			if (listener == null || !listener.terminate(this)) {
-				if (process != null)
-					process.destroy();
-			}
-			stop = true;
-		} finally {
-			lock.unlock();
-		}
-	}
-	/**
-	 * Starts listening to the specified channel.
+	 * A method called right after the process terminates. Its main purpose is to allow for wrap-up 
+	 * activities.
 	 * 
-	 * @param reader The channel to listen to.
-	 * @param error Whether it is the error out or the standard out stream of the process.
-	 * @throws IOException If there is some problem with the stream.
+	 * @param resultCode The result code the process returned.
 	 */
-	private void startListening(Reader reader, boolean error) throws IOException {
-		int c;
-		StringBuilder output = new StringBuilder();
-		while ((c = reader.read()) != -1) {
-			String line;
-			if (c == '\n') {
-				line = output.toString().trim();
-				output.setLength(0);
-			} else {
-				output.append((char) c);
-				if (reader.ready())
-					continue;
-				else
-					line = output.toString().trim();
-			}
-			if (line.isEmpty())
-				continue;
-			if (startedUp) {
-				synchronized (lock) {
-					try {
-						commandProcessed = (command == null || (error ? command.onErrorOutput(line) :
-								command.onStandardOutput(line)));
-					} finally {
-						if (commandProcessed)
-							lock.notifyAll();
-					}
-				}
-			} else {
-				startedUp = listener.isStartedUp(line, !error);
-				if (startedUp) {
-					synchronized (ProcessManager.this) {
-						ProcessManager.this.notifyAll();
-					}
-				}
-			}
-		}
-	}
-	/**
-	 * Attempts to write the specified commands to the standard in stream of the process and blocks until they are 
-	 * processed.
-	 * 
-	 * @param commandSubmission The submitted command(s) to execute.
-	 * @return Whether the submission was executed. If the manager is busy processing an other submission, 
-	 * it returns false; otherwise the submission is executed and true is returned once it's processed.
-	 * @throws IOException If a command cannot be written to the standard in stream.
-	 * @throws ProcessManagerException If the thread is interrupted while executing the commands.
-	 */
-	public boolean execute(Submission commandSubmission)
-			throws IOException {
-		if (running && !stop && lock.tryLock()) {
-			List<SubmissionListener> submissionListeners = commandSubmission.getSubmissionListeners();
-			try {
-				if (task != null) {
-					task.cancel();
-					task = null;
-				}
-				for (SubmissionListener subListener : submissionListeners)
-					subListener.onStartedProcessing();
-				List<Command> commands = commandSubmission.getCommands();
-				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>() : null;
-				synchronized (lock) {
-					for (int i = 0; i < commands.size() && running && !stop; i++) {
-						command = commands.get(i);
-						Future<?> submissionFuture = commandSubmission.getFuture();
-						if (submissionFuture != null && submissionFuture.isCancelled())
-							break;
-						if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
-							continue;
-						commandProcessed = !command.generatesOutput();
-						stdInWriter.write(command.getInstruction());
-						stdInWriter.newLine();
-						stdInWriter.flush();
-						while (running && !stop && !commandProcessed) {
-							try {
-								lock.wait();
-							} catch (InterruptedException e) {
-								throw new ProcessManagerException(e);
-							}
-						}
-						if (i < commands.size() - 1)
-							processedCommands.add(command);
-						command = null;
-					}
-				}
-				if (running && !stop) {
-					if (commandSubmission.doTerminateProcessAfterwards())
-						cancel();
-					else if (timer != null && task == null) {
-						task = new TimerTask() {
-							
-							@Override
-							public void run() {
-								task = null;
-								ProcessManager.this.cancel();
-							}
-							
-						};
-						timer.schedule(task, keepAliveTime);
-					}
-				}
-				return true;
-			} finally {
-				try {
-					for (SubmissionListener subListener : submissionListeners)
-						subListener.onFinishedProcessing();
-				} finally {
-					commandSubmission.setProcessedToTrue();
-					lock.unlock();
-				}
-			}
-		} else
-			return false;
-	}
-	@Override
-	public synchronized void run() {
-		running = true;
-		stop = false;
-		AtomicInteger rc = new AtomicInteger(0);
-		try {
-			lock.lock();
-			try {
-				// Start process
-				process = builder.start();
-				stdOutReader = new InputStreamReader(process.getInputStream());
-				errOutReader = new InputStreamReader(process.getErrorStream());
-				stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
-				startedUp = listener == null || listener.isStartedUp(null, true);
-				executor.submit(() -> {
-					try {
-						startListening(stdOutReader, false);
-					} catch (IOException e) {
-						throw new ProcessManagerException(e);
-					}
-				});
-				executor.submit(() -> {
-					try {
-						startListening(errOutReader, true);
-					} catch (IOException e) {
-						throw new ProcessManagerException(e);
-					}
-				});
-				while (!startedUp)
-					wait();
-				// Execute the onStartup listener method.
-				if (listener != null)
-					listener.onStartup(this);
-				if (timer != null && task == null) {
-					task = new TimerTask() {
-						
-						@Override
-						public void run() {
-							task = null;
-							ProcessManager.this.cancel();
-						}
-						
-					};
-					timer.schedule(task, keepAliveTime);
-				}
-			} finally {
-				lock.unlock();
-			}
-			rc.set(process.waitFor());
-		} catch (Exception e) {
-			// Set the result code to the value associated with unexpected termination.
-			rc.set(UNEXPECTED_TERMINATION_RESULT_CODE);
-			throw new ProcessManagerException(e);
-		} finally {
-			// Try to clean up and close all the resources.
-			if (task != null) {
-				task.cancel();
-				task = null;
-			}
-			process = null;
-			if (stdOutReader != null) {
-				try {
-					stdOutReader.close();
-				} catch (IOException e) { }
-			}
-			if (errOutReader != null) {
-				try {
-					errOutReader.close();
-				} catch (IOException e) { }
-			}
-			if (stdInWriter != null) {
-				try {
-					stdInWriter.close();
-				} catch (IOException e) { }
-			}
-			running = false;
-			synchronized (lock) {
-				lock.notifyAll();
-			}
-			// Execute the onTermination listener method.
-			if (listener != null)
-				listener.onTermination(rc.get());
-		}
-	}
-	@Override
-	public void close() throws Exception {
-		if (timer != null)
-			timer.cancel();
-		command = null;
-		if (running && !stop)
-			cancel();
-		if (internalExecutor)
-			executor.shutdown();
-	}
-	@Override
-	public String toString() {
-		return "#" + Long.toHexString(id);
-	}
+	void onTermination(int resultCode);
 	
 }

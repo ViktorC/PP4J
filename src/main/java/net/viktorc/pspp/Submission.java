@@ -1,172 +1,46 @@
 package net.viktorc.pspp;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 
 /**
- * A class that holds all information necessary for executing and processing commands in {@link net.viktorc.pspp.ProcessManager} instances.
+ * An interface that defines methods necessary for the submission and execution commands in {@link net.viktorc.pspp.ProcessShell} 
+ * instances. It also defines methods to call once the processing of the submitted commands has started or finished which are by 
+ * default no-operations.
  * 
  * @author A6714
  *
  */
-public class Submission {
-	
-	private final List<Command> commands;
-	private final boolean terminateProcessAfterwards;
-	private final Queue<SubmissionListener> submissionListeners;
-	private final long receivedTime;
-	private Long submittedTime;
-	private Long processedTime;
-	private boolean processed;
-	private volatile Future<?> future;
-	
-	/**
-	 * Constructs an instance according to the specified parameters.
-	 * 
-	 * @param commands A list of commands to execute. It should not contain null references.
-	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
-	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
-	 */
-	public Submission(List<Command> commands, boolean terminateProcessAfterwards) {
-		if (commands == null || commands.isEmpty())
-			throw new IllegalArgumentException("The commands cannot be null.");
-		if (commands.isEmpty())
-			throw new IllegalArgumentException("The commands cannot be empty.");
-		if (!commands.stream().filter(c -> c == null).collect(Collectors.toList()).isEmpty())
-			throw new IllegalArgumentException("The commands cannot include null references.");
-		this.commands = new ArrayList<>(commands);
-		this.terminateProcessAfterwards = terminateProcessAfterwards;
-		submissionListeners = new ConcurrentLinkedQueue<>();
-		receivedTime = System.nanoTime();
-	}
-	/**
-	 * Constructs an instance according to the specified parameters.
-	 * 
-	 * @param command A command to execute.
-	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
-	 * @throws IllegalArgumentException If the command is null.
-	 */
-	public Submission(Command command, boolean terminateProcessAfterwards) {
-		this(Arrays.asList(command), terminateProcessAfterwards);
-	}
+public interface Submission {
+
 	/**
 	 * Returns the commands to execute.
 	 * 
 	 * @return The commands to execute.
 	 */
-	public List<Command> getCommands() {
-		return new ArrayList<>(commands);
-	}
+	List<Command> getCommands();
 	/**
-	 * Returns whether the process should be terminated after the execution of the command.
+	 * Returns whether the process should be terminated after the execution of the commands.
 	 * 
-	 * @return Whether the process should be terminated after the execution of the command.
+	 * @return Whether the process should be terminated after the execution of the commands.
 	 */
-	public boolean doTerminateProcessAfterwards() {
-		return terminateProcessAfterwards;
-	}
+	boolean doTerminateProcessAfterwards();
 	/**
-	 * Subscribes a listener to the submission instance. Listeners added to the submission after it 
-	 * has already been submitted have no effect.
+	 * Returns whether the submission has been cancelled.
 	 * 
-	 * @param listener The listener to subscribe to the submission.
+	 * @return Whether the submission has been cancelled.
 	 */
-	public void addSubmissionListener(SubmissionListener listener) {
-		submissionListeners.add(listener);
+	boolean isCancelled();
+	/**
+	 * A method that is executed once the processing of the submitted commands has begun.
+	 */
+	default void onStartedProcessing() {
+		
 	}
 	/**
-	 * Removes the specified listener from the list of subscribed listeners if found. The value returned 
-	 * denotes whether the listener was subscribed. Removing listeners after the submission has already 
-	 * been submitted has no effect.
-	 * 
-	 * @param listener The listener to remove.
-	 * @return Whether the listener was subscribed and thus removed.
+	 * A method to execute once the processing of the submitted commands has completed.
 	 */
-	public boolean removeSubmissionListener(SubmissionListener listener) {
-		return submissionListeners.remove(listener);
-	}
-	/**
-	 * Returns a list of the subscribed submission listeners.
-	 * 
-	 * @return A list of the listeners subscribed to the submission instance.
-	 */
-	List<SubmissionListener> getSubmissionListeners() {
-		return new ArrayList<>(submissionListeners);
-	}
-	/**
-	 * Returns the time when the instance was constructed in nanoseconds.
-	 * 
-	 * @return The time when the instance was constructed in nanoseconds.
-	 */
-	long getReceivedTime() {
-		return receivedTime;
-	}
-	/**
-	 * Returns the time when the command was submitted in nanoseconds or null if it has not been 
-	 * submitted yet.
-	 * 
-	 * @return The time when the command was submitted in nanoseconds or null.
-	 */
-	Long getSubmittedTime() {
-		return submittedTime;
-	}
-	/**
-	 * Returns the time when the command was processed in nanoseconds or null if it has not been 
-	 * processed yet.
-	 * 
-	 * @return The time when the command was processed in nanoseconds or null.
-	 */
-	Long getProcessedTime() {
-		return processedTime;
-	}
-	/**
-	 * Returns whether the command has already been processed.
-	 * 
-	 * @return Whether the command has already been processed.
-	 */
-	boolean isProcessed() {
-		return processed;
-	}
-	/**
-	 * Returns the {@link java.util.concurrent.Future} instance associated with the submission or null if it has not been
-	 * submitted yet.
-	 * 
-	 * @return The {@link java.util.concurrent.Future} instance associated with the command or null.
-	 */
-	Future<?> getFuture() {
-		return future;
-	}
-	/**
-	 * Sets the {@link java.util.concurrent.Future} instance associated with the submission and the submission time.
-	 * 
-	 * @param future The {@link java.util.concurrent.Future} instance associated with the submission.
-	 */
-	void setFuture(Future<?> future) {
-		submittedTime = System.nanoTime();
-		processed = false;
-		this.future = future;
-		synchronized (this) {
-			notifyAll();
-		}
-	}
-	/**
-	 * Sets the command submission's state to 'processed'. Subsequent calls are ignored.
-	 */
-	void setProcessedToTrue() {
-		processedTime = System.nanoTime();
-		processed = true;
-		synchronized (this) {
-			notifyAll();
-		}
-	}
-	@Override
-	public String toString() {
-		return String.join("; ", commands.stream().map(c -> c.getInstruction()).collect(Collectors.toList()));
+	default void onFinishedProcessing() {
+		
 	}
 	
 }
