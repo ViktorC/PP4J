@@ -33,14 +33,14 @@ import java.util.stream.Collectors;
  */
 public class PSPPool implements AutoCloseable {
 	
-	private final ProcessManager handler;
+	private final ProcessManager manager;
 	private final int minPoolSize;
 	private final int maxPoolSize;
 	private final int reserveSize;
 	private final long keepAliveTime;
 	private final boolean verbose;
 	private final ThreadPoolExecutor processExecutor;
-	private final ExecutorService commandExecutorService;
+	private final ExecutorService taskExecutorService;
 	private final List<ProcessShell> activeShells;
 	private final Queue<InternalSubmission> commandQueue;
 	private final CountDownLatch startupLatch;
@@ -80,7 +80,7 @@ public class PSPPool implements AutoCloseable {
 					"minimum pool size.");
 		if (reserveSize < 0 || reserveSize > maxPoolSize)
 			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
-		this.handler = handler;
+		this.manager = handler;
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
@@ -88,7 +88,7 @@ public class PSPPool implements AutoCloseable {
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		processExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
-		commandExecutorService = Executors.newCachedThreadPool();
+		taskExecutorService = Executors.newCachedThreadPool();
 		activeShells = new CopyOnWriteArrayList<>();
 		commandQueue = new ConcurrentLinkedQueue<>();
 		startupLatch = new CountDownLatch(actualMinSize);
@@ -101,7 +101,7 @@ public class PSPPool implements AutoCloseable {
 		if (verbose) {
 			processExecutor.setThreadFactory(new VerboseThreadFactory(processExecutor.getThreadFactory(),
 					"Error while running process."));
-			ThreadPoolExecutor commandExecutor = (ThreadPoolExecutor) commandExecutorService;
+			ThreadPoolExecutor commandExecutor = (ThreadPoolExecutor) taskExecutorService;
 			commandExecutor.setThreadFactory(new VerboseThreadFactory(commandExecutor.getThreadFactory(),
 					"Error while interacting with the process."));
 		}
@@ -182,7 +182,7 @@ public class PSPPool implements AutoCloseable {
 			procManager = spareShell;
 			spareShell = null;
 		} else
-			procManager = new ProcessShell(new PooledProcessHandler(), keepAliveTime, commandExecutorService);
+			procManager = new ProcessShell(new PooledProcessManager(), keepAliveTime, taskExecutorService);
 		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
 		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 
 		 * that takes care of this. */
@@ -222,7 +222,7 @@ public class PSPPool implements AutoCloseable {
 				// Execute it in any of the available processes.
 				for (ProcessShell manager : activeShells) {
 					if (manager.isReady()) {
-						Future<?> future = commandExecutorService.submit(() -> {
+						Future<?> future = taskExecutorService.submit(() -> {
 							try {
 								if (manager.execute(submission)) {
 									if (verbose)
@@ -277,7 +277,7 @@ public class PSPPool implements AutoCloseable {
 		}
 		for (ProcessShell p : activeShells)
 			p.close();
-		commandExecutorService.shutdown();
+		taskExecutorService.shutdown();
 		processExecutor.shutdown();
 	}
 	
@@ -328,56 +328,56 @@ public class PSPPool implements AutoCloseable {
 	 * @author A6714
 	 *
 	 */
-	private class PooledProcessHandler implements ProcessManager {
+	private class PooledProcessManager implements ProcessManager {
 		
-		// The process manager to which the listener is subscribed.
-		ProcessShell manager;
+		// The process shell to which the listener is subscribed.
+		ProcessShell processShell;
 		
 		@Override
 		public Process start() throws IOException {
-			return handler.start();
+			return manager.start();
 		}
 		@Override
 		public boolean startsUpInstantly() {
-			return handler.startsUpInstantly();
+			return manager.startsUpInstantly();
 		}
 		@Override
 		public boolean isStartedUp(String output, boolean standard) {
-			return handler.isStartedUp(output, standard);
+			return manager.isStartedUp(output, standard);
 		}
 		@Override
-		public void onStartup(ProcessShell manager) {
+		public void onStartup(ProcessShell shell) {
 			// Store the reference to the manager for later use in the onTermination method.
-			this.manager = manager;
-			handler.onStartup(manager);
-			activeShells.add(manager);
+			this.processShell = shell;
+			manager.onStartup(shell);
+			activeShells.add(shell);
 			if (verbose) {
-				logger.info("Process manager " + manager + " started executing.");
+				logger.info("Process manager " + shell + " started executing.");
 				logPoolStats();
 			}
 			startupLatch.countDown();
 		}
 		@Override
-		public boolean terminate(ProcessShell manager) {
-			return handler.terminate(manager);
+		public boolean terminate(ProcessShell shell) {
+			return manager.terminate(shell);
 		}
 		@Override
 		public void onTermination(int resultCode) {
-			handler.onTermination(resultCode);
-			if (manager == null)
+			manager.onTermination(resultCode);
+			if (processShell == null)
 				return;
-			activeShells.remove(manager);
+			activeShells.remove(processShell);
 			if (verbose) {
-				logger.info("Process manager " + manager + " stopped executing.");
+				logger.info("Process manager " + processShell + " stopped executing.");
 				logPoolStats();
 			}
 			try {
-				manager.close();
+				processShell.close();
 				if (verbose)
-					logger.info("Shutting down process manager " + manager + ".");
+					logger.info("Shutting down process manager " + processShell + ".");
 			} catch (Exception e) {
 				if (verbose)
-					logger.log(Level.SEVERE, "Error while shutting down process manager " + manager + ".", e);
+					logger.log(Level.SEVERE, "Error while shutting down process manager " + processShell + ".", e);
 			}
 			synchronized (poolLock) {
 				// Consider that the pool size is about to decrease as this process terminates.
