@@ -220,7 +220,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test05() {
-		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 10000, 0, 10200));
+		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 10000, 0, 10320));
 	}
 	@Test
 	public void test06() {
@@ -244,7 +244,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test11() {
-		Assert.assertTrue(test("Test 11", 10, 50, 5, 15000, false, false, false, new int[] { 5, 3, 2 }, 50, 10000, 0, 10200));
+		Assert.assertTrue(test("Test 11", 10, 50, 5, 15000, false, false, false, new int[] { 5, 3, 2 }, 50, 10000, 0, 10350));
 	}
 	@Test
 	public void test12() {
