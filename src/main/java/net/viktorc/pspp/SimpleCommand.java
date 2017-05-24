@@ -41,7 +41,7 @@ public class SimpleCommand extends AbstractCommand {
 	}
 	@Override
 	protected boolean onOutput(String outputLine, boolean standard) {
-		return standard ? onStandardOutput.test(this, outputLine) : onErrorOutput.test(this, outputLine);
+		return (standard ? onStandardOutput.test(this, outputLine) : onErrorOutput.test(this, outputLine));
 	}
 
 }

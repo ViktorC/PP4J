@@ -8,16 +8,16 @@ import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * A class for starting, managing, and interacting with processes. The process is started by calling the 
- * {@link #run() run} method.
+ * A class for starting, managing, and interacting with a process. The life cycle of the associated process is the same as that of the 
+ * {@link #run() run} method of the instance. The process is not started until this method is called and the method does not terminate 
+ * until the process does.
  * 
  * @author A6714
  *
@@ -33,15 +33,15 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	private final ProcessManager manager;
 	private final long keepAliveTime;
 	private final ExecutorService executor;
+	private final boolean timed;
 	private final boolean internalExecutor;
 	private final ReentrantLock lock;
-	private final Timer timer;
 	private final long id;
 	private Process process;
 	private Reader stdOutReader;
 	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
-	private TimerTask task;
+	private volatile Future<?> timedTask;
 	private volatile Command command;
 	private volatile boolean running;
 	private volatile boolean stop;
@@ -49,14 +49,15 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	private volatile boolean commandProcessed;
 	
 	/**
-	 * Constructs a shell for the specified process without actually starting the process.
+	 * Constructs a shell for the specified process using two threads of the specified {@link java.util.concurrent.ExecutorService} to 
+	 * listen to the out streams of the underlying process.
 	 * 
 	 * @param manager The process manager to handle the underlying process.
 	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
 	 * less, the life-cycle of the processes will not be limited.
-	 * @param executorService A thread pool for the threads listening to the standard out and error out of the underlying process. 
-	 * If it is null, the manager's own thread pool is created. If the manager uses an external thread pool, it is not closed upon 
-	 * calling {@link #close() close}.
+	 * @param executorService A thread pool for the threads required for listening to the standard out and error out of the underlying 
+	 * process and, if specified, for terminating the process if it is idle for too long. If it is null, the manager's own thread pool 
+	 * is created. If the manager uses an external thread pool, it is not closed upon calling {@link #close() close}.
 	 * @throws IOException If the process command is invalid.
 	 * @throws IllegalArgumentException If the handler is null.
 	 */
@@ -64,16 +65,16 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			throws IOException {
 		if (manager == null)
 			throw new IllegalArgumentException("The process handler cannot be null.");
+		timed = keepAliveTime > 0;
 		internalExecutor = executorService == null;
-		this.executor = internalExecutor ? Executors.newFixedThreadPool(2) : executorService;
+		this.executor = internalExecutor ? Executors.newFixedThreadPool(timed ? 3 : 2) : executorService;
 		lock = new ReentrantLock();
 		this.manager = manager;
 		this.keepAliveTime = keepAliveTime;
-		timer = keepAliveTime > 0 ? new Timer() : null;
 		id = (new Random()).nextLong();
 	}
 	/**
-	 * Constructs a shell for the specified process without actually starting the process.
+	 * Constructs a shell for the specified process.
 	 * 
 	 * @param manager The process manager to handle the underlying process.
 	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
@@ -102,7 +103,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 		return running;
 	}
 	/**
-	 * Returns whether the manager is ready process new commands.
+	 * Returns whether the manager is ready to process new commands.
 	 * 
 	 * @return Whether the manager is ready to process commands.
 	 */
@@ -123,6 +124,23 @@ public class ProcessShell implements Runnable, AutoCloseable {
 		} finally {
 			lock.unlock();
 		}
+	}
+	/**
+	 * Submits a {@link java.lang.Runnable} to the thread pool that calls the {@link #cancel() cancel} method after 
+	 * {@link #keepAliveTime} milliseconds.
+	 */
+	private void startKeepAliveTimer() {
+		timedTask = executor.submit(() -> {
+			try {
+				Thread.sleep(keepAliveTime);
+				if (!stop)
+					ProcessShell.this.cancel();
+			} catch (InterruptedException e) {
+				
+			} catch (Exception e) {
+				throw new ProcessException(e);
+			}
+		});
 	}
 	/**
 	 * Starts listening to the specified channel.
@@ -148,21 +166,15 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			}
 			if (line.isEmpty())
 				continue;
-			if (startedUp) {
-				synchronized (lock) {
-					try {
-						commandProcessed = (command == null || command.onNewOutput(line, standard));
-					} finally {
-						if (commandProcessed)
-							lock.notifyAll();
-					}
-				}
-			} else {
-				startedUp = manager.isStartedUp(line, standard);
+			synchronized (lock) {
 				if (startedUp) {
-					synchronized (ProcessShell.this) {
-						ProcessShell.this.notifyAll();
-					}
+					commandProcessed = (command == null || command.onNewOutput(line, standard));
+					if (commandProcessed)
+						lock.notifyAll();
+				} else {
+					startedUp = manager.isStartedUp(line, standard);
+					if (startedUp)
+						lock.notifyAll();
 				}
 			}
 		}
@@ -181,13 +193,11 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			throws IOException {
 		if (running && !stop && lock.tryLock()) {
 			try {
-				if (task != null) {
-					task.cancel();
-					task = null;
-				}
+				if (timedTask != null)
+					timedTask.cancel(true);
 				submission.onStartedProcessing();
 				List<Command> commands = submission.getCommands();
-				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>() : null;
+				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
 				synchronized (lock) {
 					for (int i = 0; i < commands.size() && running && !stop; i++) {
 						command = commands.get(i);
@@ -214,18 +224,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				if (running && !stop) {
 					if (submission.doTerminateProcessAfterwards())
 						cancel();
-					else if (timer != null && task == null) {
-						task = new TimerTask() {
-							
-							@Override
-							public void run() {
-								task = null;
-								ProcessShell.this.cancel();
-							}
-							
-						};
-						timer.schedule(task, keepAliveTime);
-					}
+					else if (timed && (timedTask == null || timedTask.isCancelled()))
+						startKeepAliveTimer();
 				}
 				return true;
 			} finally {
@@ -252,35 +252,27 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				errOutReader = new InputStreamReader(process.getErrorStream());
 				stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 				startedUp = manager.startsUpInstantly();
-				executor.submit(() -> {
-					try {
-						startListening(stdOutReader, true);
-					} catch (IOException e) {
-						throw new ProcessException(e);
-					}
-				});
-				executor.submit(() -> {
-					try {
-						startListening(errOutReader, false);
-					} catch (IOException e) {
-						throw new ProcessException(e);
-					}
-				});
-				while (!startedUp)
-					wait();
-				manager.onStartup(this);
-				if (timer != null && task == null) {
-					task = new TimerTask() {
-						
-						@Override
-						public void run() {
-							task = null;
-							ProcessShell.this.cancel();
+				synchronized (lock) {
+					executor.submit(() -> {
+						try {
+							startListening(stdOutReader, true);
+						} catch (IOException e) {
+							throw new ProcessException(e);
 						}
-						
-					};
-					timer.schedule(task, keepAliveTime);
+					});
+					executor.submit(() -> {
+						try {
+							startListening(errOutReader, false);
+						} catch (IOException e) {
+							throw new ProcessException(e);
+						}
+					});
+					while (!startedUp)
+						lock.wait();
 				}
+				manager.onStartup(this);
+				if (timed && (timedTask == null || timedTask.isCancelled()))
+					startKeepAliveTimer();
 			} finally {
 				lock.unlock();
 			}
@@ -291,10 +283,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			throw new ProcessException(e);
 		} finally {
 			// Try to clean up and close all the resources.
-			if (task != null) {
-				task.cancel();
-				task = null;
-			}
+			if (timedTask != null)
+				timedTask.cancel(true);
 			process = null;
 			if (stdOutReader != null) {
 				try {
@@ -320,8 +310,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	}
 	@Override
 	public void close() throws Exception {
-		if (timer != null)
-			timer.cancel();
 		command = null;
 		if (running && !stop)
 			cancel();

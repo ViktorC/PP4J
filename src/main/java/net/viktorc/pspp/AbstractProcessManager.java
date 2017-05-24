@@ -4,8 +4,8 @@ import java.io.IOException;
 
 /**
  * An abstract implementation of the {@link net.viktorc.pspp.ProcessManager} interface. Its implementations should be stateless 
- * as the methods of the same {@link net.viktorc.pspp.SimpleProcessManager} instance are used for every {@link net.viktorc.pspp.ProcessShell} 
- * of a {@link net.viktorc.pspp.PSPPool} instance.
+ * as the methods of the same instance are used for every {@link net.viktorc.pspp.ProcessShell} of a {@link net.viktorc.pspp.PSPPool} 
+ * instance.
  * 
  * 
  * @author A6714

@@ -15,8 +15,8 @@ import java.io.IOException;
 public interface ProcessManager {
 	
 	/**
-	 * A method that starts a new process. The process created should be always the same and it should be 
-	 * always be started only upon the call of this method.
+	 * A method that starts a new process. The process created should always be the same and it should always 
+	 * be started only upon the call of this method.
 	 * 
 	 * @return A new process.
 	 * @throws IOException If the process cannot be started.

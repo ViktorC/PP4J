@@ -1,6 +1,7 @@
 package net.viktorc.pspp;
 
 import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
@@ -15,6 +16,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -37,9 +39,9 @@ public class PSPPool implements AutoCloseable {
 	private final int reserveSize;
 	private final long keepAliveTime;
 	private final boolean verbose;
-	private final ThreadPoolExecutor poolExecutor;
+	private final ThreadPoolExecutor processExecutor;
 	private final ExecutorService commandExecutorService;
-	private final List<ProcessShell> activeProcesses;
+	private final List<ProcessShell> activeShells;
 	private final Queue<InternalSubmission> commandQueue;
 	private final CountDownLatch startupLatch;
 	private final Semaphore submissionSemaphore;
@@ -48,7 +50,7 @@ public class PSPPool implements AutoCloseable {
 	private final Logger logger;
 	private volatile boolean submissionSuccessful;
 	private volatile boolean close;
-	private ProcessShell spareProcessManager;
+	private ProcessShell spareShell;
 
 	/**
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
@@ -84,10 +86,10 @@ public class PSPPool implements AutoCloseable {
 		this.reserveSize = reserveSize;
 		this.keepAliveTime = keepAliveTime;
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
-		poolExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
+		processExecutor = new ThreadPoolExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
 		commandExecutorService = Executors.newCachedThreadPool();
-		activeProcesses = new CopyOnWriteArrayList<>();
+		activeShells = new CopyOnWriteArrayList<>();
 		commandQueue = new ConcurrentLinkedQueue<>();
 		startupLatch = new CountDownLatch(actualMinSize);
 		submissionSemaphore = new Semaphore(0);
@@ -95,6 +97,14 @@ public class PSPPool implements AutoCloseable {
 		numOfExecutingCommands = new AtomicInteger(0);
 		logger = Logger.getAnonymousLogger();
 		this.verbose = verbose;
+		// Ensure that exceptions thrown by runnables submitted to the pools do not go unnoticed if the instance is verbose.
+		if (verbose) {
+			processExecutor.setThreadFactory(new VerboseThreadFactory(processExecutor.getThreadFactory(),
+					"Error while running process."));
+			ThreadPoolExecutor commandExecutor = (ThreadPoolExecutor) commandExecutorService;
+			commandExecutor.setThreadFactory(new VerboseThreadFactory(commandExecutor.getThreadFactory(),
+					"Error while interacting with the process."));
+		}
 		for (int i = 0; i < actualMinSize; i++) {
 			synchronized (poolLock) {
 				startNewProcess();
@@ -157,7 +167,7 @@ public class PSPPool implements AutoCloseable {
 	 * Logs the number of active, queued, and currently executing processes.
 	 */
 	private void logPoolStats() {
-		logger.info("Total processes: " + poolExecutor.getActiveCount() + "; acitve processes: " + activeProcesses.size() +
+		logger.info("Total processes: " + processExecutor.getActiveCount() + "; acitve processes: " + activeShells.size() +
 				"; submitted commands: " + (numOfExecutingCommands.get() + commandQueue.size()));
 	}
 	/**
@@ -168,20 +178,20 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private boolean startNewProcess() throws IOException {
 		ProcessShell procManager;
-		if (spareProcessManager != null) {
-			procManager = spareProcessManager;
-			spareProcessManager = null;
+		if (spareShell != null) {
+			procManager = spareShell;
+			spareShell = null;
 		} else
 			procManager = new ProcessShell(new PooledProcessHandler(), keepAliveTime, commandExecutorService);
 		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
 		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 
 		 * that takes care of this. */
 		try {
-			poolExecutor.execute(procManager);
+			processExecutor.execute(procManager);
 			return true;
 		} catch (RejectedExecutionException e) {
 			// If the process cannot be submitted to the pool, store it in a variable to avoid wasting the instance.
-			spareProcessManager = procManager;
+			spareShell = procManager;
 			if (verbose)
 				logger.log(Level.WARNING, "Failed to start new process due to the pool having reached its capacity.");
 			return false;
@@ -210,7 +220,7 @@ public class PSPPool implements AutoCloseable {
 					return;
 				InternalSubmission submission = optionalSubmission.get();
 				// Execute it in any of the available processes.
-				for (ProcessShell manager : activeProcesses) {
+				for (ProcessShell manager : activeShells) {
 					if (manager.isReady()) {
 						Future<?> future = commandExecutorService.submit(() -> {
 							try {
@@ -243,7 +253,7 @@ public class PSPPool implements AutoCloseable {
 				}
 				// Extend the pool if needed.
 				synchronized (poolLock) {
-					if (!close && (poolExecutor.getActiveCount() < minPoolSize || (poolExecutor.getActiveCount() <
+					if (!close && (processExecutor.getActiveCount() < minPoolSize || (processExecutor.getActiveCount() <
 							Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize)))) {
 						try {
 							startNewProcess();
@@ -265,10 +275,50 @@ public class PSPPool implements AutoCloseable {
 		synchronized (this) {
 			notifyAll();
 		}
-		for (ProcessShell p : activeProcesses)
+		for (ProcessShell p : activeShells)
 			p.close();
 		commandExecutorService.shutdown();
-		poolExecutor.shutdown();
+		processExecutor.shutdown();
+	}
+	
+	/**
+	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that extends the 
+	 * {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by logging the exceptions (throwables).
+	 * 
+	 * @author A6714
+	 *
+	 */
+	private class VerboseThreadFactory implements ThreadFactory {
+
+		final ThreadFactory originalFactory;
+		final String executionErrorMessage;
+		
+		/**
+		 * Constructs an instance according to the specified parameters.
+		 * 
+		 * @param originalFactory The default {@link java.util.concurrent.ThreadFactory} of the pool.
+		 * @param executionErrorMessage The error message to log in case an exception is thrown while 
+		 * executing the {@link java.lang.Runnable}.
+		 */
+		VerboseThreadFactory(ThreadFactory originalFactory, String executionErrorMessage) {
+			this.originalFactory = originalFactory;
+			this.executionErrorMessage = executionErrorMessage;
+		}
+		@Override
+		public Thread newThread(Runnable r) {
+			Thread t = originalFactory.newThread(r);
+			UncaughtExceptionHandler handler = t.getUncaughtExceptionHandler();
+			t.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+				
+				@Override
+				public void uncaughtException(Thread t, Throwable e) {
+					logger.log(Level.SEVERE, executionErrorMessage, e);
+					handler.uncaughtException(t, e);
+				}
+			});
+			return t;
+		}
+		
 	}
 	
 	/**
@@ -281,7 +331,7 @@ public class PSPPool implements AutoCloseable {
 	private class PooledProcessHandler implements ProcessManager {
 		
 		// The process manager to which the listener is subscribed.
-		private ProcessShell manager;
+		ProcessShell manager;
 		
 		@Override
 		public Process start() throws IOException {
@@ -300,7 +350,7 @@ public class PSPPool implements AutoCloseable {
 			// Store the reference to the manager for later use in the onTermination method.
 			this.manager = manager;
 			handler.onStartup(manager);
-			activeProcesses.add(manager);
+			activeShells.add(manager);
 			if (verbose) {
 				logger.info("Process manager " + manager + " started executing.");
 				logPoolStats();
@@ -316,7 +366,7 @@ public class PSPPool implements AutoCloseable {
 			handler.onTermination(resultCode);
 			if (manager == null)
 				return;
-			activeProcesses.remove(manager);
+			activeShells.remove(manager);
 			if (verbose) {
 				logger.info("Process manager " + manager + " stopped executing.");
 				logPoolStats();
@@ -331,8 +381,8 @@ public class PSPPool implements AutoCloseable {
 			}
 			synchronized (poolLock) {
 				// Consider that the pool size is about to decrease as this process terminates.
-				if (!close && ((maxPoolSize > minPoolSize ? poolExecutor.getActiveCount() <= minPoolSize :
-						poolExecutor.getActiveCount() < minPoolSize) || (poolExecutor.getActiveCount() <
+				if (!close && ((maxPoolSize > minPoolSize ? processExecutor.getActiveCount() <= minPoolSize :
+						processExecutor.getActiveCount() < minPoolSize) || (processExecutor.getActiveCount() <
 						Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize + 1)))) {
 					try {
 						startNewProcess();
@@ -347,10 +397,10 @@ public class PSPPool implements AutoCloseable {
 	}
 	
 	/**
-	 * An implementation of the {@link net.viktorc.pspp.Submission} interface for wrapping submissions into 'internal' submissions 
-	 * to keep track of the number of commands being executed at a time and to establish a mechanism for canceling submitted commands 
-	 * via the {@link java.util.concurrent.Future} returned by the {@link net.viktorc.pspp.PSPPool#submit(Submission) submit} 
-	 * method.
+	 * An implementation of the {@link net.viktorc.pspp.Submission} interface for wrapping submissions into 'internal' 
+	 * submissions to keep track of the number of commands being executed at a time and to establish a mechanism for 
+	 * canceling submitted commands via the {@link java.util.concurrent.Future} returned by the 
+	 * {@link net.viktorc.pspp.PSPPool#submit(Submission) submit} method.
 	 * 
 	 * @author A6714
 	 *

@@ -25,12 +25,12 @@ public interface Command {
 
 	/**
 	 * A method called before the execution of every command, except the first, in a submission containing multiple 
-	 * commands. It determines whether the method is to be executed. This allows for the establishment of conditions 
+	 * commands. It determines whether the command is to be executed. This allows for the establishment of conditions 
 	 * on which certain commands should be executed. If a submission contains only a single command, this method is 
 	 * not called at all.
 	 * 
 	 * @param prevCommands The commands preceding this one in the submission that have already been executed and 
-	 * processed.
+	 * processed or skipped if their respective <code>doExecute</code> methods returned false.
 	 * @return Whether this command should be executed.
 	 */
 	boolean doExecute(List<Command> prevCommands);
