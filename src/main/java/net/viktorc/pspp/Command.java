@@ -22,7 +22,6 @@ public interface Command {
 	 * @return The instruction to write to the process' standard in.
 	 */
 	String getInstruction();
-
 	/**
 	 * A method called before the execution of every command, except the first, in a submission containing multiple 
 	 * commands. It determines whether the command is to be executed. This allows for the establishment of conditions 
