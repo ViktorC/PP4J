@@ -4,7 +4,10 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * A simple non-cancellable sub-class of the {@link net.viktorc.pspp.AbstractSubmission} abstract class.
+ * A simple sub-class of the {@link net.viktorc.pspp.AbstractSubmission} abstract class. It does not provide a mechanism 
+ * for directly cancelling submissions; however, they can still be cancelled by cancelling the {@link java.util.concurrent.Future} 
+ * instance returned by the {@link net.viktorc.pspp.PSPPool#submit(Submission) submit} method of the {@link net.viktorc.pspp.PSPPool} 
+ * class.
  * 
  * @author A6714
  *
