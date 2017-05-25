@@ -53,7 +53,15 @@ public class PSPPoolTest {
 		File file = new File(programLocation);
 		// For testing on Travis CI
 		file.setExecutable(true);
-		PSPPool pool = new PSPPool(new AbstractProcessManager(new ProcessBuilder(programLocation)) {
+		PSPPool pool = new PSPPool(new SimpleProcessManager(new ProcessBuilder(programLocation),
+				s -> {
+					try {
+						s.execute(new SimpleSubmission(new SimpleCommand("start",
+								(c, o) -> "ok".equals(o), (c, o) -> true), false));
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}) {
 			
 			@Override
 			public boolean startsUpInstantly() {
@@ -64,20 +72,11 @@ public class PSPPoolTest {
 				return standard && "hi".equals(output);
 			}
 			@Override
-			public void onStartup(ProcessShell manager) {
-				try {
-					manager.execute(new SimpleSubmission(new SimpleCommand("start",
-							(c, o) -> "ok".equals(o), (c, o) -> true), false));
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-			@Override
-			public boolean terminate(ProcessShell manager) {
+			public boolean terminate(ProcessShell shell) {
 				if (manuallyTerminate) {
 					try {
 						AtomicBoolean success = new AtomicBoolean(true);
-						if (manager.execute(new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o),
+						if (shell.execute(new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o),
 								(c, o) -> {
 									success.set(false);
 									return true;

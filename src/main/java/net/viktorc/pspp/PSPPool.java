@@ -277,8 +277,8 @@ public class PSPPool implements AutoCloseable {
 		}
 		for (ProcessShell p : activeShells)
 			p.close();
-		taskExecutorService.shutdown();
 		processExecutor.shutdown();
+		taskExecutorService.shutdown();
 	}
 	
 	/**
