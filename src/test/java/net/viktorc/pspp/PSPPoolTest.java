@@ -1,7 +1,9 @@
 package net.viktorc.pspp;
 
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import net.viktorc.pspp.PSPPool;
 import net.viktorc.pspp.ProcessShell;
@@ -9,11 +11,14 @@ import net.viktorc.pspp.ProcessShell;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -24,6 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class PSPPoolTest {
 	
+	@Rule
+	public final ExpectedException exception = ExpectedException.none();
+	
 	/**
 	 * Creates a test process pool according to the specified parameters.
 	 * 
@@ -33,9 +41,11 @@ public class PSPPoolTest {
 	 * @param keepAliveTime The time after which idled processes are killed.
 	 * @param verifyStartup Whether the startup should be verified.
 	 * @param manuallyTerminate Whether the process should be terminated in an orderly way or forcibly.
+	 * @param verbose Whether the events relating to the management of the pool should be logged to the console.
+	 * @return The process pool created according to the specified parameters.
 	 */
 	private PSPPool getPool(int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime, boolean verifyStartup,
-			boolean manuallyTerminate) throws IllegalArgumentException, IOException, URISyntaxException {
+			boolean manuallyTerminate, boolean verbose) throws IllegalArgumentException, IOException, URISyntaxException {
 		// The tests are either run locally on my Windows machine or through Travis CI on Linux.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
 		String programLocation = new File(getClass().getResource(windows ? "win/test.exe" : "linux/test")
@@ -84,7 +94,7 @@ public class PSPPoolTest {
 				
 			}
 			
-		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime);
+		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose);
 		return pool;
 	}
 	/**
@@ -98,6 +108,7 @@ public class PSPPoolTest {
 	 * @param keepAliveTime The time after which idled processes are killed.
 	 * @param verifyStartup Whether the startup should be verified.
 	 * @param manuallyTerminate Whether the process should be terminated in an orderly way or forcibly.
+	 * @param verbose Whether the events relating to the management of the pool should be logged to the console.
 	 * @param reuse Whether a process can execute multiple commands.
 	 * @param procTimes The times for which the test processes should "execute" commands. Each element 
 	 * stands for a command. If there are multiple elements, the commands will be chained.
@@ -106,16 +117,19 @@ public class PSPPoolTest {
 	 * If it is 0 or less, they are all sent at once.
 	 * @param cancelTime The number of milliseconds after which the futures should be cancelled. If it 
 	 * is 0 or less, the futures are not cancelled.
+	 * @param forcedCancel If the command should be interrupted if it is already being processed. If 
+	 * <code>cancelTime</code> is not greater than 0, it has no effect.
 	 * @return A list of the total execution times of the commands.
 	 * @throws Exception
 	 */
 	private List<Long> testBase(int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime,
-			boolean verifyStartup, boolean manuallyTerminate, boolean reuse, int[] procTimes, int requests,
-			long timeSpan, long cancelTime) throws Exception {
+			boolean verifyStartup, boolean manuallyTerminate, boolean verbose, boolean reuse, int[] procTimes,
+			int requests, long timeSpan, long cancelTime, boolean forcedCancel) throws Exception {
 		try (PSPPool procPool = getPool(minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verifyStartup,
-				manuallyTerminate)) {
+				manuallyTerminate, verbose)) {
 			long frequency = requests > 0 ? timeSpan/requests : 0;
-			List<Future<Long>> futures = new ArrayList<>();
+			List<Future<Long>> futures = new ArrayList<>(requests);
+			List<Entry<Semaphore,Long>> cancelTimes = cancelTime > 0 ? new ArrayList<>(requests) : null;
 			for (int i = 0; i < requests; i++) {
 				if (frequency > 0) {
 					try {
@@ -127,19 +141,37 @@ public class PSPPoolTest {
 				List<Command> commands = new ArrayList<>();
 				for (int procTime : procTimes)
 					commands.add(new SimpleCommand("process " + procTime, (c, o) -> "ready".equals(o), (c, o) -> true));
-				futures.add(procPool.submit(new SimpleSubmission(commands, !reuse)));
+				Submission submission;
+				if (cancelTime > 0) {
+					Semaphore semaphore = new Semaphore(0);
+					submission = new SimpleSubmission(commands, !reuse) {
+						
+						@Override
+						public void onFinishedProcessing() {
+							semaphore.release();
+						}
+						
+					};
+					long startTime = System.nanoTime();
+					cancelTimes.add(new SimpleEntry<>(semaphore, startTime));
+				} else
+					submission = new SimpleSubmission(commands, !reuse);
+				futures.add(procPool.submit(submission));
 			}
 			if (cancelTime > 0) {
 				Thread.sleep(cancelTime);
 				for (Future<Long> future : futures)
-					future.cancel(true);
+					future.cancel(forcedCancel);
 			}
 			List<Long> times = new ArrayList<>();
-			for (Future<Long> future : futures) {
+			for (int i = 0; i < futures.size(); i++) {
+				Future<Long> future = futures.get(i);
 				try {
 					times.add(future.get());
 				} catch (CancellationException e) {
-					times.add(cancelTime*1000000);
+					Entry<Semaphore,Long> cancelEntry = cancelTimes.get(i);
+					cancelEntry.getKey().acquire();
+					times.add(System.nanoTime() - cancelEntry.getValue());
 				}
 			}
 			procPool.close();
@@ -158,6 +190,7 @@ public class PSPPoolTest {
 	 * @param keepAliveTime The time after which idled processes are killed.
 	 * @param verifyStartup Whether the startup should be verified.
 	 * @param manuallyTerminate Whether the process should be terminated in an orderly way or forcibly.
+	 * @param verbose Whether the events relating to the management of the pool should be logged to the console.
 	 * @param reuse Whether a process can execute multiple commands.
 	 * @param procTimes The times for which the test processes should "execute" commands. Each element 
 	 * stands for a command. If there are multiple elements, the commands will be chained.
@@ -165,102 +198,163 @@ public class PSPPoolTest {
 	 * @param requestPerSe The number of commands to submit per second
 	 * @param cancelTime The number of milliseconds after which the futures should be cancelled. If it 
 	 * is 0 or less, the futures are not cancelled.
+	 * @param forcedCancel If the command should be interrupted if it is already being processed. If 
+	 * <code>cancelTime</code> is not greater than 0, it has no effect.
 	 * @param failTime The duration from which on commands are considered to be executed too slowly and cause
 	 * the test to fail.
 	 * @return Whether the test passes.
+	 * @throws Exception If the process pool cannot be created.
 	 */
 	private boolean test(String testName, int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime,
-			boolean verifyStartup, boolean manuallyTerminate, boolean reuse, int[] procTimes, int requests,
-			long timeSpan, long cancelTime, long failTime) {
-		try {
-			List<Long> times = testBase(minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verifyStartup,
-					manuallyTerminate, reuse, procTimes, requests, timeSpan, cancelTime);
-			System.out.println("\n" + testName);
-			System.out.println("-------------------------------------------------------------------------------------");
-			System.out.printf("minPoolSize: %d; maxPoolSize: %d; reserveSize: %d; keepAliveTime: %d;%n" +
-					"verifyStartup: %s; manuallyTerminate: %s; reuse: %s; procTimes: %s;%n" +
-					"requests: %d; timeSpan: %d; cancelTime: %d; failTime: %.3f%n",
-					minPoolSize, maxPoolSize, reserveSize, keepAliveTime, Boolean.toString(verifyStartup),
-					Boolean.toString(manuallyTerminate), Boolean.toString(reuse), Arrays.toString(procTimes),
-					requests, timeSpan, cancelTime, (float) (((double) failTime)/1000));
-			System.out.println("-------------------------------------------------------------------------------------");
-			if (times.size() == requests) {
-				boolean pass = true;
-				for (Long time : times) {
-					boolean fail = time == null || time/1000000 >= failTime;
-					if (fail)
-						pass = false;
-					System.out.printf("Time: %.3f %s%n", (float) (((double) time)/1000000000), fail ? "FAIL" : "");
-				}
-				return pass;
-			} else {
-				System.out.printf("Some requests were not processed %d/%d%n", times.size(), requests);
-				return false;
+			boolean verifyStartup, boolean manuallyTerminate, boolean verbose, boolean reuse, int[] procTimes,
+			int requests, long timeSpan, long cancelTime, boolean forcedCancel, long failTime) throws Exception {
+		List<Long> times = testBase(minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verifyStartup,
+				manuallyTerminate, verbose, reuse, procTimes, requests, timeSpan, cancelTime, forcedCancel);
+		System.out.println("\n" + testName);
+		System.out.println("-------------------------------------------------------------------------------------");
+		System.out.printf("minPoolSize: %d; maxPoolSize: %d; reserveSize: %d; keepAliveTime: %d; " + 
+				"verifyStartup: %s;%nmanuallyTerminate: %s; verbose: %s; reuse: %s; procTimes: %s;%n" +
+				"requests: %d; timeSpan: %d; cancelTime: %d; forcedCancel: %s; failTime: %.3f%n",
+				minPoolSize, maxPoolSize, reserveSize, keepAliveTime, Boolean.toString(verifyStartup),
+				Boolean.toString(manuallyTerminate), Boolean.toString(verbose), Boolean.toString(reuse),
+				Arrays.toString(procTimes), requests, timeSpan, cancelTime, Boolean.toString(forcedCancel),
+				(float) (((double) failTime)/1000));
+		System.out.println("-------------------------------------------------------------------------------------");
+		if (times.size() == requests) {
+			boolean pass = true;
+			for (Long time : times) {
+				boolean fail = time == null || time/1000000 >= failTime;
+				if (fail)
+					pass = false;
+				System.out.printf("Time: %.3f %s%n", (float) (((double) time)/1000000000), fail ? "FAIL" : "");
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
+			return pass;
+		} else {
+			System.out.printf("Some requests were not processed %d/%d%n", times.size(), requests);
 			return false;
 		}
 	}
 	@Test
-	public void test01() {
-		Assert.assertTrue(test("Test 1", 0, 100, 0, 0, true, false, true, new int[] { 5 }, 100, 10000, 0, 6200));
+	public void test01() throws Exception {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage("The minimum pool size has to be greater than 0.");
+		test("Test 1", -1, 5, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, 6200);
 	}
 	@Test
-	public void test02() {
-		Assert.assertTrue(test("Test 2", 50, 150, 20, 0, false, false, true, new int[] { 5 }, 100, 5000, 0, 5100));
+	public void test02() throws Exception {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
+				"minimum pool size.");
+		test("Test 2", 0, 0, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, 6200);
 	}
 	@Test
-	public void test03() {
-		Assert.assertTrue(test("Test 3", 10, 25, 5, 15000, true, false, true, new int[] { 5 }, 20, 10000, 0, 5100));
+	public void test03() throws Exception {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
+				"minimum pool size.");
+		test("Test 3", 10, 5, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, 6200);
 	}
 	@Test
-	public void test04() {
-		Assert.assertTrue(test("Test 4", 50, 150, 20, 0, false, true, true, new int[] { 5 }, 100, 5000, 0, 5080));
+	public void test04() throws Exception {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
+		test("Test 4", 10, 12, -1, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, 6200);
 	}
 	@Test
-	public void test05() {
-		Assert.assertTrue(test("Test 5", 10, 50, 5, 15000, true, false, true, new int[] { 5, 3, 2 }, 50, 10000, 0, 10320));
+	public void test05() throws Exception {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
+		test("Test 5", 10, 12, 15, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, 6200);
 	}
 	@Test
-	public void test06() {
-		Assert.assertTrue(test("Test 6", 100, 250, 20, 0, true, true, true, new int[] { 5 }, 800, 20000, 0, 6000));
+	public void test06() throws Exception {
+		Assert.assertTrue(test("Test 6", 0, 100, 0, 0, true, false, false, true, new int[] { 5 },
+				100, 10000, 0, false, 6200));
 	}
 	@Test
-	public void test07() {
-		Assert.assertTrue(test("Test 7", 0, 100, 0, 0, false, false, false, new int[] { 5 }, 100, 10000, 0, 7000));
+	public void test07() throws Exception {
+		Assert.assertTrue(test("Test 7", 50, 150, 20, 0, false, false, false, true, new int[] { 5 },
+				100, 5000, 0, false, 5100));
 	}
 	@Test
-	public void test08() {
-		Assert.assertTrue(test("Test 8", 50, 150, 10, 0, true, false, false, new int[] { 5 }, 100, 5000, 0, 5600));
+	public void test08() throws Exception {
+		Assert.assertTrue(test("Test 8", 10, 25, 5, 15000, true, false, false, true, new int[] { 5 },
+				20, 10000, 0, false, 5100));
 	}
 	@Test
-	public void test09() {
-		Assert.assertTrue(test("Test 9", 10, 25, 5, 15000, false, false, false, new int[] { 5 }, 20, 10000, 0, 5100));
+	public void test09() throws Exception {
+		Assert.assertTrue(test("Test 9", 50, 150, 20, 0, false, true, false, true, new int[] { 5 },
+				100, 5000, 0, false, 5080));
 	}
 	@Test
-	public void test10() {
-		Assert.assertTrue(test("Test 10", 50, 150, 10, 0, true, true, false, new int[] { 5 }, 100, 5000, 0, 5600));
+	public void test10() throws Exception {
+		Assert.assertTrue(test("Test 10", 10, 50, 5, 15000, true, false, false, true, new int[] { 5, 3, 2 },
+				50, 10000, 0, false, 10320));
 	}
 	@Test
-	public void test11() {
-		Assert.assertTrue(test("Test 11", 10, 50, 5, 15000, false, false, false, new int[] { 5, 3, 2 }, 50, 10000, 0, 10350));
+	public void test11() throws Exception {
+		Assert.assertTrue(test("Test 11", 100, 250, 20, 0, true, true, false, true, new int[] { 5 },
+				800, 20000, 0, false, 6000));
 	}
 	@Test
-	public void test12() {
-		Assert.assertTrue(test("Test 12", 50, 250, 20, 0, true, true, false, new int[] { 5 }, 800, 20000, 0, 6000));
+	public void test12() throws Exception {
+		Assert.assertTrue(test("Test 12", 0, 100, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, 7000));
 	}
 	@Test
-	public void test13() {
-		Assert.assertTrue(test("Test 13", 10, 30, 5, 0, true, true, false, new int[] { 5 }, 20, 0, 3000, 3001));
+	public void test13() throws Exception {
+		Assert.assertTrue(test("Test 13", 50, 150, 10, 0, true, false, false, false, new int[] { 5 },
+				100, 5000, 0, false, 5600));
 	}
 	@Test
-	public void test14() {
-		Assert.assertTrue(test("Test 14", 10, 30, 5, 0, false, false, false, new int[] { 5 }, 20, 0, 2000, 2001));
+	public void test14() throws Exception {
+		Assert.assertTrue(test("Test 14", 10, 25, 5, 15000, false, false, false, false, new int[] { 5 },
+				20, 10000, 0, false, 5100));
 	}
 	@Test
-	public void test15() {
-		Assert.assertTrue(test("Test 15", 10, 30, 5, 250, true, true, false, new int[] { 5 }, 50, 10000, 0, 6000));
+	public void test15() throws Exception {
+		Assert.assertTrue(test("Test 15", 50, 150, 10, 0, true, true, false, false, new int[] { 5 },
+				100, 5000, 0, false, 5600));
+	}
+	@Test
+	public void test16() throws Exception {
+		Assert.assertTrue(test("Test 16", 10, 50, 5, 15000, false, false, false, false, new int[] { 5, 3, 2 },
+				50, 10000, 0, false, 10350));
+	}
+	@Test
+	public void test17() throws Exception {
+		Assert.assertTrue(test("Test 17", 50, 250, 20, 0, true, true, false, false, new int[] { 5 },
+				800, 20000, 0, false, 6000));
+	}
+	@Test
+	public void test18() throws Exception {
+		Assert.assertTrue(test("Test 18", 10, 30, 5, 0, true, true, false, false, new int[] { 5 },
+				20, 0, 2500, true, 2520));
+	}
+	@Test
+	public void test19() throws Exception {
+		Assert.assertTrue(test("Test 19", 20, 20, 0, 0, false, false, false, false, new int[] { 5 },
+				20, 0, 2500, false, 5040));
+	}
+	@Test
+	public void test20() throws Exception {
+		Assert.assertTrue(test("Test 20", 10, 30, 5, 0, true, true, false, false, new int[] { 5, 5, 3 },
+				20, 0, 2500, true, 2520));
+	}
+	@Test
+	public void test21() throws Exception {
+		Assert.assertTrue(test("Test 21", 20, 20, 0, 0, true, true, false, false, new int[] { 5, 5, 3 },
+				20, 0, 3000, false, 5040));
+	}
+	@Test
+	public void test22() throws Exception {
+		Assert.assertTrue(test("Test 22", 20, 40, 4, 250, true, true, true, false, new int[] { 5 },
+				40, 5000, 0, false, 6150));
 	}
 	
 }

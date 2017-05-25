@@ -50,7 +50,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	
 	/**
 	 * Constructs a shell for the specified process using two threads of the specified {@link java.util.concurrent.ExecutorService} to 
-	 * listen to the out streams of the underlying process.
+	 * listen to the out streams of the process and one thread for ensuring that the process is terminated once it times out if 
+	 * <code>keepAliveTime</code> is greater than 0.
 	 * 
 	 * @param manager The process manager to handle the underlying process.
 	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
