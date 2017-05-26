@@ -11,7 +11,6 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -113,15 +112,19 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	}
 	/**
 	 * It prompts the currently running process, if there is one, to terminate.
+	 * 
+	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pspp.ProcessManager#terminate(ProcessShell) terminate} 
+	 * method of the {@link net.viktorc.pspp.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
+	 * process is currently executing, not listening to its standard in.
 	 */
-	protected void cancel() {
+	protected void stop(boolean forcibly) {
+		if (process == null)
+			return;
 		lock.lock();
 		try {
-			if (!manager.terminate(this)) {
-				if (process != null)
-					process.destroy();
-			}
 			stop = true;
+			if (forcibly || !manager.terminate(this))
+				process.destroy();
 		} finally {
 			lock.unlock();
 		}
@@ -135,7 +138,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			try {
 				Thread.sleep(keepAliveTime);
 				if (!stop)
-					ProcessShell.this.cancel();
+					ProcessShell.this.stop(false);
 			} catch (InterruptedException e) {
 				
 			} catch (Exception e) {
@@ -192,7 +195,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 */
 	public boolean execute(Submission submission)
 			throws IOException {
-		if (running && !stop && lock.tryLock()) {
+		if (running && lock.tryLock()) {
 			try {
 				if (timedTask != null)
 					timedTask.cancel(true);
@@ -200,7 +203,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				List<Command> commands = submission.getCommands();
 				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
 				synchronized (lock) {
-					for (int i = 0; i < commands.size() && running && !stop; i++) {
+					for (int i = 0; i < commands.size() && running; i++) {
 						command = commands.get(i);
 						if (submission.isCancelled())
 							break;
@@ -210,7 +213,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 						stdInWriter.write(command.getInstruction());
 						stdInWriter.newLine();
 						stdInWriter.flush();
-						while (running && !stop && !commandProcessed) {
+						while (running && !commandProcessed) {
 							try {
 								lock.wait();
 							} catch (InterruptedException e) {
@@ -224,7 +227,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				}
 				if (running && !stop) {
 					if (submission.doTerminateProcessAfterwards())
-						cancel();
+						stop(false);
 					else if (timed && (timedTask == null || timedTask.isCancelled()))
 						startKeepAliveTimer();
 				}
@@ -243,7 +246,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	public synchronized void run() {
 		running = true;
 		stop = false;
-		AtomicInteger rc = new AtomicInteger(0);
+		int rc = -1;
 		try {
 			lock.lock();
 			try {
@@ -277,12 +280,12 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			} finally {
 				lock.unlock();
 			}
-			rc.set(process.waitFor());
+			rc = process.waitFor();
 		} catch (Exception e) {
-			// Set the result code to the value associated with unexpected termination.
-			rc.set(UNEXPECTED_TERMINATION_RESULT_CODE);
+			rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 			throw new ProcessException(e);
 		} finally {
+			running = false;
 			// Try to clean up and close all the resources.
 			if (timedTask != null)
 				timedTask.cancel(true);
@@ -302,20 +305,19 @@ public class ProcessShell implements Runnable, AutoCloseable {
 					stdInWriter.close();
 				} catch (IOException e) { }
 			}
-			running = false;
 			synchronized (lock) {
 				lock.notifyAll();
 			}
-			manager.onTermination(rc.get());
+			manager.onTermination(rc);
 		}
 	}
 	@Override
 	public void close() throws Exception {
 		command = null;
 		if (running && !stop)
-			cancel();
+			stop(true);
 		if (internalExecutor)
-			executor.shutdown();
+			executor.shutdownNow();
 	}
 	@Override
 	public String toString() {

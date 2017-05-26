@@ -3,12 +3,23 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.viktorc</groupId>
 	<artifactId>pspp</artifactId>
-	<version>1.0</version>
-	<name>PSPPool</name>
+	<version>1.01</version>
+	<name>net.viktorc:PSPPool</name>
+	<description>A small library that provides a pool for maintaining pre-started 'interactive' processes.</description>
+	<url>https://github.com/ViktorC</url>
 	<packaging>jar</packaging>
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	</properties>
+	<licenses>
+		<license>
+			<name>GNU General Public License v2.0</name>
+			<url>https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html</url>
+		</license>
+	</licenses>
+	<developers>
+		<developer>
+			<name>Viktor Csomor</name>
+			<email>viktor.csomor@gmail.com</email>
+		</developer>
+	</developers>
 	<scm>
 		<connection>scm:git:git@github.com:ViktorC/PSPPool.git</connection>
 		<developerConnection>scm:git:git@github.com:ViktorC/PSPPool.git</developerConnection>
@@ -25,6 +36,9 @@
 			</properties>
 		</profile>
 	</profiles>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
 	<build>
 		<sourceDirectory>src/main/java</sourceDirectory>
 		<testSourceDirectory>src/test/java</testSourceDirectory>

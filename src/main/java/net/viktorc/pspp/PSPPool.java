@@ -43,11 +43,11 @@ public class PSPPool implements AutoCloseable {
 	private final ProcessShellExecutor processExecutor;
 	private final ExecutorService taskExecutorService;
 	private final List<ProcessShell> activeShells;
-	private final Queue<InternalSubmission> commandQueue;
+	private final Queue<InternalSubmission> submissionQueue;
 	private final CountDownLatch startupLatch;
 	private final Semaphore submissionSemaphore;
 	private final Object poolLock;
-	private final AtomicInteger numOfExecutingCommands;
+	private final AtomicInteger numOfExecutingSubmissions;
 	private final Logger logger;
 	private volatile boolean submissionSuccessful;
 	private volatile boolean close;
@@ -91,11 +91,11 @@ public class PSPPool implements AutoCloseable {
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
 		taskExecutorService = Executors.newCachedThreadPool();
 		activeShells = new CopyOnWriteArrayList<>();
-		commandQueue = new ConcurrentLinkedQueue<>();
+		submissionQueue = new ConcurrentLinkedQueue<>();
 		startupLatch = new CountDownLatch(actualMinSize);
 		submissionSemaphore = new Semaphore(0);
 		poolLock = new Object();
-		numOfExecutingCommands = new AtomicInteger(0);
+		numOfExecutingSubmissions = new AtomicInteger(0);
 		logger = Logger.getAnonymousLogger();
 		this.verbose = verbose;
 		// Ensure that exceptions thrown by runnables submitted to the pools do not go unnoticed if the instance is verbose.
@@ -155,7 +155,7 @@ public class PSPPool implements AutoCloseable {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
 		InternalSubmission internalSubmission = new InternalSubmission(submission);
-		commandQueue.add(internalSubmission);
+		submissionQueue.add(internalSubmission);
 		// Notify the main loop that a command has been submitted.
 		synchronized (this) {
 			notifyAll();
@@ -169,7 +169,7 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private void logPoolStats() {
 		logger.info("Total processes: " + processExecutor.getActiveCount() + "; acitve processes: " + activeShells.size() +
-				"; submitted commands: " + (numOfExecutingCommands.get() + commandQueue.size()));
+				"; submitted commands: " + (numOfExecutingSubmissions.get() + submissionQueue.size()));
 	}
 	/**
 	 * Returns whether a new process {@link net.viktorc.pspp.ProcessShell} instance should be added to the pool.
@@ -178,7 +178,7 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private boolean doExtendPool() {
 		return !close && (processExecutor.getActiveCount() < minPoolSize || (processExecutor.getActiveCount() <
-				Math.min(maxPoolSize, numOfExecutingCommands.get() + commandQueue.size() + reserveSize)));
+				Math.min(maxPoolSize, numOfExecutingSubmissions.get() + submissionQueue.size() + reserveSize)));
 	}
 	/**
 	 * Starts a new process by executing the provided {@link net.viktorc.pspp.ProcessShell}. If it is null, it creates a new 
@@ -190,8 +190,11 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private boolean startNewProcess(ProcessShell processShell) throws IOException {
 		if (processShell == null) {
-			processShell = spareShell != null ? spareShell :
-				new ProcessShell(new PooledProcessManager(), keepAliveTime, taskExecutorService);
+			if (spareShell != null) {
+				processShell = spareShell;
+				spareShell = null;
+			} else
+				processShell = new ProcessShell(new PooledProcessManager(), keepAliveTime, taskExecutorService);
 		}
 		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
 		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 
@@ -216,7 +219,7 @@ public class PSPPool implements AutoCloseable {
 				// Wait until there is a command submitted.
 				if (!optionalSubmission.isPresent()) {
 					synchronized (this) {
-						while (!(optionalSubmission = Optional.ofNullable(commandQueue.peek())).isPresent()) {
+						while (!(optionalSubmission = Optional.ofNullable(submissionQueue.peek())).isPresent()) {
 							try {
 								wait();
 							} catch (InterruptedException e) {
@@ -254,7 +257,7 @@ public class PSPPool implements AutoCloseable {
 						submissionSemaphore.acquire();
 						if (submissionSuccessful) {
 							submission.setFuture(future);
-							commandQueue.remove(submission);
+							submissionQueue.remove(submission);
 							optionalSubmission = Optional.empty();
 							break;
 						}
@@ -277,12 +280,15 @@ public class PSPPool implements AutoCloseable {
 			}
 		}
 	}
+	
 	@Override
 	public void close() throws Exception {
 		close = true;
 		synchronized (this) {
 			notifyAll();
 		}
+		for (ProcessShell shell : activeShells)
+			shell.stop(true);
 		processExecutor.shutdown();
 		taskExecutorService.shutdown();
 	}
@@ -408,12 +414,12 @@ public class PSPPool implements AutoCloseable {
 			// Store the reference to the manager for later use in the onTermination method.
 			this.processShell = shell;
 			manager.onStartup(shell);
-			activeShells.add(shell);
 			if (verbose) {
 				logger.info("Process shell " + shell + " started executing.");
 				logPoolStats();
 			}
 			startupLatch.countDown();
+			activeShells.add(shell);
 		}
 		@Override
 		public boolean terminate(ProcessShell shell) {
@@ -422,9 +428,8 @@ public class PSPPool implements AutoCloseable {
 		@Override
 		public void onTermination(int resultCode) {
 			manager.onTermination(resultCode);
-			if (processShell == null)
-				return;
-			activeShells.remove(processShell);
+			if (processShell != null)
+				activeShells.remove(processShell);
 		}
 		
 	}
@@ -521,14 +526,14 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public boolean isCancelled() {
-			return submission.isCancelled() || (future != null && future.isCancelled());
+			return submission.isCancelled() || (future != null && future.isCancelled()) || close;
 		}
 		@Override
 		public void onStartedProcessing() {
 			submission.onStartedProcessing();
 			submissionSuccessful = true;
 			submissionSemaphore.release();
-			numOfExecutingCommands.incrementAndGet();
+			numOfExecutingSubmissions.incrementAndGet();
 		}
 		@Override
 		public void onFinishedProcessing() {
@@ -538,7 +543,7 @@ public class PSPPool implements AutoCloseable {
 			synchronized (this) {
 				notifyAll();
 			}
-			numOfExecutingCommands.decrementAndGet();
+			numOfExecutingSubmissions.decrementAndGet();
 		}
 		@Override
 		public String toString() {
@@ -568,7 +573,7 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-			commandQueue.remove(submission);
+			submissionQueue.remove(submission);
 			Future<?> future = submission.getFuture();
 			if (future != null && future.cancel(mayInterruptIfRunning)) {
 				synchronized (submission) {
