@@ -319,19 +319,19 @@ public class PSPPool implements AutoCloseable {
 				logger.info("Process shell " + shell + " stopped executing.");
 				logPoolStats();
 			}
-			boolean doExtend = false;
+//			boolean doExtend = false;
 			synchronized (poolLock) {
 				if (doExtendPool()) {
-					doExtend = true;
+//					doExtend = true;
 					try {
-						startNewProcess(shell);
+						startNewProcess(null);
 					} catch (IOException e) {
 						if (verbose)
 							logger.log(Level.SEVERE, "Error while starting new process.", e);
 					}
 				}
 			}
-			if (!doExtend) {
+//			if (!doExtend) {
 				try {
 					shell.close();
 					if (verbose)
@@ -340,7 +340,7 @@ public class PSPPool implements AutoCloseable {
 					if (verbose)
 						logger.log(Level.SEVERE, "Error while shutting down process shell " + shell + ".", e);
 				}
-			}
+//			}
 		}
 		
 	}

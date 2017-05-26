@@ -108,26 +108,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @return Whether the manager is ready to process commands.
 	 */
 	protected boolean isReady() {
-		return running && !stop && (!lock.isLocked() || lock.isHeldByCurrentThread());
-	}
-	/**
-	 * It prompts the currently running process, if there is one, to terminate.
-	 * 
-	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pspp.ProcessManager#terminate(ProcessShell) terminate} 
-	 * method of the {@link net.viktorc.pspp.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
-	 * process is currently executing, not listening to its standard in.
-	 */
-	protected void stop(boolean forcibly) {
-		if (process == null)
-			return;
-		lock.lock();
-		try {
-			stop = true;
-			if (forcibly || !manager.terminate(this))
-				process.destroy();
-		} finally {
-			lock.unlock();
-		}
+		return running && (!lock.isLocked() || lock.isHeldByCurrentThread());
 	}
 	/**
 	 * Submits a {@link java.lang.Runnable} to the thread pool that calls the {@link #cancel() cancel} method after 
@@ -181,6 +162,25 @@ public class ProcessShell implements Runnable, AutoCloseable {
 						lock.notifyAll();
 				}
 			}
+		}
+	}
+	/**
+	 * It prompts the currently running process, if there is one, to terminate.
+	 * 
+	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pspp.ProcessManager#terminate(ProcessShell) terminate} 
+	 * method of the {@link net.viktorc.pspp.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
+	 * process is currently executing, not listening to its standard in.
+	 */
+	protected void stop(boolean forcibly) {
+		if (process == null)
+			return;
+		lock.lock();
+		try {
+			stop = true;
+			if (forcibly || !manager.terminate(this))
+				process.destroy();
+		} finally {
+			lock.unlock();
 		}
 	}
 	/**
