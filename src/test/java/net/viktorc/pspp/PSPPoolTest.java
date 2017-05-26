@@ -247,73 +247,73 @@ public class PSPPoolTest {
 			return false;
 		}
 	}
-	@Test
-	public void test01() throws Exception {
-		exceptionRule.expect(IllegalArgumentException.class);
-		exceptionRule.expectMessage("The minimum pool size has to be greater than 0.");
-		test("Test 1", -1, 5, 0, 0, false, false, false, false, new int[] { 5 },
-				100, 10000, 0, false, false, 6200);
-	}
-	@Test
-	public void test02() throws Exception {
-		exceptionRule.expect(IllegalArgumentException.class);
-		exceptionRule.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
-				"minimum pool size.");
-		test("Test 2", 0, 0, 0, 0, false, false, false, false, new int[] { 5 },
-				100, 10000, 0, false, false, 6200);
-	}
-	@Test
-	public void test03() throws Exception {
-		exceptionRule.expect(IllegalArgumentException.class);
-		exceptionRule.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
-				"minimum pool size.");
-		test("Test 3", 10, 5, 0, 0, false, false, false, false, new int[] { 5 },
-				100, 10000, 0, false, false, 6200);
-	}
-	@Test
-	public void test04() throws Exception {
-		exceptionRule.expect(IllegalArgumentException.class);
-		exceptionRule.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
-		test("Test 4", 10, 12, -1, 0, false, false, false, false, new int[] { 5 },
-				100, 10000, 0, false, false, 6200);
-	}
-	@Test
-	public void test05() throws Exception {
-		exceptionRule.expect(IllegalArgumentException.class);
-		exceptionRule.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
-		test("Test 5", 10, 12, 15, 0, false, false, false, false, new int[] { 5 },
-				100, 10000, 0, false, false, 6200);
-	}
-	@Test
-	public void test06() throws Exception {
-		Assert.assertTrue(test("Test 6", 0, 100, 0, 0, true, false, false, true, new int[] { 5 },
-				100, 10000, 0, false, false, 6200));
-	}
-	@Test
-	public void test07() throws Exception {
-		Assert.assertTrue(test("Test 7", 50, 150, 20, 0, false, false, false, true, new int[] { 5 },
-				100, 5000, 0, false, false, 5100));
-	}
-	@Test
-	public void test08() throws Exception {
-		Assert.assertTrue(test("Test 8", 10, 25, 5, 15000, true, false, false, true, new int[] { 5 },
-				20, 10000, 0, false, false, 5100));
-	}
-	@Test
-	public void test09() throws Exception {
-		Assert.assertTrue(test("Test 9", 50, 150, 20, 0, false, true, false, true, new int[] { 5 },
-				100, 5000, 0, false, false, 5080));
-	}
-	@Test
-	public void test10() throws Exception {
-		Assert.assertTrue(test("Test 10", 10, 50, 5, 15000, true, false, false, true, new int[] { 5, 3, 2 },
-				50, 10000, 0, false, false, 10340));
-	}
-	@Test
-	public void test11() throws Exception {
-		Assert.assertTrue(test("Test 11", 100, 250, 20, 0, true, true, false, true, new int[] { 5 },
-				800, 20000, 0, false, false, 6000));
-	}
+//	@Test
+//	public void test01() throws Exception {
+//		exceptionRule.expect(IllegalArgumentException.class);
+//		exceptionRule.expectMessage("The minimum pool size has to be greater than 0.");
+//		test("Test 1", -1, 5, 0, 0, false, false, false, false, new int[] { 5 },
+//				100, 10000, 0, false, false, 6200);
+//	}
+//	@Test
+//	public void test02() throws Exception {
+//		exceptionRule.expect(IllegalArgumentException.class);
+//		exceptionRule.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
+//				"minimum pool size.");
+//		test("Test 2", 0, 0, 0, 0, false, false, false, false, new int[] { 5 },
+//				100, 10000, 0, false, false, 6200);
+//	}
+//	@Test
+//	public void test03() throws Exception {
+//		exceptionRule.expect(IllegalArgumentException.class);
+//		exceptionRule.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
+//				"minimum pool size.");
+//		test("Test 3", 10, 5, 0, 0, false, false, false, false, new int[] { 5 },
+//				100, 10000, 0, false, false, 6200);
+//	}
+//	@Test
+//	public void test04() throws Exception {
+//		exceptionRule.expect(IllegalArgumentException.class);
+//		exceptionRule.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
+//		test("Test 4", 10, 12, -1, 0, false, false, false, false, new int[] { 5 },
+//				100, 10000, 0, false, false, 6200);
+//	}
+//	@Test
+//	public void test05() throws Exception {
+//		exceptionRule.expect(IllegalArgumentException.class);
+//		exceptionRule.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
+//		test("Test 5", 10, 12, 15, 0, false, false, false, false, new int[] { 5 },
+//				100, 10000, 0, false, false, 6200);
+//	}
+//	@Test
+//	public void test06() throws Exception {
+//		Assert.assertTrue(test("Test 6", 0, 100, 0, 0, true, false, false, true, new int[] { 5 },
+//				100, 10000, 0, false, false, 6200));
+//	}
+//	@Test
+//	public void test07() throws Exception {
+//		Assert.assertTrue(test("Test 7", 50, 150, 20, 0, false, false, false, true, new int[] { 5 },
+//				100, 5000, 0, false, false, 5100));
+//	}
+//	@Test
+//	public void test08() throws Exception {
+//		Assert.assertTrue(test("Test 8", 10, 25, 5, 15000, true, false, false, true, new int[] { 5 },
+//				20, 10000, 0, false, false, 5100));
+//	}
+//	@Test
+//	public void test09() throws Exception {
+//		Assert.assertTrue(test("Test 9", 50, 150, 20, 0, false, true, false, true, new int[] { 5 },
+//				100, 5000, 0, false, false, 5080));
+//	}
+//	@Test
+//	public void test10() throws Exception {
+//		Assert.assertTrue(test("Test 10", 10, 50, 5, 15000, true, false, false, true, new int[] { 5, 3, 2 },
+//				50, 10000, 0, false, false, 10340));
+//	}
+//	@Test
+//	public void test11() throws Exception {
+//		Assert.assertTrue(test("Test 11", 100, 250, 20, 0, true, true, false, true, new int[] { 5 },
+//				800, 20000, 0, false, false, 6000));
+//	}
 	@Test
 	public void test12() throws Exception {
 		Assert.assertTrue(test("Test 12", 0, 100, 0, 0, false, false, false, false, new int[] { 5 },

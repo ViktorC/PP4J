@@ -108,10 +108,10 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @return Whether the manager is ready to process commands.
 	 */
 	protected boolean isReady() {
-		return running && (!lock.isLocked() || lock.isHeldByCurrentThread());
+		return running && !stop && (!lock.isLocked() || lock.isHeldByCurrentThread());
 	}
 	/**
-	 * Submits a {@link java.lang.Runnable} to the thread pool that calls the {@link #cancel() cancel} method after 
+	 * Submits a {@link java.lang.Runnable} to the thread pool that calls the {@link #stop() cancel} method after 
 	 * {@link #keepAliveTime} milliseconds.
 	 */
 	private void startKeepAliveTimer() {
@@ -176,9 +176,9 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			return;
 		lock.lock();
 		try {
-			stop = true;
 			if (forcibly || !manager.terminate(this))
 				process.destroy();
+			stop = true;
 		} finally {
 			lock.unlock();
 		}
@@ -195,7 +195,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 */
 	public boolean execute(Submission submission)
 			throws IOException {
-		if (running && lock.tryLock()) {
+		if (running && !stop && lock.tryLock()) {
 			try {
 				if (timedTask != null)
 					timedTask.cancel(true);
@@ -203,7 +203,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				List<Command> commands = submission.getCommands();
 				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
 				synchronized (lock) {
-					for (int i = 0; i < commands.size() && running; i++) {
+					for (int i = 0; i < commands.size() && running && !stop; i++) {
 						command = commands.get(i);
 						if (submission.isCancelled())
 							break;
@@ -213,7 +213,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 						stdInWriter.write(command.getInstruction());
 						stdInWriter.newLine();
 						stdInWriter.flush();
-						while (running && !commandProcessed) {
+						while (running && !stop && !commandProcessed) {
 							try {
 								lock.wait();
 							} catch (InterruptedException e) {
@@ -317,7 +317,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 		if (running && !stop)
 			stop(true);
 		if (internalExecutor)
-			executor.shutdownNow();
+			executor.shutdown();
 	}
 	@Override
 	public String toString() {
