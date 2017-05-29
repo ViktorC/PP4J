@@ -253,132 +253,132 @@ public class PSPPoolTest {
 			return false;
 		}
 	}
-//	@Test
-//	public void test01() throws Exception {
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		exceptionRule.expectMessage("The minimum pool size has to be greater than 0.");
-//		test("Test 1", -1, 5, 0, 0, false, false, false, false, new int[] { 5 },
-//				100, 10000, 0, false, false, 4995, 6200);
-//	}
-//	@Test
-//	public void test02() throws Exception {
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		exceptionRule.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
-//				"minimum pool size.");
-//		test("Test 2", 0, 0, 0, 0, false, false, false, false, new int[] { 5 },
-//				100, 10000, 0, false, false, 4995, 6200);
-//	}
-//	@Test
-//	public void test03() throws Exception {
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		exceptionRule.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
-//				"minimum pool size.");
-//		test("Test 3", 10, 5, 0, 0, false, false, false, false, new int[] { 5 },
-//				100, 10000, 0, false, false, 4995, 6200);
-//	}
-//	@Test
-//	public void test04() throws Exception {
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		exceptionRule.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
-//		test("Test 4", 10, 12, -1, 0, false, false, false, false, new int[] { 5 },
-//				100, 10000, 0, false, false, 4995, 6200);
-//	}
-//	@Test
-//	public void test05() throws Exception {
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		exceptionRule.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
-//		test("Test 5", 10, 12, 15, 0, false, false, false, false, new int[] { 5 },
-//				100, 10000, 0, false, false, 4995, 6200);
-//	}
-//	@Test
-//	public void test06() throws Exception {
-//		Assert.assertTrue(test("Test 6", 0, 100, 0, 0, true, false, false, true, new int[] { 5 },
-//				100, 10000, 0, false, false, 4995, 6200));
-//	}
-//	@Test
-//	public void test07() throws Exception {
-//		Assert.assertTrue(test("Test 7", 50, 150, 20, 0, false, false, false, true, new int[] { 5 },
-//				100, 5000, 0, false, false, 4995, 5100));
-//	}
-//	@Test
-//	public void test08() throws Exception {
-//		Assert.assertTrue(test("Test 8", 10, 25, 5, 15000, true, false, false, true, new int[] { 5 },
-//				20, 10000, 0, false, false, 4995, 5100));
-//	}
-//	@Test
-//	public void test09() throws Exception {
-//		Assert.assertTrue(test("Test 9", 50, 150, 20, 0, false, true, false, true, new int[] { 5 },
-//				100, 5000, 0, false, false, 4995, 5080));
-//	}
-//	@Test
-//	public void test10() throws Exception {
-//		Assert.assertTrue(test("Test 10", 10, 50, 5, 15000, true, false, false, true, new int[] { 5, 3, 2 },
-//				50, 10000, 0, false, false, 10000, 10340));
-//	}
-//	@Test
-//	public void test11() throws Exception {
-//		Assert.assertTrue(test("Test 11", 100, 250, 20, 0, true, true, false, true, new int[] { 5 },
-//				800, 20000, 0, false, false, 4995, 6000));
-//	}
-//	@Test
-//	public void test12() throws Exception {
-//		Assert.assertTrue(test("Test 12", 0, 100, 0, 0, false, false, false, false, new int[] { 5 },
-//				100, 10000, 0, false, false, 4995, 7150));
-//	}
-//	@Test
-//	public void test13() throws Exception {
-//		Assert.assertTrue(test("Test 13", 50, 150, 10, 0, true, false, false, false, new int[] { 5 },
-//				100, 5000, 0, false, false, 4995, 5600));
-//	}
-//	@Test
-//	public void test14() throws Exception {
-//		Assert.assertTrue(test("Test 14", 10, 25, 5, 15000, false, false, false, false, new int[] { 5 },
-//				20, 10000, 0, false, false, 4995, 5100));
-//	}
-//	@Test
-//	public void test15() throws Exception {
-//		Assert.assertTrue(test("Test 15", 50, 150, 10, 0, true, true, false, false, new int[] { 5 },
-//				100, 5000, 0, false, false, 4995, 5600));
-//	}
-//	@Test
-//	public void test16() throws Exception {
-//		Assert.assertTrue(test("Test 16", 10, 50, 5, 15000, false, false, false, false, new int[] { 5, 3, 2 },
-//				50, 10000, 0, false, false, 10000, 10350));
-//	}
-//	@Test
-//	public void test17() throws Exception {
-//		Assert.assertTrue(test("Test 17", 50, 250, 20, 0, true, true, false, false, new int[] { 5 },
-//				800, 20000, 0, false, false, 4995, 6000));
-//	}
-//	@Test
-//	public void test18() throws Exception {
-//		Assert.assertTrue(test("Test 18", 10, 30, 5, 0, true, true, false, false, new int[] { 5 },
-//				20, 0, 2500, true, false, 2500, 2520));
-//	}
-//	@Test
-//	public void test19() throws Exception {
-//		Assert.assertTrue(test("Test 19", 20, 20, 0, 0, false, false, false, false, new int[] { 5 },
-//				20, 0, 2500, false, false, 5000, 5090));
-//	}
-//	@Test
-//	public void test20() throws Exception {
-//		Assert.assertTrue(test("Test 20", 10, 30, 5, 0, true, true, false, false, new int[] { 5, 5, 3 },
-//				20, 0, 2500, true, false, 2500, 2520));
-//	}
-//	@Test
-//	public void test21() throws Exception {
-//		Assert.assertTrue(test("Test 21", 20, 20, 0, 0, true, true, false, false, new int[] { 5, 5, 3 },
-//				20, 0, 3000, false, false, 5000, 5090));
-//	}
-//	@Test
-//	public void test22() throws Exception {
-//		Assert.assertTrue(test("Test 22", 20, 40, 4, 250, true, true, true, false, new int[] { 5 },
-//				40, 5000, 0, false, false, 4995, 6150));
-//	}
 	@Test
-	public void test23() throws Exception {
-		Assert.assertTrue(test("Test 23", 0, 100, 0, 0, true, false, false, false, new int[] { 5 },
-				100, 10000, 0, false, true, 0, 0));
+	public void test01() throws Exception {
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The minimum pool size has to be greater than 0.");
+		test("Test 1", -1, 5, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 6200);
 	}
+	@Test
+	public void test02() throws Exception {
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
+				"minimum pool size.");
+		test("Test 2", 0, 0, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 6200);
+	}
+	@Test
+	public void test03() throws Exception {
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The maximum pool size has to be at least 1 and at least as great as the " +
+				"minimum pool size.");
+		test("Test 3", 10, 5, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 6200);
+	}
+	@Test
+	public void test04() throws Exception {
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
+		test("Test 4", 10, 12, -1, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 6200);
+	}
+	@Test
+	public void test05() throws Exception {
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The reserve has to be greater than 0 and less than the maximum pool size.");
+		test("Test 5", 10, 12, 15, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 6200);
+	}
+	@Test
+	public void test06() throws Exception {
+		Assert.assertTrue(test("Test 6", 0, 100, 0, 0, true, false, false, true, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 6200));
+	}
+	@Test
+	public void test07() throws Exception {
+		Assert.assertTrue(test("Test 7", 50, 150, 20, 0, false, false, false, true, new int[] { 5 },
+				100, 5000, 0, false, false, 4995, 5100));
+	}
+	@Test
+	public void test08() throws Exception {
+		Assert.assertTrue(test("Test 8", 10, 25, 5, 15000, true, false, false, true, new int[] { 5 },
+				20, 10000, 0, false, false, 4995, 5100));
+	}
+	@Test
+	public void test09() throws Exception {
+		Assert.assertTrue(test("Test 9", 50, 150, 20, 0, false, true, false, true, new int[] { 5 },
+				100, 5000, 0, false, false, 4995, 5080));
+	}
+	@Test
+	public void test10() throws Exception {
+		Assert.assertTrue(test("Test 10", 10, 50, 5, 15000, true, false, false, true, new int[] { 5, 3, 2 },
+				50, 10000, 0, false, false, 9995, 10340));
+	}
+	@Test
+	public void test11() throws Exception {
+		Assert.assertTrue(test("Test 11", 100, 250, 20, 0, true, true, false, true, new int[] { 5 },
+				800, 20000, 0, false, false, 4995, 6000));
+	}
+	@Test
+	public void test12() throws Exception {
+		Assert.assertTrue(test("Test 12", 0, 100, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 7150));
+	}
+	@Test
+	public void test13() throws Exception {
+		Assert.assertTrue(test("Test 13", 50, 150, 10, 0, true, false, false, false, new int[] { 5 },
+				100, 5000, 0, false, false, 4995, 5600));
+	}
+	@Test
+	public void test14() throws Exception {
+		Assert.assertTrue(test("Test 14", 10, 25, 5, 15000, false, false, false, false, new int[] { 5 },
+				20, 10000, 0, false, false, 4995, 5100));
+	}
+	@Test
+	public void test15() throws Exception {
+		Assert.assertTrue(test("Test 15", 50, 150, 10, 0, true, true, false, false, new int[] { 5 },
+				100, 5000, 0, false, false, 4995, 5600));
+	}
+	@Test
+	public void test16() throws Exception {
+		Assert.assertTrue(test("Test 16", 10, 50, 5, 15000, false, false, false, false, new int[] { 5, 3, 2 },
+				50, 10000, 0, false, false, 9995, 10350));
+	}
+	@Test
+	public void test17() throws Exception {
+		Assert.assertTrue(test("Test 17", 50, 250, 20, 0, true, true, false, false, new int[] { 5 },
+				800, 20000, 0, false, false, 4995, 6000));
+	}
+	@Test
+	public void test18() throws Exception {
+		Assert.assertTrue(test("Test 18", 10, 30, 5, 0, true, true, false, false, new int[] { 5 },
+				20, 0, 2500, true, false, 2495, 2520));
+	}
+	@Test
+	public void test19() throws Exception {
+		Assert.assertTrue(test("Test 19", 20, 20, 0, 0, false, false, false, false, new int[] { 5 },
+				20, 0, 2500, false, false, 4995, 5090));
+	}
+	@Test
+	public void test20() throws Exception {
+		Assert.assertTrue(test("Test 20", 10, 30, 5, 0, true, true, false, false, new int[] { 5, 5, 3 },
+				20, 0, 2500, true, false, 2495, 2520));
+	}
+	@Test
+	public void test21() throws Exception {
+		Assert.assertTrue(test("Test 21", 20, 20, 0, 0, true, true, false, false, new int[] { 5, 5, 3 },
+				20, 0, 3000, false, false, 4995, 5090));
+	}
+	@Test
+	public void test22() throws Exception {
+		Assert.assertTrue(test("Test 22", 20, 40, 4, 250, true, true, true, false, new int[] { 5 },
+				40, 5000, 0, false, false, 4995, 6150));
+	}
+//	@Test
+//	public void test23() throws Exception {
+//		Assert.assertTrue(test("Test 23", 100, 100, 0, 5000, true, false, false, false, new int[] { 5 },
+//				100, 0, 0, false, true, 0, 0));
+//	}
 	
 }

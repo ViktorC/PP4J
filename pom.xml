@@ -5,7 +5,6 @@
 	<artifactId>pspp</artifactId>
 	<version>1.01</version>
 	<name>net.viktorc:PSPPool</name>
-	<description>A small library that provides a pool for maintaining pre-started 'interactive' processes.</description>
 	<url>https://github.com/ViktorC</url>
 	<packaging>jar</packaging>
 	<licenses>
@@ -115,4 +114,5 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+	<description>A small library that provides a pool for maintaining pre-started processes.</description>
 </project>

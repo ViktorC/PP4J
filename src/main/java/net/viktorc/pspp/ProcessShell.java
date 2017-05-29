@@ -30,8 +30,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	
 	private final ProcessManager manager;
 	private final long keepAliveTime;
-	private final ExecutorService executor;
 	private final KeepAliveTimer timer;
+	private final ExecutorService executor;
 	private final boolean internalExecutor;
 	private final ReentrantLock lock;
 	private final long id;
@@ -59,13 +59,13 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @throws IOException If the process command is invalid.
 	 * @throws IllegalArgumentException If the handler is null.
 	 */
-	protected ProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService)
+	public ProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService)
 			throws IOException {
 		if (manager == null)
 			throw new IllegalArgumentException("The process handler cannot be null.");
-		timer = new KeepAliveTimer();
+		timer = keepAliveTime > 0 ? new KeepAliveTimer() : null;
 		internalExecutor = executorService == null;
-		this.executor = internalExecutor ? Executors.newFixedThreadPool(keepAliveTime > 0 ? 3 : 2) : executorService;
+		this.executor = internalExecutor ? Executors.newFixedThreadPool(timer != null ? 3 : 2) : executorService;
 		lock = new ReentrantLock();
 		this.manager = manager;
 		this.keepAliveTime = keepAliveTime;
@@ -80,7 +80,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @throws IOException If the process command is invalid.
 	 * @throws IllegalArgumentException If the builder or the listener is null.
 	 */
-	protected ProcessShell(ProcessManager manager, long keepAliveTime)
+	public ProcessShell(ProcessManager manager, long keepAliveTime)
 		throws IOException {
 		this(manager, keepAliveTime, null);
 	}
@@ -97,7 +97,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * 
 	 * @return Whether the process is currently running and not cancelled.
 	 */
-	protected boolean isActive() {
+	public boolean isActive() {
 		return running && !stop;
 	}
 	/**
@@ -105,8 +105,88 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * 
 	 * @return Whether the manager is ready to process commands.
 	 */
-	protected boolean isReady() {
+	public boolean isReady() {
 		return isActive() && (!lock.isLocked() || lock.isHeldByCurrentThread());
+	}
+	/**
+	 * Attempts to write the specified commands to the standard in stream of the process and blocks until they are 
+	 * processed.
+	 * 
+	 * @param submission The submitted command(s) to execute.
+	 * @return Whether the submission was executed. If the manager is busy processing an other submission, 
+	 * it returns false; otherwise the submission is executed and true is returned once it's processed.
+	 * @throws IOException If a command cannot be written to the standard in stream.
+	 * @throws ProcessException If the thread is interrupted while executing the commands.
+	 */
+	public boolean execute(Submission submission)
+			throws IOException {
+		if (running && !stop && lock.tryLock()) {
+			try {
+				if (timer != null)
+					timer.stop();
+				submission.onStartedProcessing();
+				List<Command> commands = submission.getCommands();
+				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
+				synchronized (lock) {
+					for (int i = 0; i < commands.size() && running && !stop; i++) {
+						command = commands.get(i);
+						if (submission.isCancelled())
+							break;
+						if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
+							continue;
+						commandProcessed = !command.generatesOutput();
+						stdInWriter.write(command.getInstruction());
+						stdInWriter.newLine();
+						stdInWriter.flush();
+						while (running && !stop && !commandProcessed) {
+							try {
+								lock.wait();
+							} catch (InterruptedException e) {
+								throw new ProcessException(e);
+							}
+						}
+						if (i < commands.size() - 1)
+							processedCommands.add(command);
+						command = null;
+					}
+				}
+				if (running && !stop) {
+					if (submission.doTerminateProcessAfterwards())
+						stop(false);
+					else if (timer != null)
+						timer.start();
+				}
+				return true;
+			} finally {
+				try {
+					submission.onFinishedProcessing();
+				} finally {
+					lock.unlock();
+				}
+			}
+		} else
+			return false;
+	}
+	/**
+	 * It prompts the currently running process, if there is one, to terminate.
+	 * 
+	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pspp.ProcessManager#terminate(ProcessShell) terminate} 
+	 * method of the {@link net.viktorc.pspp.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
+	 * process is currently executing, not listening to its standard in.
+	 */
+	protected void stop(boolean forcibly) {
+		if (process == null)
+			return;
+		lock.lock();
+		try {
+			if (timer != null)
+				timer.stop();
+			if (forcibly || !manager.terminate(this))
+				process.destroy();
+			stop = true;
+		} finally {
+			lock.unlock();
+		}
 	}
 	/**
 	 * Starts listening to the specified channel.
@@ -145,84 +225,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			}
 		}
 	}
-	/**
-	 * It prompts the currently running process, if there is one, to terminate.
-	 * 
-	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pspp.ProcessManager#terminate(ProcessShell) terminate} 
-	 * method of the {@link net.viktorc.pspp.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
-	 * process is currently executing, not listening to its standard in.
-	 */
-	protected void stop(boolean forcibly) {
-		if (process == null)
-			return;
-		lock.lock();
-		try {
-			timer.stop();
-			if (forcibly || !manager.terminate(this))
-				process.destroy();
-			stop = true;
-		} finally {
-			lock.unlock();
-		}
-	}
-	/**
-	 * Attempts to write the specified commands to the standard in stream of the process and blocks until they are 
-	 * processed.
-	 * 
-	 * @param submission The submitted command(s) to execute.
-	 * @return Whether the submission was executed. If the manager is busy processing an other submission, 
-	 * it returns false; otherwise the submission is executed and true is returned once it's processed.
-	 * @throws IOException If a command cannot be written to the standard in stream.
-	 * @throws ProcessException If the thread is interrupted while executing the commands.
-	 */
-	public boolean execute(Submission submission)
-			throws IOException {
-		if (running && !stop && lock.tryLock()) {
-			try {
-				timer.stop();
-				submission.onStartedProcessing();
-				List<Command> commands = submission.getCommands();
-				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
-				synchronized (lock) {
-					for (int i = 0; i < commands.size() && running && !stop; i++) {
-						command = commands.get(i);
-						if (submission.isCancelled())
-							break;
-						if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
-							continue;
-						commandProcessed = !command.generatesOutput();
-						stdInWriter.write(command.getInstruction());
-						stdInWriter.newLine();
-						stdInWriter.flush();
-						while (running && !stop && !commandProcessed) {
-							try {
-								lock.wait();
-							} catch (InterruptedException e) {
-								throw new ProcessException(e);
-							}
-						}
-						if (i < commands.size() - 1)
-							processedCommands.add(command);
-						command = null;
-					}
-				}
-				if (running && !stop) {
-					if (submission.doTerminateProcessAfterwards())
-						stop(false);
-					else
-						timer.start();
-				}
-				return true;
-			} finally {
-				try {
-					submission.onFinishedProcessing();
-				} finally {
-					lock.unlock();
-				}
-			}
-		} else
-			return false;
-	}
 	@Override
 	public synchronized void run() {
 		running = true;
@@ -256,8 +258,10 @@ public class ProcessShell implements Runnable, AutoCloseable {
 						lock.wait();
 				}
 				manager.onStartup(this);
-				executor.submit(timer);
-				timer.start();
+				if (timer != null) {
+					executor.submit(timer);
+					timer.start();
+				}
 			} finally {
 				lock.unlock();
 			}
@@ -268,7 +272,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 		} finally {
 			// Try to clean up and close all the resources.
 			running = false;
-			timer.stop();
+			if (timer != null)
+				timer.stop();
 			process = null;
 			if (stdOutReader != null) {
 				try {
@@ -352,6 +357,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				
 			} catch (Exception e) {
 				throw new ProcessException(e);
+			} finally {
+				go = false;
 			}
 		}
 		
