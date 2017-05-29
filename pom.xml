@@ -4,7 +4,7 @@
 	<groupId>net.viktorc</groupId>
 	<artifactId>pspp</artifactId>
 	<version>1.1</version>
-	<name>net.viktorc:PSPPool</name>
+	<name>PSPPool</name>
 	<url>https://github.com/ViktorC</url>
 	<packaging>jar</packaging>
 	<licenses>

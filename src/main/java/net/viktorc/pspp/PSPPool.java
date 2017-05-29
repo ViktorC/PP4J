@@ -379,9 +379,9 @@ public class PSPPool implements AutoCloseable {
 				
 				@Override
 				public void uncaughtException(Thread t, Throwable e) {
-					if (!(close && e.getCause() instanceof RejectedExecutionException))
-						logger.log(Level.SEVERE, executionErrorMessage, e);
-					handler.uncaughtException(t, e);
+					logger.log(Level.SEVERE, executionErrorMessage, e);
+					if (handler != null)
+						handler.uncaughtException(t, e);
 				}
 			});
 			return t;

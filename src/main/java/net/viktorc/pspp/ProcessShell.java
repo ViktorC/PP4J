@@ -128,10 +128,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				List<Command> commands = submission.getCommands();
 				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
 				synchronized (lock) {
-					for (int i = 0; i < commands.size() && running && !stop; i++) {
+					for (int i = 0; i < commands.size() && !submission.isCancelled() && running && !stop; i++) {
 						command = commands.get(i);
-						if (submission.isCancelled())
-							break;
 						if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
 							continue;
 						commandProcessed = !command.generatesOutput();

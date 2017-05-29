@@ -23,7 +23,7 @@ public abstract class AbstractSubmission implements Submission {
 	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
 	public AbstractSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
-		if (commands == null || commands.isEmpty())
+		if (commands == null)
 			throw new IllegalArgumentException("The commands cannot be null.");
 		if (commands.isEmpty())
 			throw new IllegalArgumentException("The commands cannot be empty.");

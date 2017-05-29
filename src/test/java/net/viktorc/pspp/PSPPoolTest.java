@@ -88,10 +88,6 @@ public class PSPPoolTest {
 				}
 				return false;
 			}
-			@Override
-			public void onTermination(int resultCode) {
-				
-			}
 			
 		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose);
 		return pool;
@@ -139,9 +135,28 @@ public class PSPPoolTest {
 						return null;
 					}
 				}
-				List<Command> commands = new ArrayList<>();
-				for (int procTime : procTimes)
-					commands.add(new SimpleCommand("process " + procTime, (c, o) -> "ready".equals(o), (c, o) -> true));
+				List<Command> commands;
+				if (procTimes == null)
+					commands = null;
+				else {
+					commands = new ArrayList<>();
+					for (int procTime : procTimes)
+						commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
+									if ("ready".equals(o)) {
+										if (verbose) {
+											System.out.println("Std: " +
+													c.getJointStandardOutLines().replaceAll("\n", " "));
+											System.out.println("Err: " +
+													c.getJointErrorOutLines().replaceAll("\n", " "));
+										}
+										Assert.assertTrue(c.getStandardOutLines().size() == procTime &&
+												c.getErrorOutLines().size() == 0);
+										c.reset();
+										return true;
+									}
+									return false;
+								}, (c, o) -> true));
+				}
 				Submission submission;
 				if (cancelTime > 0) {
 					Semaphore semaphore = new Semaphore(0);
@@ -379,6 +394,20 @@ public class PSPPoolTest {
 	public void test23() throws Exception {
 		Assert.assertTrue(test("Test 23", 100, 100, 0, 5000, true, false, false, false, new int[] { 5 },
 				100, 0, 0, false, true, 0, 0));
+	}
+	@Test
+	public void test24() throws Exception {
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The commands cannot be null.");
+		test("Test 24", 10, 20, 0, 0, false, false, false, false, null,
+				100, 10000, 0, false, false, 4995, 6200);
+	}
+	@Test
+	public void test25() throws Exception {
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The commands cannot be empty.");
+		test("Test 25", 10, 20, 0, 0, false, false, false, false, new int[0],
+				100, 10000, 0, false, false, 4995, 6200);
 	}
 	
 }
