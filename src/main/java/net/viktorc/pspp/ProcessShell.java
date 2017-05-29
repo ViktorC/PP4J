@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -32,7 +31,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	private final ProcessManager manager;
 	private final long keepAliveTime;
 	private final ExecutorService executor;
-	private final boolean timed;
+	private final KeepAliveTimer timer;
 	private final boolean internalExecutor;
 	private final ReentrantLock lock;
 	private final long id;
@@ -40,7 +39,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	private Reader stdOutReader;
 	private Reader errOutReader;
 	private BufferedWriter stdInWriter;
-	private volatile Future<?> timedTask;
 	private volatile Command command;
 	private volatile boolean running;
 	private volatile boolean stop;
@@ -65,9 +63,9 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			throws IOException {
 		if (manager == null)
 			throw new IllegalArgumentException("The process handler cannot be null.");
-		timed = keepAliveTime > 0;
+		timer = new KeepAliveTimer();
 		internalExecutor = executorService == null;
-		this.executor = internalExecutor ? Executors.newFixedThreadPool(timed ? 3 : 2) : executorService;
+		this.executor = internalExecutor ? Executors.newFixedThreadPool(keepAliveTime > 0 ? 3 : 2) : executorService;
 		lock = new ReentrantLock();
 		this.manager = manager;
 		this.keepAliveTime = keepAliveTime;
@@ -95,12 +93,12 @@ public class ProcessShell implements Runnable, AutoCloseable {
 		return id;
 	}
 	/**
-	 * Returns whether the process is currently running.
+	 * Returns whether the process is currently running and not cancelled.
 	 * 
-	 * @return Whether the process is currently running.
+	 * @return Whether the process is currently running and not cancelled.
 	 */
-	protected boolean isRunning() {
-		return running;
+	protected boolean isActive() {
+		return running && !stop;
 	}
 	/**
 	 * Returns whether the manager is ready to process new commands.
@@ -108,24 +106,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @return Whether the manager is ready to process commands.
 	 */
 	protected boolean isReady() {
-		return running && !stop && (!lock.isLocked() || lock.isHeldByCurrentThread());
-	}
-	/**
-	 * Submits a {@link java.lang.Runnable} to the thread pool that calls the {@link #stop() cancel} method after 
-	 * {@link #keepAliveTime} milliseconds.
-	 */
-	private void startKeepAliveTimer() {
-		timedTask = executor.submit(() -> {
-			try {
-				Thread.sleep(keepAliveTime);
-				if (!stop)
-					ProcessShell.this.stop(false);
-			} catch (InterruptedException e) {
-				
-			} catch (Exception e) {
-				throw new ProcessException(e);
-			}
-		});
+		return isActive() && (!lock.isLocked() || lock.isHeldByCurrentThread());
 	}
 	/**
 	 * Starts listening to the specified channel.
@@ -176,6 +157,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			return;
 		lock.lock();
 		try {
+			timer.stop();
 			if (forcibly || !manager.terminate(this))
 				process.destroy();
 			stop = true;
@@ -197,8 +179,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			throws IOException {
 		if (running && !stop && lock.tryLock()) {
 			try {
-				if (timedTask != null)
-					timedTask.cancel(true);
+				timer.stop();
 				submission.onStartedProcessing();
 				List<Command> commands = submission.getCommands();
 				List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
@@ -228,8 +209,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				if (running && !stop) {
 					if (submission.doTerminateProcessAfterwards())
 						stop(false);
-					else if (timed && (timedTask == null || timedTask.isCancelled()))
-						startKeepAliveTimer();
+					else
+						timer.start();
 				}
 				return true;
 			} finally {
@@ -275,8 +256,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 						lock.wait();
 				}
 				manager.onStartup(this);
-				if (timed && (timedTask == null || timedTask.isCancelled()))
-					startKeepAliveTimer();
+				executor.submit(timer);
+				timer.start();
 			} finally {
 				lock.unlock();
 			}
@@ -285,10 +266,9 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 			throw new ProcessException(e);
 		} finally {
-			running = false;
 			// Try to clean up and close all the resources.
-			if (timedTask != null)
-				timedTask.cancel(true);
+			running = false;
+			timer.stop();
 			process = null;
 			if (stdOutReader != null) {
 				try {
@@ -322,6 +302,59 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	@Override
 	public String toString() {
 		return "#" + Long.toHexString(id);
+	}
+	
+	/**
+	 * A simple timer that stops the process after {@link net.viktorc.pspp.ProcessShell#keepAliveTime} milliseconds 
+	 * unless the process is inactive or the timer is cancelled. It also enables the timer to be restarted using the 
+	 * same thread.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class KeepAliveTimer implements Runnable {
+
+		boolean go;
+		
+		/**
+		 * Restarts the timer.
+		 */
+		synchronized void start() {
+			go = true;
+			notifyAll();
+		}
+		/**
+		 * Stops the timer.
+		 */
+		synchronized void stop() {
+			go = false;
+			notifyAll();
+		}
+		@Override
+		public synchronized void run() {
+			try {
+				while (isActive()) {
+					while (!go) {
+						wait();
+						if (!isActive())
+							return;
+					}
+					long waitTime = keepAliveTime;
+					while (go && waitTime > 0) {
+						long start = System.currentTimeMillis();
+						wait(waitTime);
+						waitTime -= (System.currentTimeMillis() - start);
+					}
+					if (go && isActive())
+						ProcessShell.this.stop(false);
+				}
+			} catch (InterruptedException e) {
+				
+			} catch (Exception e) {
+				throw new ProcessException(e);
+			}
+		}
+		
 	}
 	
 }
