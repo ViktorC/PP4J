@@ -277,7 +277,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 					stop(true);
 				process = null;
 			}
-			if (!stop)
+			if (!stop && timer != null)
 				timer.stop();
 			process = null;
 			if (stdOutReader != null) {
