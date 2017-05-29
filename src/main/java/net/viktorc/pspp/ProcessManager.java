@@ -5,9 +5,7 @@ import java.io.IOException;
 /**
  * An interface that defines methods that allow for the managing of the life cycle of pooled processes. It 
  * defines methods that start the process, determine and handle its startup behavior, and allow for its 
- * orderly termination. Implementations of this interface should be stateless as the methods of the same 
- * instance are used for the handling of all the pooled processes in a {@link net.viktorc.pspp.PSPPool} 
- * instance.
+ * orderly termination.
  * 
  * @author A6714
  *

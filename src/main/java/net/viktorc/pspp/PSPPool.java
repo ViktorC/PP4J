@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  */
 public class PSPPool implements AutoCloseable {
 	
-	private final ProcessManager manager;
+	private final ProcessManagerFactory managerFactory;
 	private final int minPoolSize;
 	private final int maxPoolSize;
 	private final int reserveSize;
@@ -57,8 +57,8 @@ public class PSPPool implements AutoCloseable {
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
 	 * 
-	 * @param manager A {@link net.viktorc.pspp.ProcessManager} instance that handles each process' life cycle in the pool. It 
-	 * should be stateless as the same instance is used for all processes.
+	 * @param managerFactory A {@link net.viktorc.pspp.ProcessManagerFactory} instance that is used to build 
+	 * {@link net.viktorc.pspp.ProcessManager} instances that manage the processes' life cycle in the pool.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
@@ -66,14 +66,14 @@ public class PSPPool implements AutoCloseable {
 	 * life-cycle of the processes will not be limited.
 	 * @param verbose Whether events relating to the management of the pool should be logged.
 	 * @throws IOException If the process cannot be started.
-	 * @throws IllegalArgumentException If the handler is null, or the minimum pool size is less than 0, or the 
+	 * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the 
 	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
 	 * pool size.
 	 */
-	public PSPPool(ProcessManager manager, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime, boolean verbose)
-			throws IOException {
-		if (manager == null)
-			throw new IllegalArgumentException("The process manager cannot be null.");
+	public PSPPool(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime,
+			boolean verbose) throws IOException {
+		if (managerFactory == null)
+			throw new IllegalArgumentException("The process manager factory cannot be null.");
 		if (minPoolSize < 0)
 			throw new IllegalArgumentException("The minimum pool size has to be greater than 0.");
 		if (maxPoolSize < 1 || maxPoolSize < minPoolSize)
@@ -81,7 +81,7 @@ public class PSPPool implements AutoCloseable {
 					"minimum pool size.");
 		if (reserveSize < 0 || reserveSize > maxPoolSize)
 			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
-		this.manager = manager;
+		this.managerFactory = managerFactory;
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
@@ -126,21 +126,21 @@ public class PSPPool implements AutoCloseable {
 	 * Constructs a pool of identical processes. The initial size of the pool is the minimum pool size. The size of the pool 
 	 * is dynamically adjusted based on the number of requests and running processes.
 	 * 
-	 * @param manager A {@link net.viktorc.pspp.ProcessManager} instance that handles each process' life cycle in the pool. It 
-	 * should be stateless as the same instance is used for all processes.
+	 * @param managerFactory A {@link net.viktorc.pspp.ProcessManagerFactory} instance that is used to build 
+	 * {@link net.viktorc.pspp.ProcessManager} instances that manage the processes' life cycle in the pool.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
 	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
 	 * life-cycle of the processes will not be limited.
 	 * @throws IOException If the process cannot be started.
-	 * @throws IllegalArgumentException If the builder or the listener is null, or the minimum pool size is less than 0, or the 
+	 * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the 
 	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
 	 * pool size.
 	 */
-	public PSPPool(ProcessManager manager, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime)
+	public PSPPool(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime)
 			throws IOException {
-		this(manager, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
+		this(managerFactory, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
 	}
 	/**
 	 * Executes the command(s) on any of the available processes in the pool. It blocks until the command could successfully be 
@@ -193,8 +193,11 @@ public class PSPPool implements AutoCloseable {
 			if (spareShell != null) {
 				processShell = spareShell;
 				spareShell = null;
-			} else
-				processShell = new ProcessShell(new PooledProcessManager(), keepAliveTime, taskExecutorService);
+			} else {
+				PooledProcessManager manager = new PooledProcessManager(managerFactory.createNewProcessManager());
+				processShell = new ProcessShell(manager, keepAliveTime, taskExecutorService);
+				manager.setShell(processShell);
+			}
 		}
 		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
 		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 
@@ -376,7 +379,8 @@ public class PSPPool implements AutoCloseable {
 				
 				@Override
 				public void uncaughtException(Thread t, Throwable e) {
-					logger.log(Level.SEVERE, executionErrorMessage, e);
+					if (!(close && e.getCause() instanceof RejectedExecutionException))
+						logger.log(Level.SEVERE, executionErrorMessage, e);
 					handler.uncaughtException(t, e);
 				}
 			});
@@ -394,26 +398,40 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private class PooledProcessManager implements ProcessManager {
 		
-		// The process shell to which the listener is subscribed.
+		final ProcessManager originalManager;
 		ProcessShell processShell;
 		
+		/**
+		 * Constructs a wrapper around the specified process manager.
+		 * 
+		 * @param originalManager The original process manager.
+		 */
+		PooledProcessManager(ProcessManager originalManager) {
+			this.originalManager = originalManager;
+		}
+		/**
+		 * Sets the process shell to which the manager is assigned to.
+		 * 
+		 * @param shell The process shell to which the manager is assigned to.
+		 */
+		void setShell(ProcessShell shell) {
+			this.processShell = shell;
+		}
 		@Override
 		public Process start() throws IOException {
-			return manager.start();
+			return originalManager.start();
 		}
 		@Override
 		public boolean startsUpInstantly() {
-			return manager.startsUpInstantly();
+			return originalManager.startsUpInstantly();
 		}
 		@Override
 		public boolean isStartedUp(String output, boolean standard) {
-			return manager.isStartedUp(output, standard);
+			return originalManager.isStartedUp(output, standard);
 		}
 		@Override
 		public void onStartup(ProcessShell shell) {
-			// Store the reference to the manager for later use in the onTermination method.
-			this.processShell = shell;
-			manager.onStartup(shell);
+			originalManager.onStartup(shell);
 			if (verbose) {
 				logger.info("Process shell " + shell + " started executing.");
 				logPoolStats();
@@ -423,11 +441,11 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public boolean terminate(ProcessShell shell) {
-			return manager.terminate(shell);
+			return originalManager.terminate(shell);
 		}
 		@Override
 		public void onTermination(int resultCode) {
-			manager.onTermination(resultCode);
+			originalManager.onTermination(resultCode);
 			if (processShell != null)
 				activeShells.remove(processShell);
 		}
@@ -445,7 +463,7 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private class InternalSubmission implements Submission {
 		
-		final Submission submission;
+		final Submission originalSubmission;
 		final long receivedTime;
 		Long submittedTime;
 		Long processedTime;
@@ -455,13 +473,13 @@ public class PSPPool implements AutoCloseable {
 		/**
 		 * Constructs an instance according to the specified parameters.
 		 * 
-		 * @param submission The submission to wrap into an internal submission with extended features.
+		 * @param originalSubmission The submission to wrap into an internal submission with extended features.
 		 * @throws IllegalArgumentException If the submission is null.
 		 */
-		InternalSubmission(Submission submission) {
-			if (submission == null)
+		InternalSubmission(Submission originalSubmission) {
+			if (originalSubmission == null)
 				throw new IllegalArgumentException("The submission cannot be null.");
-			this.submission = submission;
+			this.originalSubmission = originalSubmission;
 			receivedTime = System.nanoTime();
 		}
 		/**
@@ -518,26 +536,26 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public List<Command> getCommands() {
-			return submission.getCommands();
+			return originalSubmission.getCommands();
 		}
 		@Override
 		public boolean doTerminateProcessAfterwards() {
-			return submission.doTerminateProcessAfterwards();
+			return originalSubmission.doTerminateProcessAfterwards();
 		}
 		@Override
 		public boolean isCancelled() {
-			return submission.isCancelled() || (future != null && future.isCancelled()) || close;
+			return originalSubmission.isCancelled() || (future != null && future.isCancelled()) || close;
 		}
 		@Override
 		public void onStartedProcessing() {
-			submission.onStartedProcessing();
+			originalSubmission.onStartedProcessing();
 			submissionSuccessful = true;
 			submissionSemaphore.release();
 			numOfExecutingSubmissions.incrementAndGet();
 		}
 		@Override
 		public void onFinishedProcessing() {
-			submission.onFinishedProcessing();
+			originalSubmission.onFinishedProcessing();
 			processedTime = System.nanoTime();
 			processed = true;
 			synchronized (this) {
@@ -547,7 +565,7 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public String toString() {
-			return String.join("; ", submission.getCommands().stream().map(c -> c.getInstruction()).collect(Collectors.toList()));
+			return String.join("; ", originalSubmission.getCommands().stream().map(c -> c.getInstruction()).collect(Collectors.toList()));
 		}
 		
 	}

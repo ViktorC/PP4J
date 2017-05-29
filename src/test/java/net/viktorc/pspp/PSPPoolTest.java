@@ -53,7 +53,7 @@ public class PSPPoolTest {
 		File file = new File(programLocation);
 		// For testing on Travis CI
 		file.setExecutable(true);
-		PSPPool pool = new PSPPool(new SimpleProcessManager(new ProcessBuilder(programLocation),
+		PSPPool pool = new PSPPool(() -> new SimpleProcessManager(new ProcessBuilder(programLocation),
 				s -> {
 					try {
 						s.execute(new SimpleSubmission(new SimpleCommand("start",
@@ -375,10 +375,10 @@ public class PSPPoolTest {
 		Assert.assertTrue(test("Test 22", 20, 40, 4, 250, true, true, true, false, new int[] { 5 },
 				40, 5000, 0, false, false, 4995, 6150));
 	}
-//	@Test
-//	public void test23() throws Exception {
-//		Assert.assertTrue(test("Test 23", 100, 100, 0, 5000, true, false, false, false, new int[] { 5 },
-//				100, 0, 0, false, true, 0, 0));
-//	}
+	@Test
+	public void test23() throws Exception {
+		Assert.assertTrue(test("Test 23", 100, 100, 0, 5000, true, false, false, false, new int[] { 5 },
+				100, 0, 0, false, true, 0, 0));
+	}
 	
 }

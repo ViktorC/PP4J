@@ -6,9 +6,7 @@ import java.util.function.Consumer;
  * A simple sub-class of the {@link net.viktorc.pspp.AbstractProcessManager} abstract class. It assumes that the process 
  * is immediately started up as soon as it is running (without having to wait for a certain output denoting that the process 
  * is ready), it has the process forcibly killed every time it needs to be terminated due to exceeding the keep-alive-time 
- * of the pool or not being reusable, and it implements no callback for when the process terminates. It should be stateless 
- * as the methods of the same {@link net.viktorc.pspp.SimpleProcessManager} instance are used for every {@link net.viktorc.pspp.ProcessShell} 
- * of a {@link net.viktorc.pspp.PSPPool} instance.
+ * of the pool or not being reusable, and it implements no callback for when the process terminates.
  * 
  * @author A6714
  *

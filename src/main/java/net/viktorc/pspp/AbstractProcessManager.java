@@ -3,9 +3,7 @@ package net.viktorc.pspp;
 import java.io.IOException;
 
 /**
- * An abstract implementation of the {@link net.viktorc.pspp.ProcessManager} interface. Its implementations should be stateless 
- * as the methods of the same instance are used for every {@link net.viktorc.pspp.ProcessShell} of a {@link net.viktorc.pspp.PSPPool} 
- * instance.
+ * An abstract implementation of the {@link net.viktorc.pspp.ProcessManager} interface.
  * 
  * 
  * @author A6714
