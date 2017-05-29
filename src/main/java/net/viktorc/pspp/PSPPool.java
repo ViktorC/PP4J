@@ -8,7 +8,6 @@ import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -42,8 +41,9 @@ public class PSPPool implements AutoCloseable {
 	private final boolean verbose;
 	private final ProcessShellExecutor processExecutor;
 	private final ExecutorService taskExecutorService;
-	private final List<ProcessShell> activeShells;
-	private final Queue<InternalSubmission> submissionQueue;
+	private final Queue<ProcessShell> allShells;
+	private final Queue<ProcessShell> activeShells;
+	private final Queue<InternalSubmission> submissions;
 	private final CountDownLatch startupLatch;
 	private final Semaphore submissionSemaphore;
 	private final Object poolLock;
@@ -90,8 +90,9 @@ public class PSPPool implements AutoCloseable {
 		processExecutor = new ProcessShellExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
 		taskExecutorService = Executors.newCachedThreadPool();
-		activeShells = new CopyOnWriteArrayList<>();
-		submissionQueue = new ConcurrentLinkedQueue<>();
+		allShells = new ConcurrentLinkedQueue<>();
+		activeShells = new ConcurrentLinkedQueue<>();
+		submissions = new ConcurrentLinkedQueue<>();
 		startupLatch = new CountDownLatch(actualMinSize);
 		submissionSemaphore = new Semaphore(0);
 		poolLock = new Object();
@@ -155,7 +156,7 @@ public class PSPPool implements AutoCloseable {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
 		InternalSubmission internalSubmission = new InternalSubmission(submission);
-		submissionQueue.add(internalSubmission);
+		submissions.add(internalSubmission);
 		// Notify the main loop that a command has been submitted.
 		synchronized (this) {
 			notifyAll();
@@ -163,13 +164,14 @@ public class PSPPool implements AutoCloseable {
 		// Return a Future holding the total execution time including the submission delay.
 		return new InternalSubmissionFuture(internalSubmission);
 	}
-
 	/**
-	 * Logs the number of active, queued, and currently executing processes.
+	 * Returns the number of active, queued, and currently executing processes as string.
+	 * 
+	 * @return A string of statistics concerning the size of the process pool.
 	 */
-	private void logPoolStats() {
-		logger.info("Total processes: " + processExecutor.getActiveCount() + "; acitve processes: " + activeShells.size() +
-				"; submitted commands: " + (numOfExecutingSubmissions.get() + submissionQueue.size()));
+	private String getPoolStats() {
+		return "Total processes: " + allShells.size() + "; acitve processes: " + activeShells.size() +
+				"; submitted commands: " + (numOfExecutingSubmissions.get() + submissions.size());
 	}
 	/**
 	 * Returns whether a new process {@link net.viktorc.pspp.ProcessShell} instance should be added to the pool.
@@ -177,8 +179,8 @@ public class PSPPool implements AutoCloseable {
 	 * @return Whether the process pool should be extended.
 	 */
 	private boolean doExtendPool() {
-		return !close && (processExecutor.getActiveCount() < minPoolSize || (processExecutor.getActiveCount() <
-				Math.min(maxPoolSize, numOfExecutingSubmissions.get() + submissionQueue.size() + reserveSize)));
+		return !close && (allShells.size() < minPoolSize || (allShells.size() < Math.min(maxPoolSize,
+				numOfExecutingSubmissions.get() + submissions.size() + reserveSize)));
 	}
 	/**
 	 * Starts a new process by executing the provided {@link net.viktorc.pspp.ProcessShell}. If it is null, it creates a new 
@@ -222,7 +224,7 @@ public class PSPPool implements AutoCloseable {
 				// Wait until there is a command submitted.
 				if (!optionalSubmission.isPresent()) {
 					synchronized (this) {
-						while (!close && !(optionalSubmission = Optional.ofNullable(submissionQueue.peek())).isPresent()) {
+						while (!close && !(optionalSubmission = Optional.ofNullable(submissions.peek())).isPresent()) {
 							try {
 								wait();
 							} catch (InterruptedException e) {
@@ -260,7 +262,7 @@ public class PSPPool implements AutoCloseable {
 						submissionSemaphore.acquire();
 						if (submissionSuccessful) {
 							submission.setFuture(future);
-							submissionQueue.remove(submission);
+							submissions.remove(submission);
 							optionalSubmission = Optional.empty();
 							break;
 						}
@@ -283,14 +285,13 @@ public class PSPPool implements AutoCloseable {
 			}
 		}
 	}
-	
 	@Override
 	public void close() throws Exception {
 		close = true;
 		synchronized (this) {
 			notifyAll();
 		}
-		for (ProcessShell shell : activeShells)
+		for (ProcessShell shell : allShells)
 			shell.stop(true);
 		processExecutor.shutdown();
 		taskExecutorService.shutdown();
@@ -315,13 +316,22 @@ public class PSPPool implements AutoCloseable {
 			super(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue);
 		}
 		@Override
+		protected void beforeExecute(Thread t, Runnable r) {
+			super.beforeExecute(t, r);
+			ProcessShell shell = (ProcessShell) r;
+			allShells.add(shell);
+			if (verbose)
+				logger.info("Process shell " + shell + " starting execution." + System.lineSeparator() +
+						getPoolStats());
+		}
+		@Override
 		protected void afterExecute(Runnable r, Throwable t) {
 			super.afterExecute(r, t);
 			ProcessShell shell = (ProcessShell) r;
-			if (verbose) {
-				logger.info("Process shell " + shell + " stopped executing.");
-				logPoolStats();
-			}
+			allShells.remove(shell);
+			if (verbose)
+				logger.info("Process shell " + shell + " stopped executing." + System.lineSeparator() +
+						getPoolStats());
 			boolean doExtend = false;
 			synchronized (poolLock) {
 				if (doExtendPool()) {
@@ -432,10 +442,8 @@ public class PSPPool implements AutoCloseable {
 		@Override
 		public void onStartup(ProcessShell shell) {
 			originalManager.onStartup(shell);
-			if (verbose) {
-				logger.info("Process shell " + shell + " started executing.");
-				logPoolStats();
-			}
+			if (verbose)
+				logger.info("Process shell " + shell + " is started up.");
 			startupLatch.countDown();
 			activeShells.add(shell);
 		}
@@ -591,7 +599,7 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-			submissionQueue.remove(submission);
+			submissions.remove(submission);
 			Future<?> future = submission.getFuture();
 			if (future != null && future.cancel(mayInterruptIfRunning)) {
 				synchronized (submission) {

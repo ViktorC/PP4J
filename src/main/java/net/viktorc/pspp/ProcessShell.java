@@ -118,8 +118,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @throws IOException If a command cannot be written to the standard in stream.
 	 * @throws ProcessException If the thread is interrupted while executing the commands.
 	 */
-	public boolean execute(Submission submission)
-			throws IOException {
+	public boolean execute(Submission submission) throws IOException {
 		if (running && !stop && lock.tryLock()) {
 			try {
 				if (timer != null)
@@ -156,6 +155,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				}
 				return true;
 			} finally {
+				command = null;
 				try {
 					submission.onFinishedProcessing();
 				} finally {
@@ -227,10 +227,13 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	public synchronized void run() {
 		running = true;
 		stop = false;
-		int rc = -1;
+		command = null;
+		int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 		try {
 			lock.lock();
 			try {
+				if (stop)
+					return;
 				// Start process
 				process = manager.start();
 				stdOutReader = new InputStreamReader(process.getInputStream());
@@ -265,12 +268,13 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			}
 			rc = process.waitFor();
 		} catch (Exception e) {
-			rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 			throw new ProcessException(e);
 		} finally {
 			// Try to clean up and close all the resources.
 			running = false;
-			if (timer != null)
+			if (process.isAlive())
+				stop(true);
+			else if (timer != null)
 				timer.stop();
 			process = null;
 			if (stdOutReader != null) {
