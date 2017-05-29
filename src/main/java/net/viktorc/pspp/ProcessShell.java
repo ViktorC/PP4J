@@ -115,10 +115,10 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @param submission The submitted command(s) to execute.
 	 * @return Whether the submission was executed. If the manager is busy processing an other submission, 
 	 * it returns false; otherwise the submission is executed and true is returned once it's processed.
-	 * @throws IOException If a command cannot be written to the standard in stream.
-	 * @throws ProcessException If the thread is interrupted while executing the commands.
+	 * @throws InterruptedException If the thread is interrupted while executing the commands.
+	 * @throws IOException If the instruction cannot be written to the process' standard in stream.
 	 */
-	public boolean execute(Submission submission) throws IOException {
+	public boolean execute(Submission submission) throws IOException, InterruptedException {
 		if (running && !stop && lock.tryLock()) {
 			try {
 				if (timer != null)
@@ -136,11 +136,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 						stdInWriter.newLine();
 						stdInWriter.flush();
 						while (running && !stop && !commandProcessed) {
-							try {
-								lock.wait();
-							} catch (InterruptedException e) {
-								throw new ProcessException(e);
-							}
+							lock.wait();
 						}
 						if (i < commands.size() - 1)
 							processedCommands.add(command);
@@ -155,6 +151,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				}
 				return true;
 			} finally {
+				commandProcessed = true;
 				command = null;
 				try {
 					submission.onFinishedProcessing();
@@ -267,14 +264,20 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				lock.unlock();
 			}
 			rc = process.waitFor();
+		} catch (InterruptedException e) {
+			if (!stop)
+				throw new ProcessException(e);
 		} catch (Exception e) {
 			throw new ProcessException(e);
 		} finally {
 			// Try to clean up and close all the resources.
 			running = false;
-			if (process.isAlive())
-				stop(true);
-			else if (timer != null)
+			if (process != null) {
+				if (process.isAlive())
+					stop(true);
+				process = null;
+			}
+			if (!stop)
 				timer.stop();
 			process = null;
 			if (stdOutReader != null) {

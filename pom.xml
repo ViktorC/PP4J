@@ -5,6 +5,7 @@
 	<artifactId>pspp</artifactId>
 	<version>1.1</version>
 	<name>PSPPool</name>
+	<description>A small library that provides a pool for maintaining pre-started processes.</description>
 	<url>https://github.com/ViktorC</url>
 	<packaging>jar</packaging>
 	<licenses>
@@ -114,5 +115,4 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-	<description>A small library that provides a pool for maintaining pre-started processes.</description>
 </project>

@@ -253,7 +253,7 @@ public class PSPPool implements AutoCloseable {
 									submissionSuccessful = false;
 									submissionSemaphore.release();
 								}
-							} catch (IOException e) {
+							} catch (IOException | InterruptedException e) {
 								if (verbose)
 									logger.log(Level.SEVERE, "Error while executing command(s) " +
 											submission + ".", e);

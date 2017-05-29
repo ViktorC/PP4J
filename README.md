@@ -22,7 +22,7 @@ __PSPPool__ (Pre-Started Process Pool) is a small library that provides a pool f
 			try {
 				shell.execute(new SimpleSubmission(new SimpleCommand("start",
 						(c, o) -> "ok".equals(o), (c, o) -> true), false));
-			} catch (IOException e) {
+			} catch (IOException | InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
@@ -45,7 +45,7 @@ __PSPPool__ (Pre-Started Process Pool) is a small library that provides a pool f
 					// If success is false, the process will be terminated forcibly
 					return success.get();
 				}
-			} catch (IOException e) {
+			} catch (IOException | InterruptedException e) {
 				e.printStackTrace();
 			}
 			// If the something went wrong, the process is terminated forcibly.

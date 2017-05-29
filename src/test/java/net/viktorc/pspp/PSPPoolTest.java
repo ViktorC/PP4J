@@ -58,7 +58,7 @@ public class PSPPoolTest {
 					try {
 						s.execute(new SimpleSubmission(new SimpleCommand("start",
 								(c, o) -> "ok".equals(o), (c, o) -> true), false));
-					} catch (IOException e) {
+					} catch (IOException | InterruptedException e) {
 						e.printStackTrace();
 					}
 				}) {
@@ -82,7 +82,7 @@ public class PSPPoolTest {
 									return true;
 								}), false)))
 							return success.get();
-					} catch (IOException e) {
+					} catch (IOException | InterruptedException e) {
 						e.printStackTrace();
 					}
 				}
