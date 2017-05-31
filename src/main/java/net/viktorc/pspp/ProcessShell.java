@@ -56,11 +56,9 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @param executorService A thread pool for the threads required for listening to the standard out and error out of the underlying 
 	 * process and, if specified, for terminating the process if it is idle for too long. If it is null, the manager's own thread pool 
 	 * is created. If the manager uses an external thread pool, it is not closed upon calling {@link #close() close}.
-	 * @throws IOException If the process command is invalid.
-	 * @throws IllegalArgumentException If the handler is null.
+	 * @throws IllegalArgumentException If the manager is null.
 	 */
-	public ProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService)
-			throws IOException {
+	public ProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService) {
 		if (manager == null)
 			throw new IllegalArgumentException("The process handler cannot be null.");
 		timer = keepAliveTime > 0 ? new KeepAliveTimer() : null;
@@ -77,11 +75,9 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @param manager The process manager to handle the underlying process.
 	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
 	 * less, the life-cycle of the processes will not be limited.
-	 * @throws IOException If the process command is invalid.
-	 * @throws IllegalArgumentException If the builder or the listener is null.
+	 * @throws IllegalArgumentException If the manager is null.
 	 */
-	public ProcessShell(ProcessManager manager, long keepAliveTime)
-		throws IOException {
+	public ProcessShell(ProcessManager manager, long keepAliveTime) {
 		this(manager, keepAliveTime, null);
 	}
 	/**
@@ -264,9 +260,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				lock.unlock();
 			}
 			rc = process.waitFor();
-		} catch (InterruptedException e) {
-			if (!stop)
-				throw new ProcessException(e);
 		} catch (Exception e) {
 			throw new ProcessException(e);
 		} finally {

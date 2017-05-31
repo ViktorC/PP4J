@@ -122,88 +122,83 @@ public class PSPPoolTest {
 			boolean verifyStartup, boolean manuallyTerminate, boolean verbose, boolean reuse, int[] procTimes,
 			int requests, long timeSpan, long cancelTime, boolean forcedCancel, boolean earlyClose)
 					throws Exception {
-		try (PSPPool procPool = getPool(minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verifyStartup,
-				manuallyTerminate, verbose)) {
-			long frequency = requests > 0 ? timeSpan/requests : 0;
-			List<Future<Long>> futures = new ArrayList<>(requests);
-			List<Entry<Semaphore,Long>> cancelTimes = cancelTime > 0 ? new ArrayList<>(requests) : null;
-			for (int i = 0; i < requests; i++) {
-				if (frequency > 0) {
-					try {
-						Thread.sleep(frequency);
-					} catch (InterruptedException e) {
-						return null;
-					}
-				}
-				List<Command> commands;
-				if (procTimes == null)
-					commands = null;
-				else {
-					commands = new ArrayList<>();
-					for (int procTime : procTimes)
-						commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
-									if ("ready".equals(o)) {
-										if (verbose) {
-											System.out.println("Std: " +
-													c.getJointStandardOutLines().replaceAll("\n", " "));
-											System.out.println("Err: " +
-													c.getJointErrorOutLines().replaceAll("\n", " "));
-										}
-										Assert.assertTrue(c.getStandardOutLines().size() == procTime &&
-												c.getErrorOutLines().size() == 0);
-										c.reset();
-										return true;
-									}
-									return false;
-								}, (c, o) -> true));
-				}
-				Submission submission;
-				if (cancelTime > 0) {
-					Semaphore semaphore = new Semaphore(0);
-					submission = new SimpleSubmission(commands, !reuse) {
-						
-						@Override
-						public void onFinishedProcessing() {
-							semaphore.release();
-						}
-						
-					};
-					long startTime = System.nanoTime();
-					cancelTimes.add(new SimpleEntry<>(semaphore, startTime));
-				} else
-					submission = new SimpleSubmission(commands, !reuse);
-				futures.add(procPool.submit(submission));
-			}
-			if (cancelTime > 0) {
-				Thread.sleep(cancelTime);
-				for (Future<Long> future : futures)
-					future.cancel(forcedCancel);
-			}
-			try {
-				if (earlyClose)
-					procPool.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-			List<Long> times = new ArrayList<>();
-			for (int i = 0; i < futures.size(); i++) {
-				Future<Long> future = futures.get(i);
+		PSPPool procPool = getPool(minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verifyStartup,
+				manuallyTerminate, verbose);
+		long frequency = requests > 0 ? timeSpan/requests : 0;
+		List<Future<Long>> futures = new ArrayList<>(requests);
+		List<Entry<Semaphore,Long>> cancelTimes = cancelTime > 0 ? new ArrayList<>(requests) : null;
+		for (int i = 0; i < requests; i++) {
+			if (frequency > 0) {
 				try {
-					long time = future.get();
-					times.add(time);
-				} catch (CancellationException e) {
-					if (cancelTime > 0) {
-						Entry<Semaphore,Long> cancelEntry = cancelTimes.get(i);
-						cancelEntry.getKey().acquire();
-						times.add(System.nanoTime() - cancelEntry.getValue());
-					} else
-						times.add((long) 0);
+					Thread.sleep(frequency);
+				} catch (InterruptedException e) {
+					return null;
 				}
 			}
-			if (!earlyClose)
-				procPool.close();
-			return times;
+			List<Command> commands;
+			if (procTimes == null)
+				commands = null;
+			else {
+				commands = new ArrayList<>();
+				for (int procTime : procTimes)
+					commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
+								if ("ready".equals(o)) {
+									if (verbose) {
+										System.out.println("Std: " +
+												c.getJointStandardOutLines().replaceAll("\n", " "));
+										System.out.println("Err: " +
+												c.getJointErrorOutLines().replaceAll("\n", " "));
+									}
+									Assert.assertTrue(c.getStandardOutLines().size() == procTime &&
+											c.getErrorOutLines().size() == 0);
+									c.reset();
+									return true;
+								}
+								return false;
+							}, (c, o) -> true));
+			}
+			Submission submission;
+			if (cancelTime > 0) {
+				Semaphore semaphore = new Semaphore(0);
+				submission = new SimpleSubmission(commands, !reuse) {
+					
+					@Override
+					public void onFinishedProcessing() {
+						semaphore.release();
+					}
+					
+				};
+				long startTime = System.nanoTime();
+				cancelTimes.add(new SimpleEntry<>(semaphore, startTime));
+			} else
+				submission = new SimpleSubmission(commands, !reuse);
+			futures.add(procPool.submit(submission));
 		}
+		if (cancelTime > 0) {
+			Thread.sleep(cancelTime);
+			for (Future<Long> future : futures)
+				future.cancel(forcedCancel);
+		}
+		if (earlyClose)
+			procPool.close();
+		List<Long> times = new ArrayList<>();
+		for (int i = 0; i < futures.size(); i++) {
+			Future<Long> future = futures.get(i);
+			try {
+				long time = future.get();
+				times.add(time);
+			} catch (CancellationException e) {
+				if (cancelTime > 0) {
+					Entry<Semaphore,Long> cancelEntry = cancelTimes.get(i);
+					cancelEntry.getKey().acquire();
+					times.add(System.nanoTime() - cancelEntry.getValue());
+				} else
+					times.add((long) 0);
+			}
+		}
+		if (!earlyClose)
+			procPool.close();
+		return times;
 	}
 	/**
 	 * Submits the specified number of commands with the specified frequency to a the test process pool 
@@ -347,7 +342,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test14() throws Exception {
-		Assert.assertTrue(test("Test 14", 10, 25, 5, 15000, false, false, false, false, new int[] { 5 },
+		Assert.assertTrue(test("Test 14", 10, 25, 5, 15000, false, true, false, false, new int[] { 5 },
 				20, 10000, 0, false, false, 4995, 5100));
 	}
 	@Test
@@ -368,7 +363,7 @@ public class PSPPoolTest {
 	@Test
 	public void test18() throws Exception {
 		Assert.assertTrue(test("Test 18", 10, 30, 5, 0, true, true, false, false, new int[] { 5 },
-				20, 0, 2500, true, false, 2495, 2520));
+				20, 0, 2500, true, true, 2495, 2520));
 	}
 	@Test
 	public void test19() throws Exception {
