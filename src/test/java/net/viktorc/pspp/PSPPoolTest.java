@@ -347,7 +347,7 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test14() throws Exception {
-		Assert.assertTrue(test("Test 14", 10, 25, 5, 15000, false, true, false, false, new int[] { 5 },
+		Assert.assertTrue(test("Test 14", 10, 25, 5, 15000, false, false, false, false, new int[] { 5 },
 				20, 10000, 0, false, false, 4995, 5100));
 	}
 	@Test
