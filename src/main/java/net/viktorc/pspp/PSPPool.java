@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -32,7 +31,7 @@ import java.util.stream.Collectors;
  * @author A6714
  *
  */
-public class PSPPool implements AutoCloseable {
+public class PSPPool {
 	
 	private final ProcessManagerFactory managerFactory;
 	private final int minPoolSize;
@@ -40,15 +39,16 @@ public class PSPPool implements AutoCloseable {
 	private final int reserveSize;
 	private final long keepAliveTime;
 	private final boolean verbose;
+	private final Thread mainLoop;
 	private final ProcessShellExecutor processExecutor;
 	private final ExecutorService taskExecutorService;
 	private final Queue<ProcessShell> allShells;
 	private final Queue<ProcessShell> activeShells;
 	private final Queue<ProcessShell> spareShells;
-	private final Queue<InternalSubmission> submissions;
-	private final CountDownLatch startupLatch;
-	private final Object poolLock;
+	private final BlockingQueue<InternalSubmission> submissions;
 	private final AtomicInteger numOfExecutingSubmissions;
+	private final CountDownLatch prestartLatch;
+	private final Object poolLock;
 	private final Logger logger;
 	private volatile boolean close;
 
@@ -85,6 +85,7 @@ public class PSPPool implements AutoCloseable {
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
 		this.keepAliveTime = keepAliveTime;
+		mainLoop = new Thread(this::mainLoop);
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		processExecutor = new ProcessShellExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
@@ -92,10 +93,10 @@ public class PSPPool implements AutoCloseable {
 		allShells = new LinkedBlockingQueue<>();
 		activeShells = new LinkedBlockingQueue<>();
 		spareShells = new LinkedList<>();
-		submissions = new ConcurrentLinkedQueue<>();
-		startupLatch = new CountDownLatch(actualMinSize);
-		poolLock = new Object();
+		submissions = new LinkedBlockingQueue<>();
 		numOfExecutingSubmissions = new AtomicInteger(0);
+		prestartLatch = new CountDownLatch(actualMinSize);
+		poolLock = new Object();
 		logger = Logger.getAnonymousLogger();
 		this.verbose = verbose;
 		// Ensure that exceptions thrown by runnables submitted to the pools do not go unnoticed if the instance is verbose.
@@ -113,7 +114,7 @@ public class PSPPool implements AutoCloseable {
 		}
 		// Wait for the processes in the initial pool to start up.
 		try {
-			startupLatch.await();
+			prestartLatch.await();
 		} catch (InterruptedException e) {
 			if (verbose)
 				logger.log(Level.SEVERE, "Thread interrupted while waiting for the pool to start up.", e);
@@ -121,7 +122,7 @@ public class PSPPool implements AutoCloseable {
 			return;
 		}
 		// Start the thread responsible for submitting commands.
-		(new Thread(this::mainLoop)).start();
+		mainLoop.start();
 	}
 	/**
 	 * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size depending on which 
@@ -141,26 +142,6 @@ public class PSPPool implements AutoCloseable {
 	 */
 	public PSPPool(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime) {
 		this(managerFactory, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
-	}
-	/**
-	 * Executes the submission on any of the available processes in the pool.
-	 * 
-	 * @param submission The submission including all information necessary for executing and processing the command(s).
-	 * @return A {@link java.util.concurrent.Future} instance of the time it took to execute the command including the submission 
-	 * delay in nanoseconds.
-	 * @throws IllegalArgumentException If the submission is null.
-	 */
-	public Future<Long> submit(Submission submission) {
-		if (submission == null)
-			throw new IllegalArgumentException("The submission cannot be null or empty.");
-		InternalSubmission internalSubmission = new InternalSubmission(submission);
-		submissions.add(internalSubmission);
-		// Notify the main loop that a command has been submitted.
-		synchronized (this) {
-			notifyAll();
-		}
-		// Return a Future holding the total execution time including the submission delay.
-		return new InternalSubmissionFuture(internalSubmission);
 	}
 	/**
 	 * Returns the number of active, queued, and currently executing processes as string.
@@ -220,21 +201,8 @@ public class PSPPool implements AutoCloseable {
 		while (!close) {
 			try {
 				// Wait until there is a command submitted.
-				if (nextSubmission == null) {
-					synchronized (this) {
-						while (!close && (nextSubmission = submissions.peek()) == null) {
-							try {
-								wait();
-							} catch (InterruptedException e) {
-								if (verbose)
-									logger.log(Level.SEVERE, "Main loop thread interrupted.", e);
-								return;
-							}
-						}
-					}
-				}
-				if (close)
-					return;
+				if (nextSubmission == null)
+					nextSubmission = submissions.take();
 				InternalSubmission submission = nextSubmission;
 				// Execute it in any of the available processes.
 				for (ProcessShell shell : activeShells) {
@@ -257,14 +225,18 @@ public class PSPPool implements AutoCloseable {
 								if (verbose)
 									logger.log(Level.SEVERE, "Error while executing command(s) " +
 											submission + ".", t);
-								submission.semaphore.release();
-								submission.setThrowable(t);
+								if (submission.semaphore.availablePermits() == 0)
+									submission.semaphore.release();
+								submission.throwable = t;
+								synchronized (submission) {
+									submission.notifyAll();
+								}
 							}
 						});
 						submission.semaphore.acquire();
 						if (submission.submitted) {
-							submission.setFuture(future);
-							submissions.remove(nextSubmission);
+							submission.future = future;
+							submissions.remove(submission);
 							nextSubmission = null;
 							break;
 						}
@@ -281,12 +253,28 @@ public class PSPPool implements AutoCloseable {
 			}
 		}
 	}
-	@Override
-	public void close() throws Exception {
+	/**
+	 * Executes the submission on any of the available processes in the pool.
+	 * 
+	 * @param submission The submission including all information necessary for executing and processing the command(s).
+	 * @return A {@link java.util.concurrent.Future} instance of the time it took to execute the command including the submission 
+	 * delay in nanoseconds.
+	 * @throws IllegalArgumentException If the submission is null.
+	 */
+	public Future<Long> submit(Submission submission) {
+		if (submission == null)
+			throw new IllegalArgumentException("The submission cannot be null or empty.");
+		InternalSubmission internalSubmission = new InternalSubmission(submission);
+		submissions.add(internalSubmission);
+		// Return a Future holding the total execution time including the submission delay.
+		return new InternalSubmissionFuture(internalSubmission);
+	}
+	/**
+	 * Attempts to shut the process pool including all its processes down.
+	 */
+	public void shutdown() {
 		close = true;
-		synchronized (this) {
-			notifyAll();
-		}
+		mainLoop.interrupt();
 		synchronized (poolLock) {
 			for (ProcessShell shell : allShells)
 				shell.stop(true);
@@ -423,7 +411,7 @@ public class PSPPool implements AutoCloseable {
 		@Override
 		public void onStartup(ProcessShell shell) {
 			originalManager.onStartup(shell);
-			startupLatch.countDown();
+			prestartLatch.countDown();
 			activeShells.add(shell);
 		}
 		@Override
@@ -470,28 +458,8 @@ public class PSPPool implements AutoCloseable {
 			if (originalSubmission == null)
 				throw new IllegalArgumentException("The submission cannot be null.");
 			this.originalSubmission = originalSubmission;
-			semaphore = new Semaphore(0);
 			receivedTime = System.nanoTime();
-		}
-		/**
-		 * Sets the {@link java.util.concurrent.Future} instance associated with the submission and the submission time.
-		 * 
-		 * @param future The {@link java.util.concurrent.Future} instance associated with the submission.
-		 */
-		void setFuture(Future<?> future) {
-			submittedTime = System.nanoTime();
-			this.future = future;
-		}
-		/**
-		 * Sets the throwable encountered while executing the submission and notifies the associated future.
-		 * 
-		 * @param t The throwable encountered while executing the submission
-		 */
-		void setThrowable(Throwable t) {
-			throwable = t;
-			synchronized (this) {
-				notifyAll();
-			}
+			semaphore = new Semaphore(0);
 		}
 		@Override
 		public List<Command> getCommands() {
@@ -507,9 +475,10 @@ public class PSPPool implements AutoCloseable {
 		}
 		@Override
 		public void onStartedProcessing() {
-			originalSubmission.onStartedProcessing();
+			submittedTime = System.nanoTime();
 			submitted = true;
 			semaphore.release();
+			originalSubmission.onStartedProcessing();
 			numOfExecutingSubmissions.incrementAndGet();
 		}
 		@Override
@@ -566,10 +535,10 @@ public class PSPPool implements AutoCloseable {
 				while (!submission.processed && !submission.isCancelled() && submission.throwable == null)
 					submission.wait();
 			}
-			if (submission.throwable != null)
-				throw new ExecutionException(submission.throwable);
 			if (submission.isCancelled())
 				throw new CancellationException();
+			if (submission.throwable != null)
+				throw new ExecutionException(submission.throwable);
 			return submission.processedTime - submission.receivedTime;
 		}
 		@Override
@@ -584,10 +553,10 @@ public class PSPPool implements AutoCloseable {
 					timeoutNs -= (System.nanoTime() - start);
 				}
 			}
-			if (submission.throwable != null)
-				throw new ExecutionException(submission.throwable);
 			if (submission.isCancelled())
 				throw new CancellationException();
+			if (submission.throwable != null)
+				throw new ExecutionException(submission.throwable);
 			if (timeoutNs <= 0)
 				throw new TimeoutException();
 			return timeoutNs <= 0 ? null : submission.processedTime - submission.receivedTime;

@@ -180,7 +180,7 @@ public class PSPPoolTest {
 				future.cancel(forcedCancel);
 		}
 		if (earlyClose)
-			procPool.close();
+			procPool.shutdown();
 		List<Long> times = new ArrayList<>();
 		for (int i = 0; i < futures.size(); i++) {
 			Future<Long> future = futures.get(i);
@@ -197,7 +197,7 @@ public class PSPPoolTest {
 			}
 		}
 		if (!earlyClose)
-			procPool.close();
+			procPool.shutdown();
 		return times;
 	}
 	/**
