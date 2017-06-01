@@ -2,8 +2,8 @@ package net.viktorc.pspp;
 
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
@@ -43,15 +44,13 @@ public class PSPPool implements AutoCloseable {
 	private final ExecutorService taskExecutorService;
 	private final Queue<ProcessShell> allShells;
 	private final Queue<ProcessShell> activeShells;
+	private final Queue<ProcessShell> spareShells;
 	private final Queue<InternalSubmission> submissions;
 	private final CountDownLatch startupLatch;
-	private final Semaphore submissionSemaphore;
 	private final Object poolLock;
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final Logger logger;
-	private volatile boolean submissionSuccessful;
 	private volatile boolean close;
-	private ProcessShell spareShell;
 
 	/**
 	 * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size depending on which 
@@ -90,11 +89,11 @@ public class PSPPool implements AutoCloseable {
 		processExecutor = new ProcessShellExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
 		taskExecutorService = Executors.newCachedThreadPool();
-		allShells = new ConcurrentLinkedQueue<>();
-		activeShells = new ConcurrentLinkedQueue<>();
+		allShells = new LinkedBlockingQueue<>();
+		activeShells = new LinkedBlockingQueue<>();
+		spareShells = new LinkedList<>();
 		submissions = new ConcurrentLinkedQueue<>();
 		startupLatch = new CountDownLatch(actualMinSize);
-		submissionSemaphore = new Semaphore(0);
 		poolLock = new Object();
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		logger = Logger.getAnonymousLogger();
@@ -117,8 +116,9 @@ public class PSPPool implements AutoCloseable {
 			startupLatch.await();
 		} catch (InterruptedException e) {
 			if (verbose)
-				logger.log(Level.SEVERE, "Error while waiting for the pool to start up.", e);
+				logger.log(Level.SEVERE, "Thread interrupted while waiting for the pool to start up.", e);
 			Thread.currentThread().interrupt();
+			return;
 		}
 		// Start the thread responsible for submitting commands.
 		(new Thread(this::mainLoop)).start();
@@ -189,24 +189,24 @@ public class PSPPool implements AutoCloseable {
 	 */
 	private boolean startNewProcess(ProcessShell processShell) {
 		if (processShell == null) {
-			if (spareShell != null) {
+			ProcessShell spareShell = spareShells.poll();
+			if (spareShell != null)
 				processShell = spareShell;
-				spareShell = null;
-			} else {
+			else {
 				PooledProcessManager manager = new PooledProcessManager(managerFactory.createNewProcessManager());
 				processShell = new ProcessShell(manager, keepAliveTime, taskExecutorService);
 				manager.processShell = processShell;
 			}
 		}
-		/* Try to execute the process. It may happen that the count of active processes returned by the pool is not correct 
-		 * and in fact the pool has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism 
-		 * that takes care of this. */
+		/* Try to execute the process. It may happen that the count of active processes is not correct and in fact the pool 
+		 * has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism that takes care of this. */
 		try {
 			processExecutor.execute(processShell);
 			allShells.add(processShell);
 			return true;
 		} catch (RejectedExecutionException e) {
-			spareShell = processShell;
+			if (spareShells.size() < reserveSize)
+				spareShells.add(processShell);
 			if (verbose)
 				logger.log(Level.WARNING, "Failed to start new process due to the pool having reached its capacity.");
 			return false;
@@ -216,16 +216,18 @@ public class PSPPool implements AutoCloseable {
 	 * A method that handles the submission of commands from the queue to the processes.
 	 */
 	private void mainLoop() {
-		Optional<InternalSubmission> optionalSubmission = Optional.empty();
+		InternalSubmission nextSubmission = null;
 		while (!close) {
 			try {
 				// Wait until there is a command submitted.
-				if (!optionalSubmission.isPresent()) {
+				if (nextSubmission == null) {
 					synchronized (this) {
-						while (!close && !(optionalSubmission = Optional.ofNullable(submissions.peek())).isPresent()) {
+						while (!close && (nextSubmission = submissions.peek()) == null) {
 							try {
 								wait();
 							} catch (InterruptedException e) {
+								if (verbose)
+									logger.log(Level.SEVERE, "Main loop thread interrupted.", e);
 								return;
 							}
 						}
@@ -233,12 +235,14 @@ public class PSPPool implements AutoCloseable {
 				}
 				if (close)
 					return;
-				InternalSubmission submission = optionalSubmission.get();
+				InternalSubmission submission = nextSubmission;
 				// Execute it in any of the available processes.
 				for (ProcessShell shell : activeShells) {
 					if (shell.isReady()) {
 						Future<?> future = taskExecutorService.submit(() -> {
 							try {
+								submission.submitted = false;
+								submission.semaphore.drainPermits();
 								if (shell.execute(submission)) {
 									if (verbose)
 										logger.info(String.format("Command(s) %s processed; submission delay: %.3f;" +
@@ -247,27 +251,21 @@ public class PSPPool implements AutoCloseable {
 												submission.receivedTime)/1000000000),
 												(float) ((double) (submission.processedTime -
 												submission.submittedTime)/1000000000)));
-								} else {
-									submissionSuccessful = false;
-									submissionSemaphore.release();
-								}
-							} catch (IOException e) {
+								} else
+									submission.semaphore.release();
+							} catch (Throwable t) {
 								if (verbose)
-									logger.log(Level.SEVERE, "IO error while executing command(s) " +
-											submission + ".", e);
-							} catch (InterruptedException e) {
-								if (verbose)
-									logger.log(Level.SEVERE, "Thread interrupted while executing command(s) " +
-											submission + ".", e);
-							} catch (Exception e) {
-								e.printStackTrace();
+									logger.log(Level.SEVERE, "Error while executing command(s) " +
+											submission + ".", t);
+								submission.semaphore.release();
+								submission.setThrowable(t);
 							}
 						});
-						submissionSemaphore.acquire();
-						if (submissionSuccessful) {
+						submission.semaphore.acquire();
+						if (submission.submitted) {
 							submission.setFuture(future);
-							submissions.remove(submission);
-							optionalSubmission = Optional.empty();
+							submissions.remove(nextSubmission);
+							nextSubmission = null;
 							break;
 						}
 					}
@@ -340,8 +338,6 @@ public class PSPPool implements AutoCloseable {
 			if (!doExtend) {
 				try {
 					shell.close();
-					if (verbose)
-						logger.info("Shutting down process shell " + shell + ".");
 				} catch (Exception e) {
 					if (verbose)
 						logger.log(Level.SEVERE, "Error while shutting down process shell " + shell + ".", e);
@@ -427,8 +423,6 @@ public class PSPPool implements AutoCloseable {
 		@Override
 		public void onStartup(ProcessShell shell) {
 			originalManager.onStartup(shell);
-			if (verbose)
-				logger.info("Process shell " + shell + " is started up.");
 			startupLatch.countDown();
 			activeShells.add(shell);
 		}
@@ -458,10 +452,13 @@ public class PSPPool implements AutoCloseable {
 		
 		final Submission originalSubmission;
 		final long receivedTime;
+		final Semaphore semaphore;
 		volatile Long submittedTime;
 		volatile Long processedTime;
+		volatile boolean submitted;
 		volatile boolean processed;
 		volatile Future<?> future;
+		volatile Throwable throwable;
 		
 		/**
 		 * Constructs an instance according to the specified parameters.
@@ -473,6 +470,7 @@ public class PSPPool implements AutoCloseable {
 			if (originalSubmission == null)
 				throw new IllegalArgumentException("The submission cannot be null.");
 			this.originalSubmission = originalSubmission;
+			semaphore = new Semaphore(0);
 			receivedTime = System.nanoTime();
 		}
 		/**
@@ -483,6 +481,17 @@ public class PSPPool implements AutoCloseable {
 		void setFuture(Future<?> future) {
 			submittedTime = System.nanoTime();
 			this.future = future;
+		}
+		/**
+		 * Sets the throwable encountered while executing the submission and notifies the associated future.
+		 * 
+		 * @param t The throwable encountered while executing the submission
+		 */
+		void setThrowable(Throwable t) {
+			throwable = t;
+			synchronized (this) {
+				notifyAll();
+			}
 		}
 		@Override
 		public List<Command> getCommands() {
@@ -499,8 +508,8 @@ public class PSPPool implements AutoCloseable {
 		@Override
 		public void onStartedProcessing() {
 			originalSubmission.onStartedProcessing();
-			submissionSuccessful = true;
-			submissionSemaphore.release();
+			submitted = true;
+			semaphore.release();
 			numOfExecutingSubmissions.incrementAndGet();
 		}
 		@Override
@@ -554,9 +563,11 @@ public class PSPPool implements AutoCloseable {
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
 			synchronized (submission) {
-				while (!submission.processed && !submission.isCancelled())
+				while (!submission.processed && !submission.isCancelled() && submission.throwable == null)
 					submission.wait();
 			}
+			if (submission.throwable != null)
+				throw new ExecutionException(submission.throwable);
 			if (submission.isCancelled())
 				throw new CancellationException();
 			return submission.processedTime - submission.receivedTime;
@@ -567,11 +578,14 @@ public class PSPPool implements AutoCloseable {
 			long timeoutNs = unit.toNanos(timeout);
 			long start = System.nanoTime();
 			synchronized (submission) {
-				while (!submission.processed && !submission.isCancelled() && timeoutNs > 0) {
+				while (!submission.processed && !submission.isCancelled() && submission.throwable == null &&
+						timeoutNs > 0) {
 					submission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
 					timeoutNs -= (System.nanoTime() - start);
 				}
 			}
+			if (submission.throwable != null)
+				throw new ExecutionException(submission.throwable);
 			if (submission.isCancelled())
 				throw new CancellationException();
 			if (timeoutNs <= 0)

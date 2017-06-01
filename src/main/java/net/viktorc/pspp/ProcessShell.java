@@ -147,11 +147,11 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				}
 				return true;
 			} finally {
-				commandProcessed = true;
-				command = null;
 				try {
 					submission.onFinishedProcessing();
 				} finally {
+					commandProcessed = true;
+					command = null;
 					lock.unlock();
 				}
 			}
