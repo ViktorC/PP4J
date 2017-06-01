@@ -17,10 +17,10 @@ public class ProcessException extends RuntimeException {
 	/**
 	 * The only constructor.
 	 * 
-	 * @param t The source exception.
+	 * @param e The source exception.
 	 */
-	public ProcessException(Exception t) {
-		super(t);
+	public ProcessException(Exception e) {
+		super(e);
 	}
 
 }

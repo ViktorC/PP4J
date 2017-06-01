@@ -227,15 +227,17 @@ public class PSPPool {
 											submission + ".", t);
 								if (submission.semaphore.availablePermits() == 0)
 									submission.semaphore.release();
-								submission.throwable = t;
 								synchronized (submission) {
+									submission.throwable = t;
 									submission.notifyAll();
 								}
 							}
 						});
 						submission.semaphore.acquire();
 						if (submission.submitted) {
-							submission.future = future;
+							synchronized (submission) {
+								submission.future = future;	
+							}
 							submissions.remove(submission);
 							nextSubmission = null;
 							break;
@@ -247,6 +249,8 @@ public class PSPPool {
 					if (doExtendPool())
 						startNewProcess(null);
 				}
+			} catch (InterruptedException e) {
+				return;
 			} catch (Exception e) {
 				if (verbose)
 					logger.log(Level.SEVERE, "An error occurred while submitting commands.", e);
@@ -273,6 +277,8 @@ public class PSPPool {
 	 * Attempts to shut the process pool including all its processes down.
 	 */
 	public void shutdown() {
+		if (verbose)
+			logger.info("Initiating shutdown...");
 		close = true;
 		mainLoop.interrupt();
 		synchronized (poolLock) {
@@ -281,6 +287,8 @@ public class PSPPool {
 		}
 		processExecutor.shutdown();
 		taskExecutorService.shutdown();
+		if (verbose)
+			logger.info("Pool shut down.");
 	}
 	
 	/**
@@ -443,6 +451,7 @@ public class PSPPool {
 		final Semaphore semaphore;
 		volatile Long submittedTime;
 		volatile Long processedTime;
+		volatile boolean cancel;
 		volatile boolean submitted;
 		volatile boolean processed;
 		volatile Future<?> future;
@@ -470,8 +479,8 @@ public class PSPPool {
 			return originalSubmission.doTerminateProcessAfterwards();
 		}
 		@Override
-		public boolean isCancelled() {
-			return originalSubmission.isCancelled() || (future != null && future.isCancelled()) || close;
+		public synchronized boolean isCancelled() {
+			return originalSubmission.isCancelled() || cancel;
 		}
 		@Override
 		public void onStartedProcessing() {
@@ -485,8 +494,8 @@ public class PSPPool {
 		public void onFinishedProcessing() {
 			originalSubmission.onFinishedProcessing();
 			processedTime = System.nanoTime();
-			processed = true;
 			synchronized (this) {
+				processed = true;
 				notifyAll();
 			}
 			numOfExecutingSubmissions.decrementAndGet();
@@ -518,16 +527,17 @@ public class PSPPool {
 			this.submission = submission;
 		}
 		@Override
-		public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-			if (submission.isCancelled() || (submission.future != null &&
-					submission.future.cancel(mayInterruptIfRunning))) {
-				synchronized (submission) {
+		public boolean cancel(boolean mayInterruptIfRunning) {
+			synchronized (submission) {
+				if (submission.isCancelled() || (submission.future != null &&
+						submission.future.cancel(mayInterruptIfRunning))) {
+					submission.cancel = true;
 					submission.notifyAll();
-				}
-				submissions.remove(submission);
-				return true;
+					submissions.remove(submission);
+					return true;
+				} else
+					return false;
 			}
-			return false;
 		}
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
