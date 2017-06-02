@@ -1,10 +1,10 @@
 package net.viktorc.pspp;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -36,8 +36,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	private final ReentrantLock lock;
 	private final long id;
 	private Process process;
-	private Reader stdOutReader;
-	private Reader errOutReader;
+	private BufferedReader stdOutReader;
+	private BufferedReader errOutReader;
 	private BufferedWriter stdInWriter;
 	private volatile Command command;
 	private volatile boolean running;
@@ -58,16 +58,16 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * is created. If the manager uses an external thread pool, it is not closed upon calling {@link #close() close}.
 	 * @throws IllegalArgumentException If the manager is null.
 	 */
-	public ProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService) {
+	protected ProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService) {
 		if (manager == null)
 			throw new IllegalArgumentException("The process handler cannot be null.");
 		timer = keepAliveTime > 0 ? new KeepAliveTimer() : null;
 		internalExecutor = executorService == null;
 		this.executor = internalExecutor ? Executors.newFixedThreadPool(timer != null ? 3 : 2) : executorService;
-		lock = new ReentrantLock();
 		this.manager = manager;
 		this.keepAliveTime = keepAliveTime;
 		id = (new Random()).nextLong();
+		lock = new ReentrantLock();
 	}
 	/**
 	 * Constructs a shell for the specified process.
@@ -77,8 +77,16 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * less, the life-cycle of the processes will not be limited.
 	 * @throws IllegalArgumentException If the manager is null.
 	 */
-	public ProcessShell(ProcessManager manager, long keepAliveTime) {
+	protected ProcessShell(ProcessManager manager, long keepAliveTime) {
 		this(manager, keepAliveTime, null);
+	}
+	/**
+	 * Returns the internal lock of the shell used to synchronize the execution of commands.
+	 * 
+	 * @return The internal lock of the shell.
+	 */
+	protected ReentrantLock getLock() {
+		return lock;
 	}
 	/**
 	 * Returns the 64 bit ID number of the instance.
@@ -131,7 +139,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 						stdInWriter.write(command.getInstruction());
 						stdInWriter.newLine();
 						stdInWriter.flush();
-						while (running && !stop && !commandProcessed) {
+						while ((!stop || running) && !commandProcessed) {
 							lock.wait();
 						}
 						if (i < commands.size() - 1)
@@ -166,7 +174,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * process is currently executing, not listening to its standard in.
 	 */
 	protected void stop(boolean forcibly) {
-		if (process == null)
+		if (process == null || stop)
 			return;
 		lock.lock();
 		try {
@@ -175,6 +183,9 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			if (forcibly || !manager.terminate(this))
 				process.destroy();
 			stop = true;
+			synchronized (lock) {
+				lock.notifyAll();
+			}
 		} finally {
 			lock.unlock();
 		}
@@ -182,25 +193,13 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	/**
 	 * Starts listening to the specified channel.
 	 * 
-	 * @param reader The channel to listen to.
+	 * @param reader The buffered reader to use to listen to the steam.
 	 * @param standard Whether it is the standard out or the error out stream of the process.
 	 * @throws IOException If there is some problem with the stream.
 	 */
-	private void startListening(Reader reader, boolean standard) throws IOException {
-		int c;
-		StringBuilder output = new StringBuilder();
-		while ((c = reader.read()) != -1) {
-			String line;
-			if (c == '\n') {
-				line = output.toString().trim();
-				output.setLength(0);
-			} else {
-				output.append((char) c);
-				if (reader.ready())
-					continue;
-				else
-					line = output.toString().trim();
-			}
+	private void startListening(BufferedReader reader, boolean standard) throws IOException {
+		String line;
+		while ((line = reader.readLine()) != null) {
 			if (line.isEmpty())
 				continue;
 			synchronized (lock) {
@@ -229,8 +228,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 					return;
 				// Start process
 				process = manager.start();
-				stdOutReader = new InputStreamReader(process.getInputStream());
-				errOutReader = new InputStreamReader(process.getErrorStream());
+				stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+				errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 				stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 				startedUp = manager.startsUpInstantly();
 				synchronized (lock) {
@@ -264,7 +263,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			throw new ProcessException(e);
 		} finally {
 			// Try to clean up and close all the resources.
-			running = false;
 			if (process != null) {
 				if (process.isAlive())
 					stop(true);
@@ -289,14 +287,15 @@ public class ProcessShell implements Runnable, AutoCloseable {
 				} catch (IOException e) { }
 			}
 			synchronized (lock) {
+				running = false;
 				lock.notifyAll();
 			}
 			manager.onTermination(rc);
 		}
 	}
+
 	@Override
 	public void close() throws Exception {
-		command = null;
 		if (running && !stop)
 			stop(true);
 		if (internalExecutor)
@@ -348,8 +347,13 @@ public class ProcessShell implements Runnable, AutoCloseable {
 						wait(waitTime);
 						waitTime -= (System.currentTimeMillis() - start);
 					}
-					if (go && isActive())
-						ProcessShell.this.stop(false);
+					if (go && lock.tryLock()) {
+						try {
+							ProcessShell.this.stop(false);
+						} finally {
+							lock.unlock();
+						}
+					}
 				}
 			} catch (InterruptedException e) {
 				

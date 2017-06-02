@@ -40,5 +40,9 @@ public abstract class AbstractSubmission implements Submission {
 	public boolean doTerminateProcessAfterwards() {
 		return terminateProcessAfterwards;
 	}
+	@Override
+	public String toString() {
+		return String.join("; ", commands.stream().map(c -> c.getInstruction()).collect(Collectors.toList()));
+	}
 
 }

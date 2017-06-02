@@ -23,7 +23,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 /**
  * A class for maintaining and managing a pool of identical pre-started processes.
@@ -214,7 +213,7 @@ public class PSPPool {
 								if (shell.execute(submission)) {
 									if (verbose)
 										logger.info(String.format("Command(s) %s processed; submission delay: %.3f;" +
-												" execution time: %.3f.%n", submission,
+												" execution time: %.3f.", submission,
 												(float) ((double) (submission.submittedTime -
 												submission.receivedTime)/1000000000),
 												(float) ((double) (submission.processedTime -
@@ -480,7 +479,7 @@ public class PSPPool {
 		}
 		@Override
 		public synchronized boolean isCancelled() {
-			return originalSubmission.isCancelled() || cancel;
+			return originalSubmission.isCancelled() || cancel || close;
 		}
 		@Override
 		public void onStartedProcessing() {
@@ -502,7 +501,7 @@ public class PSPPool {
 		}
 		@Override
 		public String toString() {
-			return String.join("; ", originalSubmission.getCommands().stream().map(c -> c.getInstruction()).collect(Collectors.toList()));
+			return originalSubmission.toString();
 		}
 		
 	}

@@ -178,8 +178,7 @@ public class PSPPoolTest {
 			Thread.sleep(cancelTime);
 			for (Future<Long> future : futures)
 				future.cancel(forcedCancel);
-		}
-		if (earlyClose)
+		} else if (earlyClose)
 			procPool.shutdown();
 		List<Long> times = new ArrayList<>();
 		for (int i = 0; i < futures.size(); i++) {
