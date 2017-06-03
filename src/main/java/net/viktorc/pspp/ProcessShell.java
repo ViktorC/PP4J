@@ -101,7 +101,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * 
 	 * @return Whether the process is currently running and not cancelled.
 	 */
-	public boolean isActive() {
+	protected boolean isActive() {
 		return running && !stop;
 	}
 	/**
@@ -109,7 +109,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * 
 	 * @return Whether the manager is ready to process commands.
 	 */
-	public boolean isReady() {
+	protected boolean isReady() {
 		return isActive() && (!lock.isLocked() || lock.isHeldByCurrentThread());
 	}
 	/**
@@ -174,20 +174,15 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * process is currently executing, not listening to its standard in.
 	 */
 	protected void stop(boolean forcibly) {
-		if (process == null || stop)
-			return;
-		lock.lock();
-		try {
+		synchronized (lock) {
+			if (process == null || stop)
+				return;
 			if (timer != null)
 				timer.stop();
 			if (forcibly || !manager.terminate(this))
 				process.destroy();
 			stop = true;
-			synchronized (lock) {
-				lock.notifyAll();
-			}
-		} finally {
-			lock.unlock();
+			lock.notifyAll();
 		}
 	}
 	/**
@@ -224,15 +219,15 @@ public class ProcessShell implements Runnable, AutoCloseable {
 		try {
 			lock.lock();
 			try {
-				if (stop)
-					return;
-				// Start process
-				process = manager.start();
-				stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-				errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-				stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
-				startedUp = manager.startsUpInstantly();
+				// Start the process
 				synchronized (lock) {
+					if (stop)
+						return;
+					process = manager.start();
+					stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+					errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+					stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+					startedUp = manager.startsUpInstantly();
 					executor.submit(() -> {
 						try {
 							startListening(stdOutReader, true);
@@ -247,8 +242,11 @@ public class ProcessShell implements Runnable, AutoCloseable {
 							throw new ProcessException(e);
 						}
 					});
-					while (!startedUp)
+					while (!startedUp) {
 						lock.wait();
+						if (stop)
+							return;
+					}
 				}
 				manager.onStartup(this);
 				if (timer != null) {
@@ -293,7 +291,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			manager.onTermination(rc);
 		}
 	}
-
 	@Override
 	public void close() throws Exception {
 		if (running && !stop)
