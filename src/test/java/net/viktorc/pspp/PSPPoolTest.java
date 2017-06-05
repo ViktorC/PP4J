@@ -187,7 +187,7 @@ public class PSPPoolTest {
 				if (cancelTime > 0) {
 					Entry<Semaphore,Long> cancelEntry = cancelTimes.get(i);
 					cancelEntry.getKey().acquire();
-					times.add((long) Math.round((System.nanoTime() - cancelEntry.getValue())/1000000));
+					times.add((long) Math.round(((double) (System.nanoTime() - cancelEntry.getValue()))/1000000));
 				} else
 					times.add((long) 0);
 			}

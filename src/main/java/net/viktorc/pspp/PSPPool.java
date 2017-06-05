@@ -549,7 +549,7 @@ public class PSPPool {
 				throw new CancellationException();
 			if (submission.throwable != null)
 				throw new ExecutionException(submission.throwable);
-			return (long) Math.round((submission.processedTime - submission.receivedTime)/1000000);
+			return (long) Math.round(((double) (submission.processedTime - submission.receivedTime))/1000000);
 		}
 		@Override
 		public Long get(long timeout, TimeUnit unit)
@@ -569,8 +569,8 @@ public class PSPPool {
 				throw new ExecutionException(submission.throwable);
 			if (timeoutNs <= 0)
 				throw new TimeoutException();
-			return timeoutNs <= 0 ? null : (long) Math.round((submission.processedTime -
-					submission.receivedTime)/1000000);
+			return timeoutNs <= 0 ? null : (long) Math.round(((double) (submission.processedTime -
+					submission.receivedTime))/1000000);
 		}
 		@Override
 		public boolean isCancelled() {
