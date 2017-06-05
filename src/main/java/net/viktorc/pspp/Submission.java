@@ -7,7 +7,7 @@ import java.util.List;
  * instances. It also defines methods to call once the processing of the submitted commands has started or finished which are by 
  * default no-operations.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public interface Submission {

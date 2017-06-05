@@ -7,7 +7,7 @@ import java.util.stream.Collectors;
 /**
  * An abstract implementation of the {@link net.viktorc.pspp.Submission} interface.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public abstract class AbstractSubmission implements Submission {

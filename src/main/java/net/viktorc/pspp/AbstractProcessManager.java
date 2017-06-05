@@ -6,7 +6,7 @@ import java.io.IOException;
  * An abstract implementation of the {@link net.viktorc.pspp.ProcessManager} interface.
  * 
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public abstract class AbstractProcessManager implements ProcessManager {

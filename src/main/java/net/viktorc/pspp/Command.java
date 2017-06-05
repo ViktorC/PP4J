@@ -11,7 +11,7 @@ import java.util.List;
  * The class also defines an abstract method that is called before the execution of chained commands with the previous command 
  * as its parameter to determine whether the current command should be executed based on the results of the previous commands.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public interface Command {

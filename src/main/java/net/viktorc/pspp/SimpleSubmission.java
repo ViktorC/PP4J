@@ -9,7 +9,7 @@ import java.util.List;
  * instance returned by the {@link net.viktorc.pspp.PSPPool#submit(Submission) submit} method of the {@link net.viktorc.pspp.PSPPool} 
  * class.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public class SimpleSubmission extends AbstractSubmission {

@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * A test class for the process pool.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public class PSPPoolTest {
@@ -46,7 +46,7 @@ public class PSPPoolTest {
 	 */
 	private PSPPool getPool(int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime, boolean verifyStartup,
 			boolean manuallyTerminate, boolean verbose) throws IllegalArgumentException, IOException, URISyntaxException {
-		// The tests are either run locally on my Windows machine or through Travis CI on Linux.
+		// Support testing on Linux and Windows.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
 		String programLocation = new File(getClass().getResource(windows ? "win/test.exe" : "linux/test")
 				.toURI().getPath()).getAbsolutePath();
@@ -143,14 +143,11 @@ public class PSPPoolTest {
 				for (int procTime : procTimes)
 					commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
 								if ("ready".equals(o)) {
-									if (verbose) {
-										System.out.println("Std: " +
-												c.getJointStandardOutLines().replaceAll("\n", " "));
-										System.out.println("Err: " +
-												c.getJointErrorOutLines().replaceAll("\n", " "));
-									}
 									Assert.assertTrue(c.getStandardOutLines().size() == procTime &&
 											c.getErrorOutLines().size() == 0);
+									if (verbose)
+										System.out.println(("Std: " + c.getJointStandardOutLines() + "; Err: " +
+												c.getJointErrorOutLines()).replaceAll("\n", " "));
 									c.reset();
 									return true;
 								}
@@ -190,7 +187,7 @@ public class PSPPoolTest {
 				if (cancelTime > 0) {
 					Entry<Semaphore,Long> cancelEntry = cancelTimes.get(i);
 					cancelEntry.getKey().acquire();
-					times.add(System.nanoTime() - cancelEntry.getValue());
+					times.add((long) Math.round((System.nanoTime() - cancelEntry.getValue())/1000000));
 				} else
 					times.add((long) 0);
 			}
@@ -250,11 +247,10 @@ public class PSPPoolTest {
 		if (times.size() == requests) {
 			boolean pass = true;
 			for (Long time : times) {
-				long timeMs = time/1000000;
-				boolean fail = time == null || timeMs > upperBound || timeMs < lowerBound;
+				boolean fail = time == null || time > upperBound || time < lowerBound;
 				if (fail)
 					pass = false;
-				System.out.printf("Time: %.3f %s%n", (float) (((double) timeMs)/1000), fail ? "FAIL" : "");
+				System.out.printf("Time: %.3f %s%n", (float) (((double) time)/1000), fail ? "FAIL" : "");
 			}
 			return pass;
 		} else {
@@ -262,6 +258,7 @@ public class PSPPoolTest {
 			return false;
 		}
 	}
+	// Exception testing.
 	@Test
 	public void test01() throws Exception {
 		exceptionRule.expect(IllegalArgumentException.class);
@@ -301,107 +298,111 @@ public class PSPPoolTest {
 	}
 	@Test
 	public void test06() throws Exception {
-		Assert.assertTrue(test("Test 6", 0, 100, 0, 0, true, false, false, true, new int[] { 5 },
-				100, 10000, 0, false, false, 4995, 6200));
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The commands cannot be null.");
+		test("Test 6", 10, 20, 0, 0, false, false, false, false, null,
+				100, 10000, 0, false, false, 4995, 6200);
 	}
 	@Test
 	public void test07() throws Exception {
-		Assert.assertTrue(test("Test 7", 50, 150, 20, 0, false, false, false, true, new int[] { 5 },
-				100, 5000, 0, false, false, 4995, 5100));
+		exceptionRule.expect(IllegalArgumentException.class);
+		exceptionRule.expectMessage("The commands cannot be empty.");
+		test("Test 7", 10, 20, 0, 0, false, false, false, false, new int[0],
+				100, 10000, 0, false, false, 4995, 6200);
 	}
+	// Performance testing.
 	@Test
 	public void test08() throws Exception {
-		Assert.assertTrue(test("Test 8", 10, 25, 5, 15000, true, false, false, true, new int[] { 5 },
-				20, 10000, 0, false, false, 4995, 5100));
+		Assert.assertTrue(test("Test 8", 0, 100, 0, 0, true, false, false, true, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 6200));
 	}
 	@Test
 	public void test09() throws Exception {
-		Assert.assertTrue(test("Test 9", 50, 150, 20, 0, false, true, false, true, new int[] { 5 },
-				100, 5000, 0, false, false, 4995, 5080));
+		Assert.assertTrue(test("Test 9", 50, 150, 20, 0, false, false, false, true, new int[] { 5 },
+				100, 5000, 0, false, false, 4995, 5100));
 	}
 	@Test
 	public void test10() throws Exception {
-		Assert.assertTrue(test("Test 10", 10, 50, 5, 15000, true, false, false, true, new int[] { 5, 3, 2 },
-				50, 10000, 0, false, false, 9995, 10340));
-	}
-	@Test
-	public void test11() throws Exception {
-		Assert.assertTrue(test("Test 11", 100, 250, 20, 0, true, true, false, true, new int[] { 5 },
-				800, 20000, 0, false, false, 4995, 6000));
-	}
-	@Test
-	public void test12() throws Exception {
-		Assert.assertTrue(test("Test 12", 0, 100, 0, 0, false, false, false, false, new int[] { 5 },
-				100, 10000, 0, false, false, 4995, 7150));
-	}
-	@Test
-	public void test13() throws Exception {
-		Assert.assertTrue(test("Test 13", 50, 150, 10, 0, true, false, false, false, new int[] { 5 },
-				100, 5000, 0, false, false, 4995, 5600));
-	}
-	@Test
-	public void test14() throws Exception {
-		Assert.assertTrue(test("Test 14", 10, 25, 5, 15000, false, true, false, false, new int[] { 5 },
+		Assert.assertTrue(test("Test 10", 10, 25, 5, 15000, true, false, false, true, new int[] { 5 },
 				20, 10000, 0, false, false, 4995, 5100));
 	}
 	@Test
+	public void test11() throws Exception {
+		Assert.assertTrue(test("Test 11", 50, 150, 20, 0, false, true, false, true, new int[] { 5 },
+				100, 5000, 0, false, false, 4995, 5080));
+	}
+	@Test
+	public void test12() throws Exception {
+		Assert.assertTrue(test("Test 12", 10, 50, 5, 15000, true, false, false, true, new int[] { 5, 3, 2 },
+				50, 10000, 0, false, false, 9995, 10340));
+	}
+	@Test
+	public void test13() throws Exception {
+		Assert.assertTrue(test("Test 13", 100, 250, 20, 0, true, true, false, true, new int[] { 5 },
+				800, 20000, 0, false, false, 4995, 6000));
+	}
+	@Test
+	public void test14() throws Exception {
+		Assert.assertTrue(test("Test 14", 0, 100, 0, 0, false, false, false, false, new int[] { 5 },
+				100, 10000, 0, false, false, 4995, 7250));
+	}
+	@Test
 	public void test15() throws Exception {
-		Assert.assertTrue(test("Test 15", 50, 150, 10, 0, true, true, false, false, new int[] { 5 },
+		Assert.assertTrue(test("Test 15", 50, 150, 10, 0, true, false, false, false, new int[] { 5 },
 				100, 5000, 0, false, false, 4995, 5600));
 	}
 	@Test
 	public void test16() throws Exception {
-		Assert.assertTrue(test("Test 16", 10, 50, 5, 15000, false, false, false, false, new int[] { 5, 3, 2 },
-				50, 10000, 0, false, false, 9995, 10350));
+		Assert.assertTrue(test("Test 16", 10, 25, 5, 15000, false, true, false, false, new int[] { 5 },
+				20, 10000, 0, false, false, 4995, 5100));
 	}
 	@Test
 	public void test17() throws Exception {
-		Assert.assertTrue(test("Test 17", 50, 250, 20, 0, true, true, false, false, new int[] { 5 },
-				800, 20000, 0, false, false, 4995, 6000));
+		Assert.assertTrue(test("Test 17", 50, 150, 10, 0, true, true, false, false, new int[] { 5 },
+				100, 5000, 0, false, false, 4995, 5600));
 	}
 	@Test
 	public void test18() throws Exception {
-		Assert.assertTrue(test("Test 18", 10, 30, 5, 0, true, true, false, false, new int[] { 5 },
-				20, 0, 2500, true, true, 2495, 2520));
+		Assert.assertTrue(test("Test 18", 10, 50, 5, 15000, false, false, false, false, new int[] { 5, 3, 2 },
+				50, 10000, 0, false, false, 9995, 10350));
 	}
 	@Test
 	public void test19() throws Exception {
-		Assert.assertTrue(test("Test 19", 20, 20, 0, 0, false, false, false, false, new int[] { 5 },
-				20, 0, 2500, false, false, 4995, 5090));
+		Assert.assertTrue(test("Test 19", 50, 250, 20, 0, true, true, false, false, new int[] { 5 },
+				800, 20000, 0, false, false, 4995, 6000));
 	}
+	// Keep alive timer and logging test.
 	@Test
 	public void test20() throws Exception {
-		Assert.assertTrue(test("Test 20", 10, 30, 5, 0, true, true, false, false, new int[] { 5, 5, 3 },
+		Assert.assertTrue(test("Test 20", 20, 40, 4, 250, true, true, true, false, new int[] { 5 },
+				40, 5000, 0, false, false, 4995, 6200));
+	}
+	// Cancellation testing.
+	@Test
+	public void test21() throws Exception {
+		Assert.assertTrue(test("Test 21", 10, 30, 5, 0, true, true, false, false, new int[] { 5 },
 				20, 0, 2500, true, false, 2495, 2520));
 	}
 	@Test
-	public void test21() throws Exception {
-		Assert.assertTrue(test("Test 21", 20, 20, 0, 0, true, true, false, false, new int[] { 5, 5, 3 },
-				20, 0, 3000, false, false, 4995, 5090));
-	}
-	@Test
 	public void test22() throws Exception {
-		Assert.assertTrue(test("Test 22", 20, 40, 4, 250, true, true, true, false, new int[] { 5 },
-				40, 5000, 0, false, false, 4995, 6150));
+		Assert.assertTrue(test("Test 22", 20, 20, 0, 0, false, false, false, false, new int[] { 5 },
+				20, 0, 2500, false, false, 4995, 5090));
 	}
 	@Test
 	public void test23() throws Exception {
-		Assert.assertTrue(test("Test 23", 100, 100, 0, 5000, true, false, false, false, new int[] { 5 },
-				100, 0, 0, false, true, 0, 0));
+		Assert.assertTrue(test("Test 23", 10, 30, 5, 0, true, true, false, false, new int[] { 5, 5, 3 },
+				20, 0, 2500, true, false, 2495, 2520));
 	}
 	@Test
 	public void test24() throws Exception {
-		exceptionRule.expect(IllegalArgumentException.class);
-		exceptionRule.expectMessage("The commands cannot be null.");
-		test("Test 24", 10, 20, 0, 0, false, false, false, false, null,
-				100, 10000, 0, false, false, 4995, 6200);
+		Assert.assertTrue(test("Test 24", 20, 20, 0, 0, true, true, false, false, new int[] { 5, 5, 3 },
+				20, 0, 3000, false, false, 4995, 5090));
 	}
+	// Early shutdown testing.
 	@Test
 	public void test25() throws Exception {
-		exceptionRule.expect(IllegalArgumentException.class);
-		exceptionRule.expectMessage("The commands cannot be empty.");
-		test("Test 25", 10, 20, 0, 0, false, false, false, false, new int[0],
-				100, 10000, 0, false, false, 4995, 6200);
+		Assert.assertTrue(test("Test 25", 100, 100, 0, 5000, true, false, false, false, new int[] { 5 },
+				100, 0, 0, false, true, 0, 0));
 	}
 	
 }

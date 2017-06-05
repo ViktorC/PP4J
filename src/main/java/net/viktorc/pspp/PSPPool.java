@@ -27,7 +27,7 @@ import java.util.logging.Logger;
 /**
  * A class for maintaining and managing a pool of identical pre-started processes.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public class PSPPool {
@@ -101,7 +101,7 @@ public class PSPPool {
 		// Ensure that exceptions thrown by runnables submitted to the pools do not go unnoticed if the instance is verbose.
 		if (verbose) {
 			processExecutor.setThreadFactory(new VerboseThreadFactory(processExecutor.getThreadFactory(),
-					"Error while running process."));
+					"Error while excuting the process."));
 			ThreadPoolExecutor commandExecutor = (ThreadPoolExecutor) taskExecutorService;
 			commandExecutor.setThreadFactory(new VerboseThreadFactory(commandExecutor.getThreadFactory(),
 					"Error while interacting with the process."));
@@ -261,7 +261,7 @@ public class PSPPool {
 	 * 
 	 * @param submission The submission including all information necessary for executing and processing the command(s).
 	 * @return A {@link java.util.concurrent.Future} instance of the time it took to execute the command including the submission 
-	 * delay in nanoseconds.
+	 * delay in milliseconds.
 	 * @throws IllegalArgumentException If the submission is null.
 	 */
 	public Future<Long> submit(Submission submission) {
@@ -273,7 +273,8 @@ public class PSPPool {
 		return new InternalSubmissionFuture(internalSubmission);
 	}
 	/**
-	 * Attempts to shut the process pool including all its processes down.
+	 * Attempts to shut the process pool including all its processes down. The method blocks until all {@link net.viktorc.pspp.ProcessShell} 
+	 * instances maintained by the pool are closed.
 	 */
 	public void shutdown() {
 		if (verbose)
@@ -544,11 +545,11 @@ public class PSPPool {
 				while (!submission.processed && !submission.isCancelled() && submission.throwable == null)
 					submission.wait();
 			}
-			if (submission.isCancelled())
+			if (submission.isCancelled() || close)
 				throw new CancellationException();
 			if (submission.throwable != null)
 				throw new ExecutionException(submission.throwable);
-			return submission.processedTime - submission.receivedTime;
+			return (long) Math.round((submission.processedTime - submission.receivedTime)/1000000);
 		}
 		@Override
 		public Long get(long timeout, TimeUnit unit)
@@ -562,13 +563,14 @@ public class PSPPool {
 					timeoutNs -= (System.nanoTime() - start);
 				}
 			}
-			if (submission.isCancelled())
+			if (submission.isCancelled() || close)
 				throw new CancellationException();
 			if (submission.throwable != null)
 				throw new ExecutionException(submission.throwable);
 			if (timeoutNs <= 0)
 				throw new TimeoutException();
-			return timeoutNs <= 0 ? null : submission.processedTime - submission.receivedTime;
+			return timeoutNs <= 0 ? null : (long) Math.round((submission.processedTime -
+					submission.receivedTime)/1000000);
 		}
 		@Override
 		public boolean isCancelled() {

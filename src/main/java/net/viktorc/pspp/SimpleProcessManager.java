@@ -8,7 +8,7 @@ import java.util.function.Consumer;
  * is ready), it has the process forcibly killed every time it needs to be terminated due to exceeding the keep-alive-time 
  * of the pool or not being reusable, and it implements no callback for when the process terminates.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public class SimpleProcessManager extends AbstractProcessManager {
@@ -44,7 +44,7 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	}
 	@Override
 	public void onTermination(int resultCode) {
-		
+		// Don't do anything.
 	}
 
 }

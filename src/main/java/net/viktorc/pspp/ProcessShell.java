@@ -17,7 +17,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * {@link #run() run} method of the instance. The process is not started until this method is called and the method does not terminate 
  * until the process does.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public class ProcessShell implements Runnable, AutoCloseable {
@@ -27,6 +27,8 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * result code of the process.
 	 */
 	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -99;
+	
+	private static final Random ID_GEN = new Random();
 	
 	private final ProcessManager manager;
 	private final long keepAliveTime;
@@ -66,7 +68,7 @@ public class ProcessShell implements Runnable, AutoCloseable {
 		this.executor = internalExecutor ? Executors.newFixedThreadPool(timer != null ? 3 : 2) : executorService;
 		this.manager = manager;
 		this.keepAliveTime = keepAliveTime;
-		id = (new Random()).nextLong();
+		id = ID_GEN.nextLong();
 		lock = new ReentrantLock();
 	}
 	/**
@@ -79,14 +81,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 */
 	protected ProcessShell(ProcessManager manager, long keepAliveTime) {
 		this(manager, keepAliveTime, null);
-	}
-	/**
-	 * Returns the internal lock of the shell used to synchronize the execution of commands.
-	 * 
-	 * @return The internal lock of the shell.
-	 */
-	protected ReentrantLock getLock() {
-		return lock;
 	}
 	/**
 	 * Returns the 64 bit ID number of the instance.
@@ -195,11 +189,12 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	private void startListening(BufferedReader reader, boolean standard) throws IOException {
 		String line;
 		while ((line = reader.readLine()) != null) {
+			line = line.trim();
 			if (line.isEmpty())
 				continue;
 			synchronized (lock) {
 				if (startedUp) {
-					commandProcessed = (command == null || command.onNewOutput(line, standard));
+					commandProcessed = command == null || command.onNewOutput(line, standard);
 					if (commandProcessed)
 						lock.notifyAll();
 				} else {
@@ -242,12 +237,11 @@ public class ProcessShell implements Runnable, AutoCloseable {
 							throw new ProcessException(e);
 						}
 					});
-					while (!startedUp) {
+					while (!startedUp)
 						lock.wait();
-						if (stop)
-							return;
-					}
 				}
+				if (stop)
+					return;
 				manager.onStartup(this);
 				if (timer != null) {
 					executor.submit(timer);
@@ -263,12 +257,11 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			// Try to clean up and close all the resources.
 			if (process != null) {
 				if (process.isAlive())
-					stop(true);
+					process.destroy();
 				process = null;
 			}
 			if (!stop && timer != null)
 				timer.stop();
-			process = null;
 			if (stdOutReader != null) {
 				try {
 					stdOutReader.close();

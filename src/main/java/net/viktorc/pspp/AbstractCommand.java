@@ -7,7 +7,7 @@ import java.util.List;
  * An abstract implementation of the {@link net.viktorc.pspp.Command} interface that stores all lines output to the process' standard 
  * out and error out in response to the command.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public abstract class AbstractCommand implements Command {

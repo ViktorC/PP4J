@@ -94,7 +94,7 @@ sleep for 1 second before it outputs "ok". Once this message is output to the pr
 			e.printStackTrace();
 		}
 	}
-	// Close the pool.
-	pool.close();
+	// Shut down the pool.
+	pool.shutdown();
 
 Once the pool is initialized, it is sent 30 instructions within 3 seconds. The instruction "process 5" has the process sleep for 5 seconds, printing "in progress" to is standard out every second except for the 5th second, when it prints "ready". The *Submission* above also has the process that executed it cancelled afterwards as denoted by the second, boolean parameter of the constructor of [*SimpleSubmission*](https://viktorc.github.io/PSPPool/net/viktorc/pspp/SimpleSubmission). As the pool receives the submissions, it manages its size according to its minimum, maximum, and reserve size parameters.

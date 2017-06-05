@@ -4,7 +4,7 @@ package net.viktorc.pspp;
  * An exception thrown by the {@link net.viktorc.pspp.ProcessShell} class if an 
  * unexpected error occurs that solicits that instantaneous termination of the process.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public class ProcessException extends RuntimeException {

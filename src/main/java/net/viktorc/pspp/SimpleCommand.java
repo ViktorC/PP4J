@@ -8,7 +8,7 @@ import java.util.function.BiPredicate;
  * implement the {@link net.viktorc.pspp.AbstractCommand#onOutput(String, boolean) onOutput} method and assumes that the 
  * command should always be executed and that the process generates an output in response to the command.
  * 
- * @author A6714
+ * @author Viktor
  *
  */
 public class SimpleCommand extends AbstractCommand {
