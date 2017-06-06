@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -20,7 +19,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * @author Viktor
  *
  */
-public class ProcessShell implements Runnable, AutoCloseable {
+public class ProcessShell implements Runnable {
 
 	/**
 	 * If the process cannot be started or an exception occurs which would make it impossible to retrieve the actual 
@@ -34,7 +33,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	private final long keepAliveTime;
 	private final KeepAliveTimer timer;
 	private final ExecutorService executor;
-	private final boolean internalExecutor;
 	private final ReentrantLock lock;
 	private final long id;
 	private Process process;
@@ -56,31 +54,18 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
 	 * less, the life-cycle of the processes will not be limited.
 	 * @param executorService A thread pool for the threads required for listening to the standard out and error out of the underlying 
-	 * process and, if specified, for terminating the process if it is idle for too long. If it is null, the manager's own thread pool 
-	 * is created. If the manager uses an external thread pool, it is not closed upon calling {@link #close() close}.
+	 * process and, if specified, for terminating the process if it is idle for too long.
 	 * @throws IllegalArgumentException If the manager is null.
 	 */
 	protected ProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService) {
 		if (manager == null)
 			throw new IllegalArgumentException("The process handler cannot be null.");
 		timer = keepAliveTime > 0 ? new KeepAliveTimer() : null;
-		internalExecutor = executorService == null;
-		this.executor = internalExecutor ? Executors.newFixedThreadPool(timer != null ? 3 : 2) : executorService;
+		this.executor = executorService;
 		this.manager = manager;
 		this.keepAliveTime = keepAliveTime;
 		id = ID_GEN.nextLong();
 		lock = new ReentrantLock();
-	}
-	/**
-	 * Constructs a shell for the specified process.
-	 * 
-	 * @param manager The process manager to handle the underlying process.
-	 * @param keepAliveTime The number of milliseconds of idleness after which the process is cancelled. If it is 0 or 
-	 * less, the life-cycle of the processes will not be limited.
-	 * @throws IllegalArgumentException If the manager is null.
-	 */
-	protected ProcessShell(ProcessManager manager, long keepAliveTime) {
-		this(manager, keepAliveTime, null);
 	}
 	/**
 	 * Returns the 64 bit ID number of the instance.
@@ -105,6 +90,51 @@ public class ProcessShell implements Runnable, AutoCloseable {
 	 */
 	protected boolean isReady() {
 		return isActive() && (!lock.isLocked() || lock.isHeldByCurrentThread());
+	}
+	/**
+	 * Starts listening to the specified channel.
+	 * 
+	 * @param reader The buffered reader to use to listen to the steam.
+	 * @param standard Whether it is the standard out or the error out stream of the process.
+	 * @throws IOException If there is some problem with the stream.
+	 */
+	private void startListening(BufferedReader reader, boolean standard) throws IOException {
+		String line;
+		while ((line = reader.readLine()) != null) {
+			line = line.trim();
+			if (line.isEmpty())
+				continue;
+			synchronized (lock) {
+				if (startedUp) {
+					commandProcessed = command == null || command.onNewOutput(line, standard);
+					if (commandProcessed)
+						lock.notifyAll();
+				} else {
+					startedUp = manager.isStartedUp(line, standard);
+					if (startedUp)
+						lock.notifyAll();
+				}
+			}
+		}
+	}
+	/**
+	 * It prompts the currently running process, if there is one, to terminate.
+	 * 
+	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pspp.ProcessManager#terminate(ProcessShell) terminate} 
+	 * method of the {@link net.viktorc.pspp.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
+	 * process is currently executing, not listening to its standard in.
+	 */
+	protected void stop(boolean forcibly) {
+		synchronized (lock) {
+			if (process == null || stop)
+				return;
+			if (timer != null)
+				timer.stop();
+			if (forcibly || !manager.terminate(this))
+				process.destroy();
+			stop = true;
+			lock.notifyAll();
+		}
 	}
 	/**
 	 * Attempts to write the specified commands to the standard in stream of the process and blocks until they are 
@@ -159,51 +189,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			}
 		} else
 			return false;
-	}
-	/**
-	 * It prompts the currently running process, if there is one, to terminate.
-	 * 
-	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pspp.ProcessManager#terminate(ProcessShell) terminate} 
-	 * method of the {@link net.viktorc.pspp.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
-	 * process is currently executing, not listening to its standard in.
-	 */
-	protected void stop(boolean forcibly) {
-		synchronized (lock) {
-			if (process == null || stop)
-				return;
-			if (timer != null)
-				timer.stop();
-			if (forcibly || !manager.terminate(this))
-				process.destroy();
-			stop = true;
-			lock.notifyAll();
-		}
-	}
-	/**
-	 * Starts listening to the specified channel.
-	 * 
-	 * @param reader The buffered reader to use to listen to the steam.
-	 * @param standard Whether it is the standard out or the error out stream of the process.
-	 * @throws IOException If there is some problem with the stream.
-	 */
-	private void startListening(BufferedReader reader, boolean standard) throws IOException {
-		String line;
-		while ((line = reader.readLine()) != null) {
-			line = line.trim();
-			if (line.isEmpty())
-				continue;
-			synchronized (lock) {
-				if (startedUp) {
-					commandProcessed = command == null || command.onNewOutput(line, standard);
-					if (commandProcessed)
-						lock.notifyAll();
-				} else {
-					startedUp = manager.isStartedUp(line, standard);
-					if (startedUp)
-						lock.notifyAll();
-				}
-			}
-		}
 	}
 	@Override
 	public synchronized void run() {
@@ -283,13 +268,6 @@ public class ProcessShell implements Runnable, AutoCloseable {
 			}
 			manager.onTermination(rc);
 		}
-	}
-	@Override
-	public void close() throws Exception {
-		if (running && !stop)
-			stop(true);
-		if (internalExecutor)
-			executor.shutdown();
 	}
 	@Override
 	public String toString() {

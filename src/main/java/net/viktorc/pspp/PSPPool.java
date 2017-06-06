@@ -324,20 +324,11 @@ public class PSPPool {
 			if (verbose)
 				logger.info("Process shell " + shell + " stopped executing." + System.lineSeparator() +
 						getPoolStats());
-			boolean doExtend = false;
 			synchronized (poolLock) {
-				if (doExtendPool()) {
-					doExtend = true;
+				if (doExtendPool())
 					startNewProcess(shell);
-				}
-			}
-			if (!doExtend) {
-				try {
-					shell.close();
-				} catch (Exception e) {
-					if (verbose)
-						logger.log(Level.SEVERE, "Error while shutting down process shell " + shell + ".", e);
-				}
+				else if (spareShells.size() < reserveSize)
+					spareShells.add(shell);
 			}
 		}
 		

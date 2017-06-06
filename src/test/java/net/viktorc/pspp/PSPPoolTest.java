@@ -314,7 +314,7 @@ public class PSPPoolTest {
 	@Test
 	public void test08() throws Exception {
 		Assert.assertTrue(test("Test 8", 0, 100, 0, 0, true, false, false, true, new int[] { 5 },
-				100, 10000, 0, false, false, 4995, 6200));
+				100, 10000, 0, false, false, 4995, 6250));
 	}
 	@Test
 	public void test09() throws Exception {
