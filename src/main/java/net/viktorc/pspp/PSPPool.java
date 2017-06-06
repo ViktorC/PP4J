@@ -2,7 +2,6 @@ package net.viktorc.pspp;
 
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
@@ -24,6 +23,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.PooledObjectFactory;
+import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+
 /**
  * A class for maintaining and managing a pool of identical pre-started processes.
  * 
@@ -41,13 +46,13 @@ public class PSPPool {
 	private final Thread mainLoop;
 	private final ProcessShellExecutor processExecutor;
 	private final ExecutorService taskExecutorService;
-	private final Queue<ProcessShell> allShells;
+	private final ProcessShellPool shellPool;
 	private final Queue<ProcessShell> activeShells;
-	private final Queue<ProcessShell> spareShells;
+	private final Queue<ProcessShell> liveShells;
 	private final BlockingQueue<InternalSubmission> submissions;
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final CountDownLatch prestartLatch;
-	private final Object poolLock;
+	private final Object lock;
 	private final Logger logger;
 	private volatile boolean close;
 
@@ -89,13 +94,13 @@ public class PSPPool {
 		processExecutor = new ProcessShellExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
 		taskExecutorService = Executors.newCachedThreadPool();
-		allShells = new LinkedBlockingQueue<>();
+		shellPool = new ProcessShellPool(new PooledProcessShellFactory());
 		activeShells = new LinkedBlockingQueue<>();
-		spareShells = new LinkedList<>();
+		liveShells = new LinkedBlockingQueue<>();
 		submissions = new LinkedBlockingQueue<>();
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
-		poolLock = new Object();
+		lock = new Object();
 		logger = Logger.getAnonymousLogger();
 		this.verbose = verbose;
 		// Ensure that exceptions thrown by runnables submitted to the pools do not go unnoticed if the instance is verbose.
@@ -107,7 +112,7 @@ public class PSPPool {
 					"Error while interacting with the process."));
 		}
 		for (int i = 0; i < actualMinSize; i++) {
-			synchronized (poolLock) {
+			synchronized (lock) {
 				startNewProcess(null);
 			}
 		}
@@ -148,16 +153,16 @@ public class PSPPool {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return "Total processes: " + allShells.size() + "; acitve processes: " + activeShells.size() +
+		return "Total processes: " + activeShells.size() + "; acitve processes: " + liveShells.size() +
 				"; submitted commands: " + (numOfExecutingSubmissions.get() + submissions.size());
 	}
 	/**
-	 * Returns whether a new process {@link net.viktorc.pspp.ProcessShell} instance should be added to the pool.
+	 * Returns whether a new process {@link net.viktorc.pspp.ProcessShell} instance should be started.
 	 * 
 	 * @return Whether the process pool should be extended.
 	 */
 	private boolean doExtendPool() {
-		return !close && (allShells.size() < minPoolSize || (allShells.size() < Math.min(maxPoolSize,
+		return !close && (activeShells.size() < minPoolSize || (activeShells.size() < Math.min(maxPoolSize,
 				numOfExecutingSubmissions.get() + submissions.size() + reserveSize)));
 	}
 	/**
@@ -166,27 +171,26 @@ public class PSPPool {
 	 * 
 	 * @param processShell An optional {@link net.viktorc.pspp.ProcessShell} instance to re-start in case one is available.
 	 * @return Whether the process was successfully started.
+	 * @throws ProcessException If a process shell instance cannot be borrowed from the pool.
 	 */
 	private boolean startNewProcess(ProcessShell processShell) {
 		if (processShell == null) {
-			ProcessShell spareShell = spareShells.poll();
-			if (spareShell != null)
-				processShell = spareShell;
-			else {
-				PooledProcessManager manager = new PooledProcessManager(managerFactory.createNewProcessManager());
-				processShell = new ProcessShell(manager, keepAliveTime, taskExecutorService);
-				manager.processShell = processShell;
+			try {
+				processShell = shellPool.borrowObject();
+			} catch (Exception e) {
+				if (verbose)
+					logger.log(Level.WARNING, "Failed to borrow a process shell from the pool.");
+				return false;
 			}
 		}
 		/* Try to execute the process. It may happen that the count of active processes is not correct and in fact the pool 
 		 * has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism that takes care of this. */
 		try {
 			processExecutor.execute(processShell);
-			allShells.add(processShell);
+			activeShells.add(processShell);
 			return true;
 		} catch (RejectedExecutionException e) {
-			if (spareShells.size() < reserveSize)
-				spareShells.add(processShell);
+			shellPool.returnObject(processShell);
 			if (verbose)
 				logger.log(Level.WARNING, "Failed to start new process due to the pool having reached its capacity.");
 			return false;
@@ -204,7 +208,7 @@ public class PSPPool {
 					nextSubmission = submissions.take();
 				InternalSubmission submission = nextSubmission;
 				// Execute it in any of the available processes.
-				for (ProcessShell shell : activeShells) {
+				for (ProcessShell shell : liveShells) {
 					if (shell.isReady()) {
 						Future<?> future = taskExecutorService.submit(() -> {
 							try {
@@ -244,7 +248,7 @@ public class PSPPool {
 					}
 				}
 				// Extend the pool if needed.
-				synchronized (poolLock) {
+				synchronized (lock) {
 					if (doExtendPool())
 						startNewProcess(null);
 				}
@@ -281,14 +285,70 @@ public class PSPPool {
 			logger.info("Initiating shutdown...");
 		close = true;
 		mainLoop.interrupt();
-		synchronized (poolLock) {
-			for (ProcessShell shell : allShells)
+		synchronized (lock) {
+			for (ProcessShell shell : activeShells)
 				shell.stop(true);
 		}
+		shellPool.close();
 		processExecutor.shutdown();
 		taskExecutorService.shutdown();
 		if (verbose)
 			logger.info("Pool shut down.");
+	}
+	
+	/**
+	 * An implementation of the {@link org.apache.commons.pool2.PooledObjectFactory} interface to handle the creation and pooling 
+	 * of {@link net.viktorc.pspp.ProcessShell} instances.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class PooledProcessShellFactory implements PooledObjectFactory<ProcessShell> {
+
+		@Override
+		public PooledObject<ProcessShell> makeObject() throws Exception {
+			PooledProcessManager manager = new PooledProcessManager(managerFactory.createNewProcessManager());
+			ProcessShell processShell = new ProcessShell(manager, keepAliveTime, taskExecutorService);
+			manager.processShell = processShell;
+			return new DefaultPooledObject<ProcessShell>(processShell);
+		}
+		@Override
+		public void activateObject(PooledObject<ProcessShell> p) {
+			// No-operation.
+		}
+		@Override
+		public boolean validateObject(PooledObject<ProcessShell> p) {
+			return !p.getObject().isActive();
+		}
+		@Override
+		public void passivateObject(PooledObject<ProcessShell> p) {
+			activeShells.remove(p.getObject());
+		}
+		@Override
+		public void destroyObject(PooledObject<ProcessShell> p) {
+			// No-operation.
+		}
+		
+	}
+	
+	/**
+	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.pspp.ProcessShell} 
+	 * instances.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class ProcessShellPool extends GenericObjectPool<ProcessShell> {
+
+		public ProcessShellPool(PooledObjectFactory<ProcessShell> factory) {
+			super(factory);
+			GenericObjectPoolConfig config = new GenericObjectPoolConfig();
+			config.setBlockWhenExhausted(false);
+			config.setMaxTotal(maxPoolSize + reserveSize);
+			config.setMinIdle(reserveSize);
+			this.setConfig(config);
+		}
+		
 	}
 	
 	/**
@@ -320,15 +380,14 @@ public class PSPPool {
 		protected void afterExecute(Runnable r, Throwable t) {
 			super.afterExecute(r, t);
 			ProcessShell shell = (ProcessShell) r;
-			allShells.remove(shell);
 			if (verbose)
 				logger.info("Process shell " + shell + " stopped executing." + System.lineSeparator() +
 						getPoolStats());
-			synchronized (poolLock) {
+			synchronized (lock) {
 				if (doExtendPool())
 					startNewProcess(shell);
-				else if (spareShells.size() < reserveSize)
-					spareShells.add(shell);
+				else
+					shellPool.returnObject(shell);
 			}
 		}
 		
@@ -411,7 +470,7 @@ public class PSPPool {
 		public void onStartup(ProcessShell shell) {
 			originalManager.onStartup(shell);
 			prestartLatch.countDown();
-			activeShells.add(shell);
+			liveShells.add(shell);
 		}
 		@Override
 		public boolean terminate(ProcessShell shell) {
@@ -421,7 +480,7 @@ public class PSPPool {
 		public void onTermination(int resultCode) {
 			originalManager.onTermination(resultCode);
 			if (processShell != null)
-				activeShells.remove(processShell);
+				liveShells.remove(processShell);
 		}
 		
 	}
