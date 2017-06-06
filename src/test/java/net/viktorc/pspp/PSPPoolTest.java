@@ -90,6 +90,24 @@ public class PSPPoolTest {
 			}
 			
 		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose);
+		// Basic pool statistics checks.
+		assert minPoolSize == pool.getMinSize() : "Different min pool sizes: " + minPoolSize + " and " +
+				pool.getMinSize() + ".";
+		assert maxPoolSize == pool.getMaxSize() : "Different max pool sizes: " + maxPoolSize + " and " +
+				pool.getMaxSize() + ".";
+		assert reserveSize == pool.getReserveSize() : "Different reserve sizes: " + reserveSize + " and " +
+				pool.getReserveSize() + ".";
+		assert Math.max(0, keepAliveTime) == pool.getKeepAliveTime() : "Different keep alive times: " +
+				Math.max(0, keepAliveTime) + " and " + pool.getKeepAliveTime() + ".";
+		assert verbose == pool.isVerbose() : "Different verbosity: " + verbose + " and " + pool.isVerbose() + ".";
+		assert pool.getNumOfQueuedSubmissions() == 0 : "Non-zero number of queued submissions on startup: " +
+				pool.getNumOfQueuedSubmissions() + ".";
+		assert pool.getNumOfExecutingSubmissions() == 0 : "Non-zero number of executing submissions on startup: " +
+				pool.getNumOfExecutingSubmissions() + ".";
+		assert pool.getTotalNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of total " +
+				"processes: " + pool.getTotalNumOfProcesses() + " instead of " + Math.max(minPoolSize, reserveSize) + ".";
+		assert pool.getNumOfActiveProcesses() == pool.getTotalNumOfProcesses() : "Unexpected number of active " +
+				"processes: " + pool.getNumOfActiveProcesses() + " instead of " + pool.getTotalNumOfProcesses() + ".";
 		return pool;
 	}
 	/**
@@ -143,8 +161,11 @@ public class PSPPoolTest {
 				for (int procTime : procTimes)
 					commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
 								if ("ready".equals(o)) {
-									Assert.assertTrue(c.getStandardOutLines().size() == procTime &&
-											c.getErrorOutLines().size() == 0);
+									// Output line caching check.
+									assert c.getStandardOutLines().size() == procTime && c.getErrorOutLines().size() == 0 :
+											"Unexpected numbers of output lines: " + c.getStandardOutLines().size() + 
+											" instead of " + procTime + " and " + c.getErrorOutLines().size() + 
+											" instead of " + 0 + ".";
 									if (verbose)
 										System.out.println(("Std: " + c.getJointStandardOutLines() + "; Err: " +
 												c.getJointErrorOutLines()).replaceAll("\n", " "));

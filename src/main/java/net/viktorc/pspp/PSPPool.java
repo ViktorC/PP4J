@@ -30,7 +30,14 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 /**
- * A class for maintaining and managing a pool of identical pre-started processes.
+ * A class for maintaining and managing a pool of pre-started processes. The processes are executed in {@link net.viktorc.pspp.ProcessShell} 
+ * instances. Each shell is assigned an instance of an implementation of the {@link net.viktorc.pspp.ProcessManager} interface using an 
+ * implementation of the {@link net.viktorc.pspp.ProcessManagerFactory} interface. The pool accepts submissions in the form of 
+ * {@link net.viktorc.pspp.Submission} implementations which are executed on any one of the available active process shells maintained 
+ * by the pool. While executing a submission, the shell cannot accept further submissions. The submissions are queued and executed as 
+ * soon as there is an available shell. The size of the pool is always kept between the minimum pool size and the maximum pool size 
+ * (both inclusive). The reserve size specifies the minimum number of processes that should always be available (there are no guarantees 
+ * that there actually will be this many available shells at any given time).
  * 
  * @author Viktor
  *
@@ -88,7 +95,7 @@ public class PSPPool {
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
-		this.keepAliveTime = keepAliveTime;
+		this.keepAliveTime = Math.max(0, keepAliveTime);
 		mainLoop = new Thread(this::mainLoop);
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		processExecutor = new ProcessShellExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
@@ -129,23 +136,78 @@ public class PSPPool {
 		mainLoop.start();
 	}
 	/**
-	 * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size depending on which 
-	 * one is greater. This constructor blocks until the initial number of processes start up. The size of the pool is dynamically 
-	 * adjusted based on the pool parameters and the rate of incoming submissions.
+	 * Returns the maximum allowed number of processes to hold in the pool.
 	 * 
-	 * @param managerFactory A {@link net.viktorc.pspp.ProcessManagerFactory} instance that is used to build 
-	 * {@link net.viktorc.pspp.ProcessManager} instances that manage the processes' life cycle in the pool.
-	 * @param minPoolSize The minimum size of the process pool.
-	 * @param maxPoolSize The maximum size of the process pool.
-	 * @param reserveSize The number of available processes to keep in the pool.
-	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
-	 * life-cycle of the processes will not be limited.
-	 * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the 
-	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
-	 * pool size.
+	 * @return The maximum size of the process pool.
 	 */
-	public PSPPool(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime) {
-		this(managerFactory, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
+	public int getMaxSize() {
+		return maxPoolSize;
+	}
+	/**
+	 * Returns the minimum number of processes to hold in the pool.
+	 * 
+	 * @return The minimum size of the process pool.
+	 */
+	public int getMinSize() {
+		return minPoolSize;
+	}
+	/**
+	 * Returns the minimum number of available processes to keep in the pool.
+	 * 
+	 * @return The number of available processes to keep in the pool.
+	 */
+	public int getReserveSize() {
+		return reserveSize;
+	}
+	/**
+	 * Returns the number of milliseconds after which idle processes should be terminated. If it is 0 or less, 
+	 * the processes are never terminated due to a timeout.
+	 * 
+	 * @return The number of milliseconds after which idle processes should be terminated.
+	 */
+	public long getKeepAliveTime() {
+		return keepAliveTime;
+	}
+	/**
+	 * Returns whether events relating to the management of the processes held by the pool are logged to the 
+	 * console.
+	 * 
+	 * @return Whether the pool is verbose.
+	 */
+	public boolean isVerbose() {
+		return verbose;
+	}
+	/**
+	 * Returns the total number of running processes currently held in the pool.
+	 * 
+	 * @return The total number of running processes.
+	 */
+	public int getTotalNumOfProcesses() {
+		return activeShells.size();
+	}
+	/**
+	 * Returns the number of active, i.e. started up and not yet cancelled, processes held in the pool.
+	 * 
+	 * @return The number of active processes.
+	 */
+	public int getNumOfActiveProcesses() {
+		return liveShells.size();
+	}
+	/**
+	 * Returns the number of submissions currently being executed in the pool.
+	 * 
+	 * @return The number of submissions currently being executed in the pool.
+	 */
+	public int getNumOfExecutingSubmissions() {
+		return numOfExecutingSubmissions.get();
+	}
+	/**
+	 * Returns the number of submissions queued and waiting for execution.
+	 * 
+	 * @return The number of queued submissions.
+	 */
+	public int getNumOfQueuedSubmissions() {
+		return submissions.size();
 	}
 	/**
 	 * Returns the number of active, queued, and currently executing processes as string.
@@ -224,14 +286,14 @@ public class PSPPool {
 												submission.submittedTime)/1000000000)));
 								} else
 									submission.semaphore.release();
-							} catch (Throwable t) {
+							} catch (Exception e) {
 								if (verbose)
-									logger.log(Level.SEVERE, "Error while executing command(s) " +
-											submission + ".", t);
+									logger.log(Level.SEVERE, "Exception while executing command(s) " +
+											submission + ".", e);
 								if (submission.semaphore.availablePermits() == 0)
 									submission.semaphore.release();
 								synchronized (submission) {
-									submission.throwable = t;
+									submission.exception = e;
 									submission.notifyAll();
 								}
 							}
@@ -528,7 +590,7 @@ public class PSPPool {
 		volatile boolean submitted;
 		volatile boolean processed;
 		volatile Future<?> future;
-		volatile Throwable throwable;
+		volatile Exception exception;
 		
 		/**
 		 * Constructs an instance according to the specified parameters.
@@ -615,13 +677,13 @@ public class PSPPool {
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
 			synchronized (submission) {
-				while (!submission.processed && !submission.isCancelled() && submission.throwable == null)
+				while (!submission.processed && !submission.isCancelled() && submission.exception == null)
 					submission.wait();
 			}
 			if (submission.isCancelled() || close)
 				throw new CancellationException();
-			if (submission.throwable != null)
-				throw new ExecutionException(submission.throwable);
+			if (submission.exception != null)
+				throw new ExecutionException(submission.exception);
 			return (long) Math.round(((double) (submission.processedTime - submission.receivedTime))/1000000);
 		}
 		@Override
@@ -630,7 +692,7 @@ public class PSPPool {
 			long timeoutNs = unit.toNanos(timeout);
 			long start = System.nanoTime();
 			synchronized (submission) {
-				while (!submission.processed && !submission.isCancelled() && submission.throwable == null &&
+				while (!submission.processed && !submission.isCancelled() && submission.exception == null &&
 						timeoutNs > 0) {
 					submission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
 					timeoutNs -= (System.nanoTime() - start);
@@ -638,8 +700,8 @@ public class PSPPool {
 			}
 			if (submission.isCancelled() || close)
 				throw new CancellationException();
-			if (submission.throwable != null)
-				throw new ExecutionException(submission.throwable);
+			if (submission.exception != null)
+				throw new ExecutionException(submission.exception);
 			if (timeoutNs <= 0)
 				throw new TimeoutException();
 			return timeoutNs <= 0 ? null : (long) Math.round(((double) (submission.processedTime -
