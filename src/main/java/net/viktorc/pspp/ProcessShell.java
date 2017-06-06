@@ -224,14 +224,14 @@ public class ProcessShell implements Runnable {
 					});
 					while (!startedUp)
 						lock.wait();
+					manager.onStartup(this);
+					if (timer != null) {
+						executor.submit(timer);
+						timer.start();
+					}
 				}
 				if (stop)
 					return;
-				manager.onStartup(this);
-				if (timer != null) {
-					executor.submit(timer);
-					timer.start();
-				}
 			} finally {
 				lock.unlock();
 			}

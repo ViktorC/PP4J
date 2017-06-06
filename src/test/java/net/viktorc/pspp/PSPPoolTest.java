@@ -386,7 +386,7 @@ public class PSPPoolTest {
 	@Test
 	public void test22() throws Exception {
 		Assert.assertTrue(test("Test 22", 20, 20, 0, 0, false, false, false, false, new int[] { 5 },
-				20, 0, 2500, false, false, 4995, 5090));
+				20, 0, 2500, false, false, 4995, 5120));
 	}
 	@Test
 	public void test23() throws Exception {
@@ -396,7 +396,7 @@ public class PSPPoolTest {
 	@Test
 	public void test24() throws Exception {
 		Assert.assertTrue(test("Test 24", 20, 20, 0, 0, true, true, false, false, new int[] { 5, 5, 3 },
-				20, 0, 3000, false, false, 4995, 5090));
+				20, 0, 3000, false, false, 4995, 5120));
 	}
 	// Early shutdown testing.
 	@Test

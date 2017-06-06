@@ -266,9 +266,12 @@ public class PSPPool {
 	 * @param submission The submission including all information necessary for executing and processing the command(s).
 	 * @return A {@link java.util.concurrent.Future} instance of the time it took to execute the command including the submission 
 	 * delay in milliseconds.
+	 * @throws IllegalStateException If the pool has already been shut down.
 	 * @throws IllegalArgumentException If the submission is null.
 	 */
 	public Future<Long> submit(Submission submission) {
+		if (close)
+			throw new IllegalStateException("The pool has already been shut down.");
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
 		InternalSubmission internalSubmission = new InternalSubmission(submission);
@@ -279,8 +282,12 @@ public class PSPPool {
 	/**
 	 * Attempts to shut the process pool including all its processes down. The method blocks until all {@link net.viktorc.pspp.ProcessShell} 
 	 * instances maintained by the pool are closed.
+	 * 
+	 * @throws IllegalStateException If the pool has already been shut down.
 	 */
-	public void shutdown() {
+	public synchronized void shutdown() {
+		if (close)
+			throw new IllegalStateException("The pool has already been shut down.");
 		if (verbose)
 			logger.info("Initiating shutdown...");
 		close = true;
@@ -289,66 +296,11 @@ public class PSPPool {
 			for (ProcessShell shell : activeShells)
 				shell.stop(true);
 		}
-		shellPool.close();
 		processExecutor.shutdown();
 		taskExecutorService.shutdown();
+		shellPool.close();
 		if (verbose)
 			logger.info("Pool shut down.");
-	}
-	
-	/**
-	 * An implementation of the {@link org.apache.commons.pool2.PooledObjectFactory} interface to handle the creation and pooling 
-	 * of {@link net.viktorc.pspp.ProcessShell} instances.
-	 * 
-	 * @author Viktor
-	 *
-	 */
-	private class PooledProcessShellFactory implements PooledObjectFactory<ProcessShell> {
-
-		@Override
-		public PooledObject<ProcessShell> makeObject() throws Exception {
-			PooledProcessManager manager = new PooledProcessManager(managerFactory.createNewProcessManager());
-			ProcessShell processShell = new ProcessShell(manager, keepAliveTime, taskExecutorService);
-			manager.processShell = processShell;
-			return new DefaultPooledObject<ProcessShell>(processShell);
-		}
-		@Override
-		public void activateObject(PooledObject<ProcessShell> p) {
-			// No-operation.
-		}
-		@Override
-		public boolean validateObject(PooledObject<ProcessShell> p) {
-			return !p.getObject().isActive();
-		}
-		@Override
-		public void passivateObject(PooledObject<ProcessShell> p) {
-			activeShells.remove(p.getObject());
-		}
-		@Override
-		public void destroyObject(PooledObject<ProcessShell> p) {
-			// No-operation.
-		}
-		
-	}
-	
-	/**
-	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.pspp.ProcessShell} 
-	 * instances.
-	 * 
-	 * @author Viktor
-	 *
-	 */
-	private class ProcessShellPool extends GenericObjectPool<ProcessShell> {
-
-		public ProcessShellPool(PooledObjectFactory<ProcessShell> factory) {
-			super(factory);
-			GenericObjectPoolConfig config = new GenericObjectPoolConfig();
-			config.setBlockWhenExhausted(false);
-			config.setMaxTotal(maxPoolSize + reserveSize);
-			config.setMinIdle(reserveSize);
-			this.setConfig(config);
-		}
-		
 	}
 	
 	/**
@@ -380,14 +332,25 @@ public class PSPPool {
 		protected void afterExecute(Runnable r, Throwable t) {
 			super.afterExecute(r, t);
 			ProcessShell shell = (ProcessShell) r;
+			activeShells.remove(shell);
 			if (verbose)
 				logger.info("Process shell " + shell + " stopped executing." + System.lineSeparator() +
 						getPoolStats());
-			synchronized (lock) {
-				if (doExtendPool())
-					startNewProcess(shell);
-				else
-					shellPool.returnObject(shell);
+			if (t == null) {
+				synchronized (lock) {
+					if (doExtendPool())
+						startNewProcess(shell);
+					else
+						shellPool.returnObject(shell);
+				}
+			} else {
+				try {
+					shellPool.invalidateObject(shell);
+				} catch (Exception e) {
+					// This cannot practically happen.
+					if (verbose)
+						logger.log(Level.SEVERE, "Error while invalidating process shell " + shell + ".", e);
+				}
 			}
 		}
 		
@@ -430,6 +393,66 @@ public class PSPPool {
 				}
 			});
 			return t;
+		}
+		
+	}
+	
+	/**
+	 * An implementation of the {@link org.apache.commons.pool2.PooledObjectFactory} interface to handle the creation of 
+	 * pooled {@link net.viktorc.pspp.ProcessShell} instances.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class PooledProcessShellFactory implements PooledObjectFactory<ProcessShell> {
+
+		@Override
+		public PooledObject<ProcessShell> makeObject() throws Exception {
+			PooledProcessManager manager = new PooledProcessManager(managerFactory.createNewProcessManager());
+			ProcessShell processShell = new ProcessShell(manager, keepAliveTime, taskExecutorService);
+			manager.processShell = processShell;
+			return new DefaultPooledObject<ProcessShell>(processShell);
+		}
+		@Override
+		public void activateObject(PooledObject<ProcessShell> p) {
+			// No-operation.
+		}
+		@Override
+		public boolean validateObject(PooledObject<ProcessShell> p) {
+			return !p.getObject().isActive();
+		}
+		@Override
+		public void passivateObject(PooledObject<ProcessShell> p) {
+			// No-operation
+		}
+		@Override
+		public void destroyObject(PooledObject<ProcessShell> p) {
+			// No-operation.
+		}
+		
+	}
+	
+	/**
+	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.pspp.ProcessShell} 
+	 * instances.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class ProcessShellPool extends GenericObjectPool<ProcessShell> {
+
+		/**
+		 * Constructs a pool instance that does not block when exhausted and has a maximum total size of 
+		 * {@link net.viktorc.pspp.PSPPool#maxPoolSize}.
+		 * 
+		 * @param factory A factory for the creation of pooled {@link net.viktorc.pspp.ProcessShell} instances.
+		 */
+		public ProcessShellPool(PooledProcessShellFactory factory) {
+			super(factory);
+			GenericObjectPoolConfig config = new GenericObjectPoolConfig();
+			config.setBlockWhenExhausted(false);
+			config.setMaxTotal(maxPoolSize);
+			this.setConfig(config);
 		}
 		
 	}
