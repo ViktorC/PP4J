@@ -510,10 +510,10 @@ public class PSPPool {
 		 */
 		public ProcessShellPool(PooledProcessShellFactory factory) {
 			super(factory);
+			setTestOnReturn(true);
 			setBlockWhenExhausted(false);
 			setMaxTotal(maxPoolSize);
-			setMaxIdle(Math.min(minPoolSize + reserveSize, maxPoolSize));
-			setTestOnReturn(true);
+			setMaxIdle(Math.max(minPoolSize, reserveSize));
 			// To avoid having the process restarts and the eviction at the same time in the first cycle.
 			setTimeBetweenEvictionRunsMillis((long) (1.5*keepAliveTime));
 			setSoftMinEvictableIdleTimeMillis(keepAliveTime);
