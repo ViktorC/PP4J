@@ -230,8 +230,6 @@ public class ProcessShell implements Runnable {
 						timer.start();
 					}
 				}
-				if (stop)
-					return;
 			} finally {
 				lock.unlock();
 			}
@@ -324,7 +322,7 @@ public class ProcessShell implements Runnable {
 					}
 				}
 			} catch (InterruptedException e) {
-				
+				// Just let the thread terminate.
 			} catch (Exception e) {
 				throw new ProcessException(e);
 			} finally {

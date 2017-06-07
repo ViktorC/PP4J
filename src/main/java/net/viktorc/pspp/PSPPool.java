@@ -27,7 +27,6 @@ import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 /**
  * A class for maintaining and managing a pool of pre-started processes. The processes are executed in {@link net.viktorc.pspp.ProcessShell} 
@@ -54,8 +53,8 @@ public class PSPPool {
 	private final ProcessShellExecutor processExecutor;
 	private final ExecutorService taskExecutorService;
 	private final ProcessShellPool shellPool;
+	private final Queue<ProcessShell> borrowedShells;
 	private final Queue<ProcessShell> activeShells;
-	private final Queue<ProcessShell> liveShells;
 	private final BlockingQueue<InternalSubmission> submissions;
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final CountDownLatch prestartLatch;
@@ -102,8 +101,8 @@ public class PSPPool {
 				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
 		taskExecutorService = Executors.newCachedThreadPool();
 		shellPool = new ProcessShellPool(new PooledProcessShellFactory());
+		borrowedShells = new LinkedBlockingQueue<>();
 		activeShells = new LinkedBlockingQueue<>();
-		liveShells = new LinkedBlockingQueue<>();
 		submissions = new LinkedBlockingQueue<>();
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
@@ -183,7 +182,7 @@ public class PSPPool {
 	 * @return The total number of running processes.
 	 */
 	public int getTotalNumOfProcesses() {
-		return activeShells.size();
+		return borrowedShells.size();
 	}
 	/**
 	 * Returns the number of active, i.e. started up and not yet cancelled, processes held in the pool.
@@ -191,7 +190,7 @@ public class PSPPool {
 	 * @return The number of active processes.
 	 */
 	public int getNumOfActiveProcesses() {
-		return liveShells.size();
+		return activeShells.size();
 	}
 	/**
 	 * Returns the number of submissions currently being executed in the pool.
@@ -215,7 +214,7 @@ public class PSPPool {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return "Total processes: " + activeShells.size() + "; acitve processes: " + liveShells.size() +
+		return "Total processes: " + borrowedShells.size() + "; acitve processes: " + activeShells.size() +
 				"; submitted commands: " + (numOfExecutingSubmissions.get() + submissions.size());
 	}
 	/**
@@ -224,7 +223,7 @@ public class PSPPool {
 	 * @return Whether the process pool should be extended.
 	 */
 	private boolean doExtendPool() {
-		return !close && (activeShells.size() < minPoolSize || (activeShells.size() < Math.min(maxPoolSize,
+		return !close && (borrowedShells.size() < minPoolSize || (borrowedShells.size() < Math.min(maxPoolSize,
 				numOfExecutingSubmissions.get() + submissions.size() + reserveSize)));
 	}
 	/**
@@ -249,7 +248,7 @@ public class PSPPool {
 		 * has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism that takes care of this. */
 		try {
 			processExecutor.execute(processShell);
-			activeShells.add(processShell);
+			borrowedShells.add(processShell);
 			return true;
 		} catch (RejectedExecutionException e) {
 			shellPool.returnObject(processShell);
@@ -270,7 +269,7 @@ public class PSPPool {
 					nextSubmission = submissions.take();
 				InternalSubmission submission = nextSubmission;
 				// Execute it in any of the available processes.
-				for (ProcessShell shell : liveShells) {
+				for (ProcessShell shell : activeShells) {
 					if (shell.isReady()) {
 						Future<?> future = taskExecutorService.submit(() -> {
 							try {
@@ -355,7 +354,7 @@ public class PSPPool {
 		close = true;
 		mainLoop.interrupt();
 		synchronized (lock) {
-			for (ProcessShell shell : activeShells)
+			for (ProcessShell shell : borrowedShells)
 				shell.stop(true);
 		}
 		processExecutor.shutdown();
@@ -394,7 +393,7 @@ public class PSPPool {
 		protected void afterExecute(Runnable r, Throwable t) {
 			super.afterExecute(r, t);
 			ProcessShell shell = (ProcessShell) r;
-			activeShells.remove(shell);
+			borrowedShells.remove(shell);
 			if (verbose)
 				logger.info("Process shell " + shell + " stopped executing." + System.lineSeparator() +
 						getPoolStats());
@@ -511,10 +510,14 @@ public class PSPPool {
 		 */
 		public ProcessShellPool(PooledProcessShellFactory factory) {
 			super(factory);
-			GenericObjectPoolConfig config = new GenericObjectPoolConfig();
-			config.setBlockWhenExhausted(false);
-			config.setMaxTotal(maxPoolSize);
-			this.setConfig(config);
+			setBlockWhenExhausted(false);
+			setMaxTotal(maxPoolSize);
+			setMaxIdle(Math.min(minPoolSize + reserveSize, maxPoolSize));
+			setTestOnReturn(true);
+			// To avoid having the process restarts and the eviction at the same time in the first cycle.
+			setTimeBetweenEvictionRunsMillis((long) (1.5*keepAliveTime));
+			setSoftMinEvictableIdleTimeMillis(keepAliveTime);
+			setNumTestsPerEvictionRun(maxPoolSize);
 		}
 		
 	}
@@ -554,8 +557,8 @@ public class PSPPool {
 		@Override
 		public void onStartup(ProcessShell shell) {
 			originalManager.onStartup(shell);
+			activeShells.add(shell);
 			prestartLatch.countDown();
-			liveShells.add(shell);
 		}
 		@Override
 		public boolean terminate(ProcessShell shell) {
@@ -565,7 +568,7 @@ public class PSPPool {
 		public void onTermination(int resultCode) {
 			originalManager.onTermination(resultCode);
 			if (processShell != null)
-				liveShells.remove(processShell);
+				activeShells.remove(processShell);
 		}
 		
 	}

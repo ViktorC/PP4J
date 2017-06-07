@@ -90,6 +90,8 @@ public class PSPPoolTest {
 			}
 			
 		}, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose);
+		if (Thread.currentThread().isInterrupted())
+			return null;
 		// Basic pool statistics checks.
 		assert minPoolSize == pool.getMinSize() : "Different min pool sizes: " + minPoolSize + " and " +
 				pool.getMinSize() + ".";
@@ -424,6 +426,22 @@ public class PSPPoolTest {
 	public void test25() throws Exception {
 		Assert.assertTrue(test("Test 25", 100, 100, 0, 5000, true, false, false, false, new int[] { 5 },
 				100, 0, 0, false, true, 0, 0));
+	}
+	// Interrupted construction testing.
+	@Test
+	public void test26() throws Exception {
+		Thread t = new Thread(() -> {
+			try {
+				PSPPool pool = getPool(20, 30, 0, 0, false, false, true);
+				exceptionRule.expect(NullPointerException.class);
+				pool.shutdown();
+			} catch (IllegalArgumentException | IOException | URISyntaxException e) {
+				Assert.assertTrue(false);
+			}
+		});
+		t.start();
+		Thread.sleep(500);
+		t.interrupt();
 	}
 	
 }
