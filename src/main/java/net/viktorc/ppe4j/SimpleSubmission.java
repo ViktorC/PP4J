@@ -1,13 +1,13 @@
-package net.viktorc.pspp;
+package net.viktorc.ppe4j;
 
 import java.util.Arrays;
 import java.util.List;
 
 /**
- * A simple sub-class of the {@link net.viktorc.pspp.AbstractSubmission} abstract class. It does not provide a mechanism 
- * for directly cancelling submissions; however, they can still be cancelled by cancelling the {@link java.util.concurrent.Future} 
- * instance returned by the {@link net.viktorc.pspp.PSPPool#submit(Submission) submit} method of the {@link net.viktorc.pspp.PSPPool} 
- * class.
+ * A simple sub-class of the {@link net.viktorc.ppe4j.AbstractSubmission} abstract class. It does not provide a mechanism 
+ * for directly canceling submissions; however, they can still be cancelled by canceling the {@link java.util.concurrent.Future} 
+ * instance returned by the {@link net.viktorc.ppe4j.ProcessPoolExecutor#submit(Submission) submit} method of the implementations 
+ * of the {@link net.viktorc.ppe4j.ProcessPoolExecutor} interface.
  * 
  * @author Viktor
  *

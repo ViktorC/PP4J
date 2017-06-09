@@ -1,7 +1,7 @@
-package net.viktorc.pspp;
+package net.viktorc.ppe4j;
 
 /**
- * An exception thrown by the {@link net.viktorc.pspp.ProcessShell} class if an 
+ * An exception thrown by the {@link net.viktorc.ppe4j.StandardProcessShell} class if an 
  * unexpected error occurs that solicits that instantaneous termination of the process.
  * 
  * @author Viktor

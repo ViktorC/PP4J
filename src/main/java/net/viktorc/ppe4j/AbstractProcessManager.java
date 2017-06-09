@@ -1,9 +1,9 @@
-package net.viktorc.pspp;
+package net.viktorc.ppe4j;
 
 import java.io.IOException;
 
 /**
- * An abstract implementation of the {@link net.viktorc.pspp.ProcessManager} interface.
+ * An abstract implementation of the {@link net.viktorc.ppe4j.ProcessManager} interface.
  * 
  * 
  * @author Viktor

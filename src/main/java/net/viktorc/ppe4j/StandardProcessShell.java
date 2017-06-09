@@ -1,4 +1,4 @@
-package net.viktorc.pspp;
+package net.viktorc.ppe4j;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -12,14 +12,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * A class for starting, managing, and interacting with a process. The life cycle of the associated process is the same as that of the 
- * {@link #run() run} method of the instance. The process is not started until this method is called and the method does not terminate 
- * until the process does.
+ * An implementation of the {@link net.viktorc.ppe4j.ProcessShell} interface for starting, managing, and interacting with a process. The 
+ * life cycle of the associated process is the same as that of the {@link #run()} method of the instance. The process is not started until 
+ * this method is called and the method does not terminate until the process does.
  * 
  * @author Viktor
  *
  */
-public class ProcessShell implements Runnable {
+public class StandardProcessShell implements ProcessShell, Runnable {
 
 	/**
 	 * If the process cannot be started or an exception occurs which would make it impossible to retrieve the actual 
@@ -57,7 +57,7 @@ public class ProcessShell implements Runnable {
 	 * process and, if specified, for terminating the process if it is idle for too long.
 	 * @throws IllegalArgumentException If the manager is null.
 	 */
-	protected ProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService) {
+	public StandardProcessShell(ProcessManager manager, long keepAliveTime, ExecutorService executorService) {
 		if (manager == null)
 			throw new IllegalArgumentException("The process handler cannot be null.");
 		timer = keepAliveTime > 0 ? new KeepAliveTimer() : null;
@@ -80,7 +80,7 @@ public class ProcessShell implements Runnable {
 	 * 
 	 * @return Whether the process is currently running and not cancelled.
 	 */
-	protected boolean isActive() {
+	public boolean isActive() {
 		return running && !stop;
 	}
 	/**
@@ -88,8 +88,27 @@ public class ProcessShell implements Runnable {
 	 * 
 	 * @return Whether the manager is ready to process commands.
 	 */
-	protected boolean isReady() {
+	public boolean isReady() {
 		return isActive() && (!lock.isLocked() || lock.isHeldByCurrentThread());
+	}
+	/**
+	 * It prompts the currently running process, if there is one, to terminate.
+	 * 
+	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.ppe4j.ProcessManager#terminate(ProcessShell)} 
+	 * method of the {@link net.viktorc.ppe4j.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
+	 * process is currently executing, not listening to its standard in.
+	 */
+	public void stop(boolean forcibly) {
+		synchronized (lock) {
+			if (process == null || stop)
+				return;
+			if (timer != null)
+				timer.stop();
+			if (forcibly || !manager.terminate(this))
+				process.destroy();
+			stop = true;
+			lock.notifyAll();
+		}
 	}
 	/**
 	 * Starts listening to the specified channel.
@@ -118,34 +137,16 @@ public class ProcessShell implements Runnable {
 		}
 	}
 	/**
-	 * It prompts the currently running process, if there is one, to terminate.
-	 * 
-	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pspp.ProcessManager#terminate(ProcessShell) terminate} 
-	 * method of the {@link net.viktorc.pspp.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
-	 * process is currently executing, not listening to its standard in.
-	 */
-	protected void stop(boolean forcibly) {
-		synchronized (lock) {
-			if (process == null || stop)
-				return;
-			if (timer != null)
-				timer.stop();
-			if (forcibly || !manager.terminate(this))
-				process.destroy();
-			stop = true;
-			lock.notifyAll();
-		}
-	}
-	/**
-	 * Attempts to write the specified commands to the standard in stream of the process and blocks until they are 
+	 * Writes the specified commands to the standard in stream of the process and blocks until they are 
 	 * processed.
 	 * 
 	 * @param submission The submitted command(s) to execute.
-	 * @return Whether the submission was executed. If the manager is busy processing an other submission, 
+	 * @return Whether the submission was executed. If the shell is busy processing an other submission, 
 	 * it returns false; otherwise the submission is executed and true is returned once it's processed.
 	 * @throws InterruptedException If the thread is interrupted while executing the commands.
 	 * @throws IOException If the instruction cannot be written to the process' standard in stream.
 	 */
+	@Override
 	public boolean execute(Submission submission) throws IOException, InterruptedException {
 		if (running && !stop && lock.tryLock()) {
 			try {
@@ -163,9 +164,8 @@ public class ProcessShell implements Runnable {
 						stdInWriter.write(command.getInstruction());
 						stdInWriter.newLine();
 						stdInWriter.flush();
-						while ((!stop || running) && !commandProcessed) {
+						while (running && !stop && !commandProcessed)
 							lock.wait();
-						}
 						if (i < commands.size() - 1)
 							processedCommands.add(command);
 						command = null;
@@ -225,6 +225,8 @@ public class ProcessShell implements Runnable {
 					while (!startedUp)
 						lock.wait();
 					manager.onStartup(this);
+					if (stop)
+						return;
 					if (timer != null) {
 						executor.submit(timer);
 						timer.start();
@@ -243,7 +245,7 @@ public class ProcessShell implements Runnable {
 					process.destroy();
 				process = null;
 			}
-			if (!stop && timer != null)
+			if (timer != null)
 				timer.stop();
 			if (stdOutReader != null) {
 				try {
@@ -273,9 +275,8 @@ public class ProcessShell implements Runnable {
 	}
 	
 	/**
-	 * A simple timer that stops the process after {@link net.viktorc.pspp.ProcessShell#keepAliveTime} milliseconds 
-	 * unless the process is inactive or the timer is cancelled. It also enables the timer to be restarted using the 
-	 * same thread.
+	 * A simple timer that stops the process after <code>keepAliveTime</code> milliseconds unless the process is inactive 
+	 * or the timer is cancelled. It also enables the timer to be restarted using the same thread.
 	 * 
 	 * @author Viktor
 	 *
@@ -315,7 +316,7 @@ public class ProcessShell implements Runnable {
 					}
 					if (go && lock.tryLock()) {
 						try {
-							ProcessShell.this.stop(false);
+							StandardProcessShell.this.stop(false);
 						} finally {
 							lock.unlock();
 						}

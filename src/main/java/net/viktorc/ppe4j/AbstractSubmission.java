@@ -1,11 +1,11 @@
-package net.viktorc.pspp;
+package net.viktorc.ppe4j;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * An abstract implementation of the {@link net.viktorc.pspp.Submission} interface.
+ * An abstract implementation of the {@link net.viktorc.ppe4j.Submission} interface.
  * 
  * @author Viktor
  *

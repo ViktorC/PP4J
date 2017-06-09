@@ -1,9 +1,9 @@
-package net.viktorc.pspp;
+package net.viktorc.ppe4j;
 
 import java.util.function.Consumer;
 
 /**
- * A simple sub-class of the {@link net.viktorc.pspp.AbstractProcessManager} abstract class. It assumes that the process 
+ * A simple sub-class of the {@link net.viktorc.ppe4j.AbstractProcessManager} abstract class. It assumes that the process 
  * is immediately started up as soon as it is running (without having to wait for a certain output denoting that the process 
  * is ready), it has the process forcibly killed every time it needs to be terminated due to exceeding the keep-alive-time 
  * of the pool or not being reusable, and it implements no callback for when the process terminates.

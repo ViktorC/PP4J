@@ -1,4 +1,4 @@
-package net.viktorc.pspp;
+package net.viktorc.ppe4j;
 
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
@@ -29,19 +29,25 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
 /**
- * A class for maintaining and managing a pool of pre-started processes. The processes are executed in {@link net.viktorc.pspp.ProcessShell} 
- * instances. Each shell is assigned an instance of an implementation of the {@link net.viktorc.pspp.ProcessManager} interface using an 
- * implementation of the {@link net.viktorc.pspp.ProcessManagerFactory} interface. The pool accepts submissions in the form of 
- * {@link net.viktorc.pspp.Submission} implementations which are executed on any one of the available active process shells maintained 
- * by the pool. While executing a submission, the shell cannot accept further submissions. The submissions are queued and executed as 
- * soon as there is an available shell. The size of the pool is always kept between the minimum pool size and the maximum pool size 
- * (both inclusive). The reserve size specifies the minimum number of processes that should always be available (there are no guarantees 
- * that there actually will be this many available shells at any given time).
+ * An implementation of the {@link net.viktorc.ppe4j.ProcessPoolExecutor} interface for maintaining and managing a pool of pre-started 
+ * processes. The processes are executed in {@link net.viktorc.ppe4j.StandardProcessShell} instances. Each shell is assigned an instance 
+ * of an implementation of the {@link net.viktorc.ppe4j.ProcessManager} interface using an implementation of the {@link net.viktorc.ppe4j.ProcessManagerFactory} 
+ * interface. The pool accepts submissions in the form of {@link net.viktorc.ppe4j.Submission} implementations which are executed on any 
+ * one of the available active process shells maintained by the pool. While executing a submission, the shell cannot accept further 
+ * submissions. The submissions are queued and executed as soon as there is an available shell. The size of the pool is always kept between 
+ * the minimum pool size and the maximum pool size (both inclusive). The reserve size specifies the minimum number of processes that should 
+ * always be available (there are no guarantees that there actually will be this many available shells at any given time).
  * 
  * @author Viktor
  *
  */
-public class PSPPool {
+public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
+	
+	/**
+	 * The number of milliseconds after which idle process shell instances and process shell executor threads are evicted if 
+	 * {@link #keepAliveTime} is non-positive.
+	 */
+	private static final long DEFAULT_EVICT_TIME = 60L*1000;
 	
 	private final ProcessManagerFactory managerFactory;
 	private final int minPoolSize;
@@ -49,12 +55,14 @@ public class PSPPool {
 	private final int reserveSize;
 	private final long keepAliveTime;
 	private final boolean verbose;
-	private final Thread mainLoop;
-	private final ProcessShellExecutor processExecutor;
-	private final ExecutorService taskExecutorService;
+	private final Thread submissionLoop;
+	private final ProcessShellExecutor shellExecutor;
+	private final ExecutorService auxExecutor;
 	private final ProcessShellPool shellPool;
-	private final Queue<ProcessShell> borrowedShells;
-	private final Queue<ProcessShell> activeShells;
+	// All shells borrowed from the pool including those that are in the startup or termination phases.
+	private final Queue<StandardProcessShell> activeShells;
+	// Shells borrowed from the pool that are ready for submissions or are currently executing submissions.
+	private final Queue<StandardProcessShell> hotShells;
 	private final BlockingQueue<InternalSubmission> submissions;
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final CountDownLatch prestartLatch;
@@ -67,20 +75,21 @@ public class PSPPool {
 	 * one is greater. This constructor blocks until the initial number of processes start up. The size of the pool is dynamically 
 	 * adjusted based on the pool parameters and the rate of incoming submissions.
 	 * 
-	 * @param managerFactory A {@link net.viktorc.pspp.ProcessManagerFactory} instance that is used to build 
-	 * {@link net.viktorc.pspp.ProcessManager} instances that manage the processes' life cycle in the pool.
+	 * @param managerFactory A {@link net.viktorc.ppe4j.ProcessManagerFactory} instance that is used to build 
+	 * {@link net.viktorc.ppe4j.ProcessManager} instances that manage the processes' life cycle in the pool.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
 	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
 	 * life-cycle of the processes will not be limited.
 	 * @param verbose Whether events relating to the management of the pool should be logged.
+	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
 	 * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the 
 	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
 	 * pool size.
 	 */
-	public PSPPool(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize,int reserveSize, long keepAliveTime,
-			boolean verbose) {
+	public StandardProcessPoolExecutor(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize, int reserveSize,
+			long keepAliveTime, boolean verbose) throws InterruptedException {
 		if (managerFactory == null)
 			throw new IllegalArgumentException("The process manager factory cannot be null.");
 		if (minPoolSize < 0)
@@ -95,44 +104,32 @@ public class PSPPool {
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
 		this.keepAliveTime = Math.max(0, keepAliveTime);
-		mainLoop = new Thread(this::mainLoop);
+		this.verbose = verbose;
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
-		processExecutor = new ProcessShellExecutor(actualMinSize, maxPoolSize, keepAliveTime > 0 ? keepAliveTime : Long.MAX_VALUE,
-				keepAliveTime > 0 ? TimeUnit.MILLISECONDS : TimeUnit.DAYS, new SynchronousQueue<>());
-		taskExecutorService = Executors.newCachedThreadPool();
-		shellPool = new ProcessShellPool(new PooledProcessShellFactory());
-		borrowedShells = new LinkedBlockingQueue<>();
+		submissionLoop = new Thread(this::submissionLoop, "submissionLoop");
+		shellExecutor = new ProcessShellExecutor();
+		auxExecutor = Executors.newCachedThreadPool(new CustomizedThreadFactory("auxExecutor",
+				"Error while interacting with the process."));
+		shellPool = new ProcessShellPool();
 		activeShells = new LinkedBlockingQueue<>();
+		hotShells = new LinkedBlockingQueue<>();
 		submissions = new LinkedBlockingQueue<>();
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
 		lock = new Object();
 		logger = Logger.getAnonymousLogger();
-		this.verbose = verbose;
-		// Ensure that exceptions thrown by runnables submitted to the pools do not go unnoticed if the instance is verbose.
-		if (verbose) {
-			processExecutor.setThreadFactory(new VerboseThreadFactory(processExecutor.getThreadFactory(),
-					"Error while excuting the process."));
-			ThreadPoolExecutor commandExecutor = (ThreadPoolExecutor) taskExecutorService;
-			commandExecutor.setThreadFactory(new VerboseThreadFactory(commandExecutor.getThreadFactory(),
-					"Error while interacting with the process."));
-		}
 		for (int i = 0; i < actualMinSize; i++) {
 			synchronized (lock) {
 				startNewProcess(null);
 			}
 		}
 		// Wait for the processes in the initial pool to start up.
-		try {
-			prestartLatch.await();
-		} catch (InterruptedException e) {
-			if (verbose)
-				logger.log(Level.SEVERE, "Thread interrupted while waiting for the pool to start up.", e);
-			Thread.currentThread().interrupt();
-			return;
-		}
+		prestartLatch.await();
 		// Start the thread responsible for submitting commands.
-		mainLoop.start();
+		synchronized (lock) {
+			if (!close)
+				submissionLoop.start();
+		}
 	}
 	/**
 	 * Returns the maximum allowed number of processes to hold in the pool.
@@ -182,7 +179,7 @@ public class PSPPool {
 	 * @return The total number of running processes.
 	 */
 	public int getTotalNumOfProcesses() {
-		return borrowedShells.size();
+		return activeShells.size();
 	}
 	/**
 	 * Returns the number of active, i.e. started up and not yet cancelled, processes held in the pool.
@@ -190,7 +187,7 @@ public class PSPPool {
 	 * @return The number of active processes.
 	 */
 	public int getNumOfActiveProcesses() {
-		return activeShells.size();
+		return hotShells.size();
 	}
 	/**
 	 * Returns the number of submissions currently being executed in the pool.
@@ -214,41 +211,39 @@ public class PSPPool {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return "Total processes: " + borrowedShells.size() + "; acitve processes: " + activeShells.size() +
+		return "Total processes: " + activeShells.size() + "; acitve processes: " + hotShells.size() +
 				"; submitted commands: " + (numOfExecutingSubmissions.get() + submissions.size());
 	}
 	/**
-	 * Returns whether a new process {@link net.viktorc.pspp.ProcessShell} instance should be started.
+	 * Returns whether a new process {@link net.viktorc.ppe4j.StandardProcessShell} instance should be started.
 	 * 
 	 * @return Whether the process pool should be extended.
 	 */
 	private boolean doExtendPool() {
-		return !close && (borrowedShells.size() < minPoolSize || (borrowedShells.size() < Math.min(maxPoolSize,
+		return !close && (activeShells.size() < minPoolSize || (activeShells.size() < Math.min(maxPoolSize,
 				numOfExecutingSubmissions.get() + submissions.size() + reserveSize)));
 	}
 	/**
-	 * Starts a new process by executing the provided {@link net.viktorc.pspp.ProcessShell}. If it is null, it creates a new 
+	 * Starts a new process by executing the provided {@link net.viktorc.ppe4j.StandardProcessShell}. If it is null, it creates a new 
 	 * instance, adds it to the pool, and executes it.
 	 * 
-	 * @param processShell An optional {@link net.viktorc.pspp.ProcessShell} instance to re-start in case one is available.
+	 * @param processShell An optional {@link net.viktorc.ppe4j.StandardProcessShell} instance to re-start in case one is available.
 	 * @return Whether the process was successfully started.
 	 * @throws ProcessException If a process shell instance cannot be borrowed from the pool.
 	 */
-	private boolean startNewProcess(ProcessShell processShell) {
+	private boolean startNewProcess(StandardProcessShell processShell) {
 		if (processShell == null) {
 			try {
 				processShell = shellPool.borrowObject();
 			} catch (Exception e) {
-				if (verbose)
-					logger.log(Level.WARNING, "Failed to borrow a process shell from the pool.");
 				return false;
 			}
 		}
 		/* Try to execute the process. It may happen that the count of active processes is not correct and in fact the pool 
 		 * has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism that takes care of this. */
 		try {
-			processExecutor.execute(processShell);
-			borrowedShells.add(processShell);
+			shellExecutor.execute(processShell);
+			activeShells.add(processShell);
 			return true;
 		} catch (RejectedExecutionException e) {
 			shellPool.returnObject(processShell);
@@ -260,7 +255,7 @@ public class PSPPool {
 	/**
 	 * A method that handles the submission of commands from the queue to the processes.
 	 */
-	private void mainLoop() {
+	private void submissionLoop() {
 		InternalSubmission nextSubmission = null;
 		while (!close) {
 			try {
@@ -269,9 +264,9 @@ public class PSPPool {
 					nextSubmission = submissions.take();
 				InternalSubmission submission = nextSubmission;
 				// Execute it in any of the available processes.
-				for (ProcessShell shell : activeShells) {
+				for (StandardProcessShell shell : hotShells) {
 					if (shell.isReady()) {
-						Future<?> future = taskExecutorService.submit(() -> {
+						Future<?> future = auxExecutor.submit(() -> {
 							try {
 								submission.submitted = false;
 								submission.semaphore.drainPermits();
@@ -330,6 +325,7 @@ public class PSPPool {
 	 * @throws IllegalStateException If the pool has already been shut down.
 	 * @throws IllegalArgumentException If the submission is null.
 	 */
+	@Override
 	public Future<Long> submit(Submission submission) {
 		if (close)
 			throw new IllegalStateException("The pool has already been shut down.");
@@ -341,46 +337,106 @@ public class PSPPool {
 		return new InternalSubmissionFuture(internalSubmission);
 	}
 	/**
-	 * Attempts to shut the process pool including all its processes down. The method blocks until all {@link net.viktorc.pspp.ProcessShell} 
+	 * Attempts to shut the process pool including all its processes down. The method blocks until all {@link net.viktorc.ppe4j.StandardProcessShell} 
 	 * instances maintained by the pool are closed.
 	 * 
 	 * @throws IllegalStateException If the pool has already been shut down.
 	 */
+	@Override
 	public synchronized void shutdown() {
 		if (close)
 			throw new IllegalStateException("The pool has already been shut down.");
-		if (verbose)
-			logger.info("Initiating shutdown...");
-		close = true;
-		mainLoop.interrupt();
 		synchronized (lock) {
-			for (ProcessShell shell : borrowedShells)
+			if (verbose)
+				logger.info("Initiating shutdown...");
+			close = true;
+			while (prestartLatch.getCount() != 0)
+				prestartLatch.countDown();
+			submissionLoop.interrupt();
+			if (verbose)
+				logger.info("Shutting down process shells...");
+			for (StandardProcessShell shell : activeShells)
 				shell.stop(true);
+			if (verbose)
+				logger.info("Shutting down thread pools...");
+			shellExecutor.shutdown();
+			auxExecutor.shutdown();
+			shellPool.close();
+			if (verbose)
+				logger.info("Process pool shut down.");
 		}
-		processExecutor.shutdown();
-		taskExecutorService.shutdown();
-		shellPool.close();
-		if (verbose)
-			logger.info("Pool shut down.");
 	}
 	
 	/**
-	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of {@link net.viktorc.pspp.ProcessShell} 
+	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that provides more descriptive thread names and 
+	 * extends the {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by logging the uncaught exceptions if 
+	 * the enclosing {@link net.viktorc.ppe4j.StandardProcessPoolExecutor} instance is verbose. It also attempts to shut down the 
+	 * enclosing pool if a {@link net.viktorc.ppe4j.ProcessException} is thrown in one of the threads it created.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class CustomizedThreadFactory implements ThreadFactory {
+
+		final ThreadFactory defaultFactory;
+		final String poolName;
+		final String executionErrorMessage;
+		
+		/**
+		 * Constructs an instance according to the specified parameters.
+		 * 
+		 * @param poolName The name of the thread pool. It will be prepended to the name of the created threads.
+		 * @param executionErrorMessage The error message to log in case an exception is thrown while 
+		 * executing the {@link java.lang.Runnable}.
+		 */
+		CustomizedThreadFactory(String poolName, String executionErrorMessage) {
+			defaultFactory = Executors.defaultThreadFactory();
+			this.poolName = poolName;
+			this.executionErrorMessage = executionErrorMessage;
+		}
+		@Override
+		public Thread newThread(Runnable r) {
+			Thread t = defaultFactory.newThread(r);
+			t.setName(t.getName().replaceFirst("pool-[0-9]+", poolName));
+			UncaughtExceptionHandler handler = t.getUncaughtExceptionHandler();
+			t.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+				
+				@Override
+				public void uncaughtException(Thread t, Throwable e) {
+					if (e instanceof ProcessException) {
+						e.printStackTrace();
+						StandardProcessPoolExecutor.this.shutdown();
+						return;
+					}
+					if (verbose)
+						logger.log(Level.SEVERE, executionErrorMessage, e);
+					if (handler != null)
+						handler.uncaughtException(t, e);
+				}
+			});
+			return t;
+		}
+		
+	}
+	
+	/**
+	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of {@link net.viktorc.ppe4j.StandardProcessShell} 
 	 * instances.
 	 * 
-	 * @author A6714
+	 * @author Viktor
 	 *
 	 */
 	private class ProcessShellExecutor extends ThreadPoolExecutor {
 
 		/**
-		 * Constructs a pool according to the specified parameters. </br>
-		 * 
-		 * See {@link java.util.concurrent.ThreadPoolExecutor#ThreadPoolExecutor(int, int, long, TimeUnit, BlockingQueue)}.
+		 * Constructs thread pool for the execution of {@link net.viktorc.ppe4j.StandardProcessShell} instances. If there are more than 
+		 * <code>Math.max(minPoolSize, reserveSize)</code> idle threads in the pool, excess threads are evicted after <code>keepAliveTime</code> 
+		 * milliseconds, or if it is non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds.
 		 */
-		ProcessShellExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit,
-				BlockingQueue<Runnable> workQueue) {
-			super(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue);
+		ProcessShellExecutor() {
+			super(Math.max(minPoolSize, reserveSize), maxPoolSize, keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME,
+					TimeUnit.MILLISECONDS, new SynchronousQueue<>(), new CustomizedThreadFactory("shellExecutor",
+							"Error while excuting the process."));
 		}
 		@Override
 		protected void beforeExecute(Thread t, Runnable r) {
@@ -392,8 +448,8 @@ public class PSPPool {
 		@Override
 		protected void afterExecute(Runnable r, Throwable t) {
 			super.afterExecute(r, t);
-			ProcessShell shell = (ProcessShell) r;
-			borrowedShells.remove(shell);
+			StandardProcessShell shell = (StandardProcessShell) r;
+			activeShells.remove(shell);
 			if (verbose)
 				logger.info("Process shell " + shell + " stopped executing." + System.lineSeparator() +
 						getPoolStats());
@@ -418,115 +474,74 @@ public class PSPPool {
 	}
 	
 	/**
-	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that extends the 
-	 * {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by logging the exceptions (throwables).
-	 * 
-	 * @author A6714
-	 *
-	 */
-	private class VerboseThreadFactory implements ThreadFactory {
-
-		final ThreadFactory originalFactory;
-		final String executionErrorMessage;
-		
-		/**
-		 * Constructs an instance according to the specified parameters.
-		 * 
-		 * @param originalFactory The default {@link java.util.concurrent.ThreadFactory} of the pool.
-		 * @param executionErrorMessage The error message to log in case an exception is thrown while 
-		 * executing the {@link java.lang.Runnable}.
-		 */
-		VerboseThreadFactory(ThreadFactory originalFactory, String executionErrorMessage) {
-			this.originalFactory = originalFactory;
-			this.executionErrorMessage = executionErrorMessage;
-		}
-		@Override
-		public Thread newThread(Runnable r) {
-			Thread t = originalFactory.newThread(r);
-			UncaughtExceptionHandler handler = t.getUncaughtExceptionHandler();
-			t.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-				
-				@Override
-				public void uncaughtException(Thread t, Throwable e) {
-					logger.log(Level.SEVERE, executionErrorMessage, e);
-					if (handler != null)
-						handler.uncaughtException(t, e);
-				}
-			});
-			return t;
-		}
-		
-	}
-	
-	/**
 	 * An implementation of the {@link org.apache.commons.pool2.PooledObjectFactory} interface to handle the creation of 
-	 * pooled {@link net.viktorc.pspp.ProcessShell} instances.
+	 * pooled {@link net.viktorc.ppe4j.StandardProcessShell} instances.
 	 * 
 	 * @author Viktor
 	 *
 	 */
-	private class PooledProcessShellFactory implements PooledObjectFactory<ProcessShell> {
+	private class PooledProcessShellFactory implements PooledObjectFactory<StandardProcessShell> {
 
 		@Override
-		public PooledObject<ProcessShell> makeObject() throws Exception {
+		public PooledObject<StandardProcessShell> makeObject() throws Exception {
 			PooledProcessManager manager = new PooledProcessManager(managerFactory.createNewProcessManager());
-			ProcessShell processShell = new ProcessShell(manager, keepAliveTime, taskExecutorService);
+			StandardProcessShell processShell = new StandardProcessShell(manager, keepAliveTime, auxExecutor);
 			manager.processShell = processShell;
-			return new DefaultPooledObject<ProcessShell>(processShell);
+			return new DefaultPooledObject<StandardProcessShell>(processShell);
 		}
 		@Override
-		public void activateObject(PooledObject<ProcessShell> p) {
+		public void activateObject(PooledObject<StandardProcessShell> p) {
 			// No-operation.
 		}
 		@Override
-		public boolean validateObject(PooledObject<ProcessShell> p) {
-			return !p.getObject().isActive();
+		public boolean validateObject(PooledObject<StandardProcessShell> p) {
+			return true;
 		}
 		@Override
-		public void passivateObject(PooledObject<ProcessShell> p) {
+		public void passivateObject(PooledObject<StandardProcessShell> p) {
 			// No-operation
 		}
 		@Override
-		public void destroyObject(PooledObject<ProcessShell> p) {
+		public void destroyObject(PooledObject<StandardProcessShell> p) {
 			// No-operation.
 		}
 		
 	}
 	
 	/**
-	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.pspp.ProcessShell} 
+	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.ppe4j.StandardProcessShell} 
 	 * instances.
 	 * 
 	 * @author Viktor
 	 *
 	 */
-	private class ProcessShellPool extends GenericObjectPool<ProcessShell> {
+	private class ProcessShellPool extends GenericObjectPool<StandardProcessShell> {
 
 		/**
-		 * Constructs a pool instance that does not block when exhausted and has a maximum total size of 
-		 * {@link net.viktorc.pspp.PSPPool#maxPoolSize}.
-		 * 
-		 * @param factory A factory for the creation of pooled {@link net.viktorc.pspp.ProcessShell} instances.
+		 * Constructs an object pool instance to facilitate the reuse of {@link net.viktorc.ppe4j.StandardProcessShell} instances. The pool 
+		 * does not block if there are no available objects, it accommodates <code>maxPoolSize</code> objects, and if there are more than 
+		 * <code>Math.max(minPoolSize, reserveSize)</code> idle objects in the pool, excess idle objects are eligible for eviction after 
+		 * <code>keepAliveTime</code> milliseconds, or if it is non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds. The eviction 
+		 * thread runs at the above specified intervals and performs at most <code>maxPoolSize - minPoolSize</code> evictions per run.
 		 */
-		public ProcessShellPool(PooledProcessShellFactory factory) {
-			super(factory);
-			setTestOnReturn(true);
+		public ProcessShellPool() {
+			super(new PooledProcessShellFactory());
 			setBlockWhenExhausted(false);
 			setMaxTotal(maxPoolSize);
 			setMaxIdle(Math.max(minPoolSize, reserveSize));
-			// To avoid having the process restarts and the eviction at the same time in the first cycle.
-			setTimeBetweenEvictionRunsMillis((long) (1.5*keepAliveTime));
-			setSoftMinEvictableIdleTimeMillis(keepAliveTime);
-			setNumTestsPerEvictionRun(maxPoolSize);
+			long evictTime = keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME;
+			setTimeBetweenEvictionRunsMillis(evictTime);
+			setSoftMinEvictableIdleTimeMillis(evictTime);
+			setNumTestsPerEvictionRun(maxPoolSize - minPoolSize);
 		}
 		
 	}
 	
 	/**
-	 * An implementation of the {@link net.viktorc.pspp.ProcessManager} interface for managing the life cycle of 
+	 * An implementation of the {@link net.viktorc.ppe4j.ProcessManager} interface for managing the life cycle of 
 	 * individual pooled processes.
 	 * 
-	 * @author A6714
+	 * @author Viktor
 	 *
 	 */
 	private class PooledProcessManager implements ProcessManager {
@@ -557,7 +572,7 @@ public class PSPPool {
 		@Override
 		public void onStartup(ProcessShell shell) {
 			originalManager.onStartup(shell);
-			activeShells.add(shell);
+			hotShells.add((StandardProcessShell) shell);
 			prestartLatch.countDown();
 		}
 		@Override
@@ -568,18 +583,18 @@ public class PSPPool {
 		public void onTermination(int resultCode) {
 			originalManager.onTermination(resultCode);
 			if (processShell != null)
-				activeShells.remove(processShell);
+				hotShells.remove(processShell);
 		}
 		
 	}
 	
 	/**
-	 * An implementation of the {@link net.viktorc.pspp.Submission} interface for wrapping submissions into 'internal' 
+	 * An implementation of the {@link net.viktorc.ppe4j.Submission} interface for wrapping submissions into 'internal' 
 	 * submissions to keep track of the number of commands being executed at a time and to establish a mechanism for 
 	 * canceling submitted commands via the {@link java.util.concurrent.Future} returned by the 
-	 * {@link net.viktorc.pspp.PSPPool#submit(Submission) submit} method.
+	 * {@link net.viktorc.ppe4j.StandardProcessPoolExecutor#submit(Submission)} method.
 	 * 
-	 * @author A6714
+	 * @author Viktor
 	 *
 	 */
 	private class InternalSubmission implements Submission {
@@ -649,7 +664,7 @@ public class PSPPool {
 	 * An implementation of {@link java.util.concurrent.Future} that returns the time it took to process the 
 	 * submission.
 	 * 
-	 * @author A6714
+	 * @author Viktor
 	 *
 	 */
 	private class InternalSubmissionFuture implements Future<Long> {

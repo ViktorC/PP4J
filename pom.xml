@@ -2,9 +2,9 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.viktorc</groupId>
-	<artifactId>pspp</artifactId>
-	<version>1.2</version>
-	<name>PSPPool</name>
+	<artifactId>ppe4j</artifactId>
+	<version>1.0</version>
+	<name>PPE4J</name>
 	<description>A small library that provides a pool for maintaining pre-started processes.</description>
 	<url>https://github.com/ViktorC</url>
 	<packaging>jar</packaging>
