@@ -51,15 +51,14 @@ public interface ProcessManager {
 	void onStartup(ProcessShell shell);
 	/**
 	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
-	 * close resources or to exit the process in an orderly way and avoid the need to forcibly terminate 
-	 * it at all. The return value of the method determines whether there is a need to forcibly terminate
-	 * the process. If true is returned, the termination is assumed to have been successful and the 
-	 * process is not forcibly terminated afterwards. If it returns false, the process is killed.
+	 * close resources or to exit the process in an orderly way. The return value of the method denotes 
+	 * whether the process was successfully terminated. If orderly termination fails, the process is 
+	 * killed forcibly.
 	 * 
 	 * @param shell The {@link net.viktorc.ppe4j.ProcessShell} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process to terminate it in an orderly 
 	 * way.
-	 * @return Whether the process has been successfully terminated or it should be forcibly cancelled.
+	 * @return Whether the process has been successfully terminated.
 	 */
 	boolean terminate(ProcessShell shell);
 	/**

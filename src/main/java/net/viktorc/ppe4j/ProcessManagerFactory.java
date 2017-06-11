@@ -15,6 +15,6 @@ public interface ProcessManagerFactory {
 	 * 
 	 * @return A new instance of an implementation of the {@link net.viktorc.ppe4j.ProcessManager} interface.
 	 */
-	ProcessManager createNewProcessManager();
+	ProcessManager newProcessManager();
 	
 }

@@ -240,10 +240,13 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 			}
 		}
 		/* Try to execute the process. It may happen that the count of active processes is not correct and in fact the pool 
-		 * has reached its capacity in the mean time. It is ignored for now. !TODO Devise a mechanism that takes care of this. */
+		 * has reached its capacity in the mean time. */
 		try {
 			shellExecutor.execute(processShell);
 			activeShells.add(processShell);
+			if (verbose)
+				logger.info("Process shell " + processShell + " started running." + System.lineSeparator() +
+						getPoolStats());
 			return true;
 		} catch (RejectedExecutionException e) {
 			shellPool.returnObject(processShell);
@@ -256,9 +259,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * A method that handles the submission of commands from the queue to the processes.
 	 */
 	private void submissionLoop() {
-		InternalSubmission nextSubmission = null;
-		while (!close) {
-			try {
+		try {
+			InternalSubmission nextSubmission = null;
+			while (!close) {
 				// Wait until there is a command submitted.
 				if (nextSubmission == null)
 					nextSubmission = submissions.take();
@@ -280,9 +283,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 												submission.submittedTime)/1000000000)));
 								} else
 									submission.semaphore.release();
-							} catch (Exception e) {
+							} catch (InterruptedException | IOException e) {
 								if (verbose)
-									logger.log(Level.SEVERE, "Exception while executing command(s) " +
+									logger.log(Level.WARNING, "Exception while executing submission " +
 											submission + ".", e);
 								if (submission.semaphore.availablePermits() == 0)
 									submission.semaphore.release();
@@ -308,12 +311,14 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 					if (doExtendPool())
 						startNewProcess(null);
 				}
-			} catch (InterruptedException e) {
-				return;
-			} catch (Exception e) {
-				if (verbose)
-					logger.log(Level.SEVERE, "An error occurred while submitting commands.", e);
 			}
+		} catch (InterruptedException e) {
+			// Let the thread terminate.
+			return;
+		} catch (Exception e) {
+			// Severe error, log regardless of verbosity.
+			logger.log(Level.SEVERE, "An error occurred while delegating submissions.", e);
+			shutdown();
 		}
 	}
 	/**
@@ -398,20 +403,13 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		public Thread newThread(Runnable r) {
 			Thread t = defaultFactory.newThread(r);
 			t.setName(t.getName().replaceFirst("pool-[0-9]+", poolName));
-			UncaughtExceptionHandler handler = t.getUncaughtExceptionHandler();
 			t.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
 				
 				@Override
 				public void uncaughtException(Thread t, Throwable e) {
-					if (e instanceof ProcessException) {
-						e.printStackTrace();
-						StandardProcessPoolExecutor.this.shutdown();
-						return;
-					}
-					if (verbose)
-						logger.log(Level.SEVERE, executionErrorMessage, e);
-					if (handler != null)
-						handler.uncaughtException(t, e);
+					// Log the exception whether verbose or not.
+					logger.log(Level.SEVERE, executionErrorMessage, e);
+					StandardProcessPoolExecutor.this.shutdown();
 				}
 			});
 			return t;
@@ -439,19 +437,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							"Error while excuting the process."));
 		}
 		@Override
-		protected void beforeExecute(Thread t, Runnable r) {
-			super.beforeExecute(t, r);
-			if (verbose)
-				logger.info("Process shell " + (ProcessShell) r + " starting execution." + System.lineSeparator() +
-						getPoolStats());
-		}
-		@Override
 		protected void afterExecute(Runnable r, Throwable t) {
 			super.afterExecute(r, t);
 			StandardProcessShell shell = (StandardProcessShell) r;
 			activeShells.remove(shell);
 			if (verbose)
-				logger.info("Process shell " + shell + " stopped executing." + System.lineSeparator() +
+				logger.info("Process shell " + shell + " stopped running." + System.lineSeparator() +
 						getPoolStats());
 			if (t == null) {
 				synchronized (lock) {
@@ -466,7 +457,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				} catch (Exception e) {
 					// This cannot practically happen.
 					if (verbose)
-						logger.log(Level.SEVERE, "Error while invalidating process shell " + shell + ".", e);
+						logger.log(Level.WARNING, "Error while invalidating process shell " + shell + ".", e);
 				}
 			}
 		}
@@ -484,7 +475,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 
 		@Override
 		public PooledObject<StandardProcessShell> makeObject() throws Exception {
-			PooledProcessManager manager = new PooledProcessManager(managerFactory.createNewProcessManager());
+			PooledProcessManager manager = new PooledProcessManager(managerFactory.newProcessManager());
 			StandardProcessShell processShell = new StandardProcessShell(manager, keepAliveTime, auxExecutor);
 			manager.processShell = processShell;
 			return new DefaultPooledObject<StandardProcessShell>(processShell);
@@ -573,6 +564,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		public void onStartup(ProcessShell shell) {
 			originalManager.onStartup(shell);
 			hotShells.add((StandardProcessShell) shell);
+			if (verbose)
+				logger.info("Process shell " + shell + " is hot." + System.lineSeparator() +
+						getPoolStats());
 			prestartLatch.countDown();
 		}
 		@Override
@@ -582,8 +576,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		@Override
 		public void onTermination(int resultCode) {
 			originalManager.onTermination(resultCode);
-			if (processShell != null)
+			if (processShell != null) {
 				hotShells.remove(processShell);
+				if (verbose)
+					logger.info("Process shell " + processShell + " is cold." + System.lineSeparator() +
+							getPoolStats());
+			}
 		}
 		
 	}

@@ -92,22 +92,39 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 		return isActive() && (!lock.isLocked() || lock.isHeldByCurrentThread());
 	}
 	/**
-	 * It prompts the currently running process, if there is one, to terminate.
+	 * It prompts the currently running process, if there is one, to terminate. Once the process has been successfully terminated, 
+	 * subsequent calls are ignored and return true unless the process is started again.
 	 * 
 	 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.ppe4j.ProcessManager#terminate(ProcessShell)} 
 	 * method of the {@link net.viktorc.ppe4j.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
-	 * process is currently executing, not listening to its standard in.
+	 * process is currently executing a command or has not started up.
+	 * @return Whether the process was successfully terminated.
 	 */
-	public void stop(boolean forcibly) {
+	public boolean stop(boolean forcibly) {
 		synchronized (lock) {
-			if (process == null || stop)
-				return;
-			if (timer != null)
-				timer.stop();
-			if (forcibly || !manager.terminate(this))
-				process.destroy();
-			stop = true;
-			lock.notifyAll();
+			if (stop)
+				return true;
+			boolean success = true;
+			if (process != null) {
+				if (!forcibly) {
+					if (lock.tryLock()) {
+						try {
+							success = manager.terminate(this);
+						} finally {
+							lock.unlock();
+						}
+					} else
+						success = false;
+				} else
+					process.destroy();
+			}
+			if (success) {
+				if (timer != null)
+					timer.stop();
+				stop = true;
+				lock.notifyAll();
+			}
+			return success;
 		}
 	}
 	/**
@@ -172,9 +189,10 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 					}
 				}
 				if (running && !stop) {
-					if (submission.doTerminateProcessAfterwards())
-						stop(false);
-					else if (timer != null)
+					if (submission.doTerminateProcessAfterwards()) {
+						if (!stop(false))
+							stop(true);
+					} else if (timer != null)
 						timer.start();
 				}
 				return true;
@@ -222,8 +240,11 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 							throw new ProcessException(e);
 						}
 					});
-					while (!startedUp)
+					while (!startedUp) {
 						lock.wait();
+						if (stop)
+							return;
+					}
 					manager.onStartup(this);
 					if (stop)
 						return;
@@ -314,12 +335,9 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 						wait(waitTime);
 						waitTime -= (System.currentTimeMillis() - start);
 					}
-					if (go && lock.tryLock()) {
-						try {
-							StandardProcessShell.this.stop(false);
-						} finally {
-							lock.unlock();
-						}
+					if (go) {
+						if (!StandardProcessShell.this.stop(false))
+							StandardProcessShell.this.stop(true);
 					}
 				}
 			} catch (InterruptedException e) {
