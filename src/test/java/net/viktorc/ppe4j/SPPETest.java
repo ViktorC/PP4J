@@ -127,6 +127,12 @@ public class SPPETest {
 				pool.getNumOfExecutingSubmissions() + ".";
 		assert pool.getTotalNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of total " +
 				"processes: " + pool.getTotalNumOfProcesses() + " instead of " + Math.max(minPoolSize, reserveSize) + ".";
+		// Give the shells a few milliseconds to get hot.
+		try {
+			Thread.sleep(5);
+		} catch (InterruptedException e) {
+			assert false : e.getMessage();
+		}
 		assert pool.getNumOfActiveProcesses() == pool.getTotalNumOfProcesses() : "Unexpected number of active " +
 				"processes: " + pool.getNumOfActiveProcesses() + " instead of " + pool.getTotalNumOfProcesses() + ".";
 	}
@@ -177,7 +183,7 @@ public class SPPETest {
 		List<Future<Long>> futures = new ArrayList<>(requests);
 		List<Entry<Semaphore,Long>> cancelTimes = cancelTime > 0 ? new ArrayList<>(requests) : null;
 		for (int i = 0; i < requests; i++) {
-			if (frequency > 0) {
+			if (i != 0 && frequency > 0) {
 				try {
 					Thread.sleep(frequency);
 				} catch (InterruptedException e) {
@@ -389,7 +395,7 @@ public class SPPETest {
 	@Test
 	public void test15() throws Exception {
 		StandardProcessPoolExecutor pool = getCustomPool(50, 150, 10, 0, true, false, false);
-		Assert.assertTrue(perfTest("Test 15", pool, false, new int[] { 5 }, 100, 5000, 0, false, false, 4995, 5600));
+		Assert.assertTrue(perfTest("Test 15", pool, false, new int[] { 5 }, 100, 5000, 0, false, false, 4995, 5620));
 	}
 	@Test
 	public void test16() throws Exception {
@@ -467,8 +473,8 @@ public class SPPETest {
 	// Single process pool performance testing.
 	@Test
 	public void test27() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(1, 1, 0, 20000, true, false, false);
-		Assert.assertTrue(perfTest("Test 27", pool, false, new int[] { 5 }, 5, 30000, 0, false, false, 4995, 6200));
+		StandardProcessPoolExecutor pool = getCustomPool(1, 1, 0, 20000, true, true, true);
+		Assert.assertTrue(perfTest("Test 27", pool, false, new int[] { 5 }, 5, 30000, 0, false, false, 4995, 5100));
 	}
 	@Test
 	public void test28() throws Exception {

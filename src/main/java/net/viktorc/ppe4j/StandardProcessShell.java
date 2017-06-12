@@ -162,6 +162,8 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 	 * it returns false; otherwise the submission is executed and true is returned once it's processed.
 	 * @throws InterruptedException If the thread is interrupted while executing the commands.
 	 * @throws IOException If the instruction cannot be written to the process' standard in stream.
+	 * @throws ProcessException If the submission requires the process to be terminated afterwards but 
+	 * all attempts at termination fail.
 	 */
 	@Override
 	public boolean execute(Submission submission) throws IOException, InterruptedException {
@@ -190,8 +192,10 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 				}
 				if (running && !stop) {
 					if (submission.doTerminateProcessAfterwards()) {
-						if (!stop(false))
-							stop(true);
+						if (!stop(false) && !stop(true)) {
+							// This should not happen as the second call cannot practically fail.
+							throw new ProcessException("The process could not be terminated.");
+						}
 					} else if (timer != null)
 						timer.start();
 				}
@@ -211,7 +215,6 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 	@Override
 	public synchronized void run() {
 		running = true;
-		stop = false;
 		command = null;
 		int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 		try {
@@ -288,6 +291,7 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 				lock.notifyAll();
 			}
 			manager.onTermination(rc);
+			stop = false;
 		}
 	}
 	@Override

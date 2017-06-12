@@ -1,8 +1,8 @@
 package net.viktorc.ppe4j;
 
 /**
- * An exception thrown by the {@link net.viktorc.ppe4j.StandardProcessShell} class if an 
- * unexpected error occurs that solicits that instantaneous termination of the process.
+ * An exception thrown if an unexpected error occurs while running or interacting with a process that solicits the 
+ * instantaneous termination of the process and possibly the entire pool.
  * 
  * @author Viktor
  *
@@ -15,7 +15,15 @@ public class ProcessException extends RuntimeException {
 	private static final long serialVersionUID = 1L;
 	
 	/**
-	 * The only constructor.
+	 * Constructs an exception with the specified message.
+	 * 
+	 * @param message The exception message.
+	 */
+	public ProcessException(String message) {
+		super(message);
+	}
+	/**
+	 * Constructs a wrapper for the specified exception.
 	 * 
 	 * @param e The source exception.
 	 */

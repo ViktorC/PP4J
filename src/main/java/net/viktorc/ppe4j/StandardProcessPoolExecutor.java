@@ -12,9 +12,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -118,7 +118,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		prestartLatch = new CountDownLatch(actualMinSize);
 		lock = new Object();
 		logger = Logger.getAnonymousLogger();
-		for (int i = 0; i < actualMinSize; i++) {
+		for (int i = 0; i < actualMinSize && !close; i++) {
 			synchronized (lock) {
 				startNewProcess(null);
 			}
@@ -224,12 +224,11 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				numOfExecutingSubmissions.get() + submissions.size() + reserveSize)));
 	}
 	/**
-	 * Starts a new process by executing the provided {@link net.viktorc.ppe4j.StandardProcessShell}. If it is null, it creates a new 
-	 * instance, adds it to the pool, and executes it.
+	 * Starts a new process by executing the provided {@link net.viktorc.ppe4j.StandardProcessShell}. If it is null, it borrows an 
+	 * instance from the pool.
 	 * 
 	 * @param processShell An optional {@link net.viktorc.ppe4j.StandardProcessShell} instance to re-start in case one is available.
 	 * @return Whether the process was successfully started.
-	 * @throws ProcessException If a process shell instance cannot be borrowed from the pool.
 	 */
 	private boolean startNewProcess(StandardProcessShell processShell) {
 		if (processShell == null) {
@@ -239,21 +238,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				return false;
 			}
 		}
-		/* Try to execute the process. It may happen that the count of active processes is not correct and in fact the pool 
-		 * has reached its capacity in the mean time. */
-		try {
-			shellExecutor.execute(processShell);
-			activeShells.add(processShell);
-			if (verbose)
-				logger.info("Process shell " + processShell + " started running." + System.lineSeparator() +
-						getPoolStats());
-			return true;
-		} catch (RejectedExecutionException e) {
-			shellPool.returnObject(processShell);
-			if (verbose)
-				logger.log(Level.WARNING, "Failed to start new process due to the pool having reached its capacity.");
-			return false;
-		}
+		shellExecutor.execute(processShell);
+		activeShells.add(processShell);
+		if (verbose)
+			logger.info("Process shell " + processShell + " started running." + System.lineSeparator() +
+					getPoolStats());
+		return true;
 	}
 	/**
 	 * A method that handles the submission of commands from the queue to the processes.
@@ -360,8 +350,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 			submissionLoop.interrupt();
 			if (verbose)
 				logger.info("Shutting down process shells...");
-			for (StandardProcessShell shell : activeShells)
-				shell.stop(true);
+			for (StandardProcessShell shell : activeShells) {
+				if (!shell.stop(true)) {
+					// This should never happen.
+					logger.log(Level.SEVERE, "Process shell " + shell + " could not be stopped.");
+				}
+			}
 			if (verbose)
 				logger.info("Shutting down thread pools...");
 			shellExecutor.shutdown();
@@ -419,22 +413,51 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	
 	/**
 	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of {@link net.viktorc.ppe4j.StandardProcessShell} 
-	 * instances.
+	 * instances. It utilizes an extension of the {@link java.util.concurrent.LinkedTransferQueue} and an implementation of the 
+	 * {@link java.util.concurrent.RejectedExecutionHandler} as per Robert Tupelo-Schneck's answer to a StackOverflow 
+	 * <a href="https://stackoverflow.com/questions/19528304/how-to-get-the-threadpoolexecutor-to-increase-threads-to-max-before-queueing/19528305#19528305">
+	 * question</a> to facilitate a queueing logic that has the pool first increase the number of its threads and only really queue tasks 
+	 * once the maximum pool size has been reached.
 	 * 
 	 * @author Viktor
 	 *
 	 */
 	private class ProcessShellExecutor extends ThreadPoolExecutor {
-
+		
 		/**
 		 * Constructs thread pool for the execution of {@link net.viktorc.ppe4j.StandardProcessShell} instances. If there are more than 
-		 * <code>Math.max(minPoolSize, reserveSize)</code> idle threads in the pool, excess threads are evicted after <code>keepAliveTime</code> 
-		 * milliseconds, or if it is non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds.
+		 * <code>Math.max(minPoolSize, reserveSize)</code> idle threads in the pool, excess threads are evicted after <code>keepAliveTime
+		 * </code> milliseconds, or if it is non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds.
 		 */
 		ProcessShellExecutor() {
 			super(Math.max(minPoolSize, reserveSize), maxPoolSize, keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME,
-					TimeUnit.MILLISECONDS, new SynchronousQueue<>(), new CustomizedThreadFactory("shellExecutor",
-							"Error while excuting the process."));
+					TimeUnit.MILLISECONDS, new LinkedTransferQueue<Runnable>() {
+				
+						private static final long serialVersionUID = 7747592632597608014L;
+
+						@Override
+						public boolean offer(Runnable r) {
+							/* If there is at least one thread waiting on the queue, delegate the task immediately; else decline it and force 
+							 * the pool to create a new thread for running the task. */
+							return tryTransfer(r);
+						}
+						
+					}, new CustomizedThreadFactory("shellExecutor", "Error while running the process."),
+					new RejectedExecutionHandler() {
+						
+						@Override
+						public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+							try {
+								/* If there are no threads waiting on the queue (all of them are busy executing) and the maximum pool size has 
+								 * been reached, when the queue declines the offer, the pool will not create any more threads but call this 
+								 * handler instead. This handler 'forces' the declined task on the queue, ensuring that it is not rejected. */
+								executor.getQueue().put(r);
+							} catch (InterruptedException e) {
+								// Should not happen.
+								Thread.currentThread().interrupt();
+							}
+						}
+					});
 		}
 		@Override
 		protected void afterExecute(Runnable r, Throwable t) {
@@ -465,41 +488,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	}
 	
 	/**
-	 * An implementation of the {@link org.apache.commons.pool2.PooledObjectFactory} interface to handle the creation of 
-	 * pooled {@link net.viktorc.ppe4j.StandardProcessShell} instances.
-	 * 
-	 * @author Viktor
-	 *
-	 */
-	private class PooledProcessShellFactory implements PooledObjectFactory<StandardProcessShell> {
-
-		@Override
-		public PooledObject<StandardProcessShell> makeObject() throws Exception {
-			PooledProcessManager manager = new PooledProcessManager(managerFactory.newProcessManager());
-			StandardProcessShell processShell = new StandardProcessShell(manager, keepAliveTime, auxExecutor);
-			manager.processShell = processShell;
-			return new DefaultPooledObject<StandardProcessShell>(processShell);
-		}
-		@Override
-		public void activateObject(PooledObject<StandardProcessShell> p) {
-			// No-operation.
-		}
-		@Override
-		public boolean validateObject(PooledObject<StandardProcessShell> p) {
-			return true;
-		}
-		@Override
-		public void passivateObject(PooledObject<StandardProcessShell> p) {
-			// No-operation
-		}
-		@Override
-		public void destroyObject(PooledObject<StandardProcessShell> p) {
-			// No-operation.
-		}
-		
-	}
-	
-	/**
 	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.ppe4j.StandardProcessShell} 
 	 * instances.
 	 * 
@@ -515,8 +503,34 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		 * <code>keepAliveTime</code> milliseconds, or if it is non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds. The eviction 
 		 * thread runs at the above specified intervals and performs at most <code>maxPoolSize - minPoolSize</code> evictions per run.
 		 */
-		public ProcessShellPool() {
-			super(new PooledProcessShellFactory());
+		ProcessShellPool() {
+			super(new PooledObjectFactory<StandardProcessShell>() {
+
+				@Override
+				public PooledObject<StandardProcessShell> makeObject() throws Exception {
+					PooledProcessManager manager = new PooledProcessManager(managerFactory.newProcessManager());
+					StandardProcessShell processShell = new StandardProcessShell(manager, keepAliveTime, auxExecutor);
+					manager.processShell = processShell;
+					return new DefaultPooledObject<StandardProcessShell>(processShell);
+				}
+				@Override
+				public void activateObject(PooledObject<StandardProcessShell> p) {
+					// No-operation.
+				}
+				@Override
+				public boolean validateObject(PooledObject<StandardProcessShell> p) {
+					return true;
+				}
+				@Override
+				public void passivateObject(PooledObject<StandardProcessShell> p) {
+					// No-operation
+				}
+				@Override
+				public void destroyObject(PooledObject<StandardProcessShell> p) {
+					// No-operation.
+				}
+				
+			});
 			setBlockWhenExhausted(false);
 			setMaxTotal(maxPoolSize);
 			setMaxIdle(Math.max(minPoolSize, reserveSize));
