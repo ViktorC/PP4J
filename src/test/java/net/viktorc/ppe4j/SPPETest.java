@@ -133,8 +133,8 @@ public class SPPETest {
 		} catch (InterruptedException e) {
 			assert false : e.getMessage();
 		}
-		assert pool.getNumOfActiveProcesses() == pool.getTotalNumOfProcesses() : "Unexpected number of active " +
-				"processes: " + pool.getNumOfActiveProcesses() + " instead of " + pool.getTotalNumOfProcesses() + ".";
+		assert pool.getNumOfAvailableProcesses() == pool.getTotalNumOfProcesses() : "Unexpected number of active " +
+				"processes: " + pool.getNumOfAvailableProcesses() + " instead of " + pool.getTotalNumOfProcesses() + ".";
 	}
 	/**
 	 * Creates a custom test process pool according to the specified parameters.
