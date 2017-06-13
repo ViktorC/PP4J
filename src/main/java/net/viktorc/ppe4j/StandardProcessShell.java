@@ -39,9 +39,9 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 	private BufferedReader stdOutReader;
 	private BufferedReader errOutReader;
 	private BufferedWriter stdInWriter;
-	private Command command;
-	private boolean commandProcessed;
 	private boolean startedUp;
+	private volatile Command command;
+	private volatile boolean commandProcessed;
 	private volatile boolean running;
 	private volatile boolean stop;
 	
@@ -204,10 +204,8 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 				try {
 					submission.onFinishedProcessing();
 				} finally {
-					synchronized (lock) {
-						commandProcessed = true;
-						command = null;
-					}
+					commandProcessed = true;
+					command = null;
 					lock.unlock();
 				}
 			}
@@ -217,6 +215,7 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 	@Override
 	public synchronized void run() {
 		running = true;
+		command = null;
 		int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 		try {
 			lock.lock();
@@ -225,7 +224,6 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 				synchronized (lock) {
 					if (stop)
 						return;
-					command = null;
 					process = manager.start();
 					stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 					errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));

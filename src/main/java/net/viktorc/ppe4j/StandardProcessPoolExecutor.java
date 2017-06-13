@@ -50,7 +50,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 */
 	private static final long DEFAULT_EVICT_TIME = 60L*1000;
 	
-	private final ProcessManagerFactory managerFactory;
+	private final ProcessManagerFactory procManagerFactory;
 	private final int minPoolSize;
 	private final int maxPoolSize;
 	private final int reserveSize;
@@ -76,7 +76,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * one is greater. This constructor blocks until the initial number of processes start up. The size of the pool is dynamically 
 	 * adjusted based on the pool parameters and the rate of incoming submissions.
 	 * 
-	 * @param managerFactory A {@link net.viktorc.ppe4j.ProcessManagerFactory} instance that is used to build 
+	 * @param procManagerFactory A {@link net.viktorc.ppe4j.ProcessManagerFactory} instance that is used to build 
 	 * {@link net.viktorc.ppe4j.ProcessManager} instances that manage the processes' life cycle in the pool.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
@@ -89,9 +89,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
 	 * pool size.
 	 */
-	public StandardProcessPoolExecutor(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize, int reserveSize,
+	public StandardProcessPoolExecutor(ProcessManagerFactory procManagerFactory, int minPoolSize, int maxPoolSize, int reserveSize,
 			long keepAliveTime, boolean verbose) throws InterruptedException {
-		if (managerFactory == null)
+		if (procManagerFactory == null)
 			throw new IllegalArgumentException("The process manager factory cannot be null.");
 		if (minPoolSize < 0)
 			throw new IllegalArgumentException("The minimum pool size has to be greater than 0.");
@@ -100,7 +100,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 					"minimum pool size.");
 		if (reserveSize < 0 || reserveSize > maxPoolSize)
 			throw new IllegalArgumentException("The reserve has to be greater than 0 and less than the maximum pool size.");
-		this.managerFactory = managerFactory;
+		this.procManagerFactory = procManagerFactory;
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
@@ -131,6 +131,14 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 			if (!close)
 				submissionLoop.start();
 		}
+	}
+	/**
+	 * Returns the <code>ProcessManagerFactory</code> assigned to the pool.
+	 * 
+	 * @return The process manager factory of the process pool.
+	 */
+	public ProcessManagerFactory getProcessManagerFactory() {
+		return procManagerFactory;
 	}
 	/**
 	 * Returns the maximum allowed number of processes to hold in the pool.
@@ -260,6 +268,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				// Execute it in any of the available processes.
 				for (StandardProcessShell shell : hotShells) {
 					if (submission.isCancelled()) {
+						synchronized (submission) {
+							submission.notifyAll();
+						}
 						submissions.remove(submission);
 						nextSubmission = null;
 						break;
@@ -292,7 +303,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						});
 						submission.semaphore.acquire();
 						if (submission.submitted || submission.exception != null) {
-							submission.future = future;
+							synchronized (submission) {
+								submission.future = future;
+							}
 							submissions.remove(submission);
 							nextSubmission = null;
 							break;
@@ -511,7 +524,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 
 				@Override
 				public PooledObject<StandardProcessShell> makeObject() throws Exception {
-					PooledProcessManager manager = new PooledProcessManager(managerFactory.newProcessManager());
+					PooledProcessManager manager = new PooledProcessManager(procManagerFactory.newProcessManager());
 					StandardProcessShell processShell = new StandardProcessShell(manager, keepAliveTime, auxExecutor);
 					manager.processShell = processShell;
 					return new DefaultPooledObject<StandardProcessShell>(processShell);
@@ -619,7 +632,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		final Semaphore semaphore;
 		final AtomicLong submittedTime;
 		final AtomicLong processedTime;
-		volatile Future<?> future;
+		Future<?> future;
 		volatile Exception exception;
 		volatile boolean submitted;
 		volatile boolean processed;
@@ -698,15 +711,15 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		}
 		@Override
 		public boolean cancel(boolean mayInterruptIfRunning) {
-			if (submission.isCancelled() || (submission.future != null &&
-					submission.future.cancel(mayInterruptIfRunning))) {
-				synchronized (submission) {
+			synchronized (submission) {
+				if (submission.isCancelled() || (submission.future != null &&
+						submission.future.cancel(mayInterruptIfRunning))) {
 					submission.cancel = true;
 					submission.notifyAll();
-				}
-				return true;
-			} else
-				return false;
+					return true;
+				} else
+					return false;
+			}
 		}
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
