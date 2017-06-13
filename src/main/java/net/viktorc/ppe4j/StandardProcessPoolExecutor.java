@@ -20,6 +20,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -61,8 +62,8 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	private final ProcessShellPool shellPool;
 	// All shells borrowed from the pool including those that are in the startup or termination phases.
 	private final Queue<StandardProcessShell> activeShells;
-	// Shells borrowed from the pool that are ready for submissions, i.e. are started up and currently not executing submissions.
-	private final Queue<StandardProcessShell> availableShells;
+	// Shells borrowed from the pool that are ready for submissions or are currently executing submissions.
+	private final Queue<StandardProcessShell> hotShells;
 	private final BlockingQueue<InternalSubmission> submissions;
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final CountDownLatch prestartLatch;
@@ -112,7 +113,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				"Error while interacting with the process."));
 		shellPool = new ProcessShellPool();
 		activeShells = new LinkedBlockingQueue<>();
-		availableShells = new LinkedBlockingQueue<>();
+		hotShells = new LinkedBlockingQueue<>();
 		submissions = new LinkedBlockingQueue<>();
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
@@ -182,12 +183,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		return activeShells.size();
 	}
 	/**
-	 * Returns the number of available, i.e. started up, not yet cancelled, and currently not busy processes held in the pool.
+	 * Returns the number of active, i.e. started up and not yet cancelled, processes held in the pool.
 	 * 
 	 * @return The number of active processes.
 	 */
-	public int getNumOfAvailableProcesses() {
-		return availableShells.size();
+	public int getNumOfActiveProcesses() {
+		return hotShells.size();
 	}
 	/**
 	 * Returns the number of submissions currently being executed in the pool.
@@ -211,7 +212,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return "Total processes: " + activeShells.size() + "; available processes: " + availableShells.size() +
+		return "Total processes: " + activeShells.size() + "; acitve processes: " + hotShells.size() +
 				"; submitted commands: " + (numOfExecutingSubmissions.get() + submissions.size());
 	}
 	/**
@@ -257,33 +258,41 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 					nextSubmission = submissions.take();
 				InternalSubmission submission = nextSubmission;
 				// Execute it in any of the available processes.
-				for (StandardProcessShell shell : availableShells) {
+				for (StandardProcessShell shell : hotShells) {
+					if (submission.isCancelled()) {
+						submissions.remove(submission);
+						nextSubmission = null;
+						break;
+					}
 					if (shell.isReady()) {
 						Future<?> future = auxExecutor.submit(() -> {
 							try {
-								submission.shell = shell;
+								submission.semaphore.drainPermits();
 								if (shell.execute(submission)) {
 									if (verbose)
 										logger.info(String.format("Command(s) %s processed; submission delay: %.3f;" +
 												" execution time: %.3f.", submission,
-												(float) ((double) (submission.submittedTime -
+												(float) ((double) (submission.submittedTime.get() -
 												submission.receivedTime)/1000000000),
-												(float) ((double) (submission.processedTime -
-												submission.submittedTime)/1000000000)));
+												(float) ((double) (submission.processedTime.get() -
+												submission.submittedTime.get())/1000000000)));
 								} else
 									submission.semaphore.release();
 							} catch (InterruptedException | IOException e) {
 								if (verbose)
 									logger.log(Level.WARNING, "Exception while executing submission " +
 											submission + ".", e);
-								submission.setException(e);
+								synchronized (submission) {
+									submission.exception = e;
+									submission.notifyAll();
+								}
 								if (submission.semaphore.availablePermits() == 0)
 									submission.semaphore.release();
 							}
 						});
 						submission.semaphore.acquire();
 						if (submission.submitted || submission.exception != null) {
-							submission.setFuture(future);
+							submission.future = future;
 							submissions.remove(submission);
 							nextSubmission = null;
 							break;
@@ -546,7 +555,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	private class PooledProcessManager implements ProcessManager {
 		
 		final ProcessManager originalManager;
-		StandardProcessShell processShell;
+		volatile StandardProcessShell processShell;
 		
 		/**
 		 * Constructs a wrapper around the specified process manager.
@@ -571,7 +580,10 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		@Override
 		public void onStartup(ProcessShell shell) {
 			originalManager.onStartup(shell);
-			availableShells.add((StandardProcessShell) shell);
+			hotShells.add((StandardProcessShell) shell);
+			if (verbose)
+				logger.info("Process shell " + shell + " is hot." + System.lineSeparator() +
+						getPoolStats());
 			prestartLatch.countDown();
 		}
 		@Override
@@ -581,8 +593,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		@Override
 		public void onTermination(int resultCode) {
 			originalManager.onTermination(resultCode);
-			if (processShell != null)
-				availableShells.remove(processShell);
+			if (processShell != null) {
+				hotShells.remove(processShell);
+				if (verbose)
+					logger.info("Process shell " + processShell + " is cold." + System.lineSeparator() +
+							getPoolStats());
+			}
 		}
 		
 	}
@@ -598,86 +614,65 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 */
 	private class InternalSubmission implements Submission {
 		
-		final Submission originalSubmission;
+		final Submission origSubmission;
 		final long receivedTime;
 		final Semaphore semaphore;
-		volatile Long submittedTime;
-		volatile Long processedTime;
-		volatile boolean cancel;
-		volatile boolean submitted;
-		volatile boolean processed;
-		volatile StandardProcessShell shell;
+		final AtomicLong submittedTime;
+		final AtomicLong processedTime;
+		boolean cancel;
 		volatile Future<?> future;
 		volatile Exception exception;
+		volatile boolean submitted;
+		volatile boolean processed;
 		
 		/**
 		 * Constructs an instance according to the specified parameters.
 		 * 
-		 * @param originalSubmission The submission to wrap into an internal submission with extended features.
+		 * @param origSubmission The submission to wrap into an internal submission with extended features.
 		 * @throws IllegalArgumentException If the submission is null.
 		 */
 		InternalSubmission(Submission originalSubmission) {
 			if (originalSubmission == null)
 				throw new IllegalArgumentException("The submission cannot be null.");
-			this.originalSubmission = originalSubmission;
+			this.origSubmission = originalSubmission;
 			receivedTime = System.nanoTime();
 			semaphore = new Semaphore(0);
-		}
-		/**
-		 * A synchronized method for setting the <code>Future</code> instance associated with the submission.
-		 * 
-		 * @param f The <code>Future</code> instance associated with the submission.
-		 */
-		synchronized void setFuture(Future<?> f) {
-			this.future = f;
-		}
-		/**
-		 * A synchronized method for setting the <code>Exception</code> instance thrown during the execution of 
-		 * the submission.
-		 * 
-		 * @param e The <code>Exception</code> instance thrown during the execution of the submission.
-		 */
-		synchronized void setException(Exception e) {
-			exception = e;
-			notifyAll();
+			submittedTime = new AtomicLong(-1);
+			processedTime = new AtomicLong(-1);
 		}
 		@Override
 		public List<Command> getCommands() {
-			return originalSubmission.getCommands();
+			return origSubmission.getCommands();
 		}
 		@Override
 		public boolean doTerminateProcessAfterwards() {
-			return originalSubmission.doTerminateProcessAfterwards();
+			return origSubmission.doTerminateProcessAfterwards();
 		}
 		@Override
-		public synchronized boolean isCancelled() {
-			return originalSubmission.isCancelled() || cancel || close;
+		public boolean isCancelled() {
+			return origSubmission.isCancelled() || cancel || close;
 		}
 		@Override
 		public void onStartedProcessing() {
-			if (shell != null)
-				availableShells.remove(shell);
 			numOfExecutingSubmissions.incrementAndGet();
-			submittedTime = System.nanoTime();
+			submittedTime.set(System.nanoTime());
 			submitted = true;
 			semaphore.release();
-			originalSubmission.onStartedProcessing();
+			origSubmission.onStartedProcessing();
 		}
 		@Override
 		public void onFinishedProcessing() {
-			originalSubmission.onFinishedProcessing();
-			processedTime = System.nanoTime();
+			origSubmission.onFinishedProcessing();
+			processedTime.set(System.nanoTime());
 			synchronized (this) {
 				processed = true;
 				notifyAll();
 			}
 			numOfExecutingSubmissions.decrementAndGet();
-			if (shell != null && !doTerminateProcessAfterwards())
-				availableShells.add(shell);
 		}
 		@Override
 		public String toString() {
-			return originalSubmission.toString();
+			return origSubmission.toString();
 		}
 		
 	}
@@ -703,16 +698,15 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		}
 		@Override
 		public boolean cancel(boolean mayInterruptIfRunning) {
-			synchronized (submission) {
-				if (submission.isCancelled() || (submission.future != null &&
-						submission.future.cancel(mayInterruptIfRunning))) {
+			if (submission.isCancelled() || (submission.future != null &&
+					submission.future.cancel(mayInterruptIfRunning))) {
+				synchronized (submission) {
 					submission.cancel = true;
 					submission.notifyAll();
-					submissions.remove(submission);
-					return true;
-				} else
-					return false;
-			}
+				}
+				return true;
+			} else
+				return false;
 		}
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
@@ -724,7 +718,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				throw new CancellationException();
 			if (submission.exception != null)
 				throw new ExecutionException(submission.exception);
-			return (long) Math.round(((double) (submission.processedTime - submission.receivedTime))/1000000);
+			return (long) Math.round(((double) (submission.processedTime.get() - submission.receivedTime))/1000000);
 		}
 		@Override
 		public Long get(long timeout, TimeUnit unit)
@@ -744,7 +738,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				throw new ExecutionException(submission.exception);
 			if (timeoutNs <= 0)
 				throw new TimeoutException();
-			return timeoutNs <= 0 ? null : (long) Math.round(((double) (submission.processedTime -
+			return timeoutNs <= 0 ? null : (long) Math.round(((double) (submission.processedTime.get() -
 					submission.receivedTime))/1000000);
 		}
 		@Override

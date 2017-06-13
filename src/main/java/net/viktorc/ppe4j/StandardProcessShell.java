@@ -39,11 +39,11 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 	private BufferedReader stdOutReader;
 	private BufferedReader errOutReader;
 	private BufferedWriter stdInWriter;
-	private volatile Command command;
+	private Command command;
+	private boolean commandProcessed;
+	private boolean startedUp;
 	private volatile boolean running;
 	private volatile boolean stop;
-	private volatile boolean startedUp;
-	private volatile boolean commandProcessed;
 	
 	/**
 	 * Constructs a shell for the specified process using two threads of the specified {@link java.util.concurrent.ExecutorService} to 
@@ -204,8 +204,10 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 				try {
 					submission.onFinishedProcessing();
 				} finally {
-					commandProcessed = true;
-					command = null;
+					synchronized (lock) {
+						commandProcessed = true;
+						command = null;
+					}
 					lock.unlock();
 				}
 			}
@@ -215,7 +217,6 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 	@Override
 	public synchronized void run() {
 		running = true;
-		command = null;
 		int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 		try {
 			lock.lock();
@@ -224,6 +225,7 @@ public class StandardProcessShell implements ProcessShell, Runnable {
 				synchronized (lock) {
 					if (stop)
 						return;
+					command = null;
 					process = manager.start();
 					stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 					errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
