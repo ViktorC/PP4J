@@ -129,7 +129,7 @@ public class SPPETest {
 				"processes: " + pool.getTotalNumOfProcesses() + " instead of " + Math.max(minPoolSize, reserveSize) + ".";
 		// Give the shells a few milliseconds to get hot.
 		try {
-			Thread.sleep(5);
+			Thread.sleep(10);
 		} catch (InterruptedException e) {
 			assert false : e.getMessage();
 		}

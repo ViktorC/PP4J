@@ -619,11 +619,11 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		final Semaphore semaphore;
 		final AtomicLong submittedTime;
 		final AtomicLong processedTime;
-		boolean cancel;
 		volatile Future<?> future;
 		volatile Exception exception;
 		volatile boolean submitted;
 		volatile boolean processed;
+		volatile boolean cancel;
 		
 		/**
 		 * Constructs an instance according to the specified parameters.
