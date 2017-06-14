@@ -81,16 +81,8 @@ public class SPPETest {
 				pool.getNumOfQueuedSubmissions() + ".";
 		assert pool.getNumOfExecutingSubmissions() == 0 : "Non-zero number of executing submissions on startup: " +
 				pool.getNumOfExecutingSubmissions() + ".";
-		assert pool.getTotalNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of total " +
-				"processes: " + pool.getTotalNumOfProcesses() + " instead of " + Math.max(minPoolSize, reserveSize) + ".";
-		// Give the shells a few milliseconds to get hot.
-		try {
-			Thread.sleep(10);
-		} catch (InterruptedException e) {
-			assert false : e.getMessage();
-		}
-		assert pool.getNumOfActiveProcesses() == pool.getTotalNumOfProcesses() : "Unexpected number of active " +
-				"processes: " + pool.getNumOfActiveProcesses() + " instead of " + pool.getTotalNumOfProcesses() + ".";
+		assert pool.getNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of total " +
+				"processes: " + pool.getNumOfProcesses() + " instead of " + Math.max(minPoolSize, reserveSize) + ".";
 	}
 	/**
 	 * Creates a custom test process pool according to the specified parameters.

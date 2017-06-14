@@ -43,7 +43,9 @@ public interface ProcessManager {
 	boolean isStartedUp(String outputLine, boolean standard);
 	/**
 	 * A method called right after the process is started. Its main purpose is to allow for startup 
-	 * activities such as the execution of commands.
+	 * activities such as the execution of commands. The <code>shell</code> should be available and ready 
+	 * for processing submissions within this call back, thus its {@link net.viktorc.ppe4j.ProcessShell#execute(Submission)} 
+	 * method should always return <code>true</code>.
 	 * 
 	 * @param shell The {@link net.viktorc.ppe4j.ProcessShell} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process after the startup if needed.
@@ -53,12 +55,16 @@ public interface ProcessManager {
 	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
 	 * close resources or to exit the process in an orderly way. The return value of the method denotes 
 	 * whether the process was successfully terminated. If orderly termination fails, the process is 
-	 * killed forcibly.
+	 * killed forcibly. The <code>shell</code> might not be available or ready for processing submissions 
+	 * within this call back, thus its {@link net.viktorc.ppe4j.ProcessShell#execute(Submission)} method 
+	 * might return <code>false</code>. In this case, it is recommended to have this method return <code>
+	 * false</code> as well to have the process killed.
 	 * 
 	 * @param shell The {@link net.viktorc.ppe4j.ProcessShell} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process to terminate it in an orderly 
 	 * way.
-	 * @return Whether the process has been successfully terminated.
+	 * @return Whether the process has been successfully terminated. If it is <code>false</code> the process 
+	 * is killed forcibly.
 	 */
 	boolean terminate(ProcessShell shell);
 	/**

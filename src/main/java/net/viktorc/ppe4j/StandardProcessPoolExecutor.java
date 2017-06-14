@@ -1,26 +1,32 @@
 package net.viktorc.ppe4j;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,19 +37,25 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 
 /**
  * An implementation of the {@link net.viktorc.ppe4j.ProcessPoolExecutor} interface for maintaining and managing a pool of pre-started 
- * processes. The processes are executed in {@link net.viktorc.ppe4j.StandardProcessShell} instances. Each shell is assigned an instance 
- * of an implementation of the {@link net.viktorc.ppe4j.ProcessManager} interface using an implementation of the {@link net.viktorc.ppe4j.ProcessManagerFactory} 
- * interface. The pool accepts submissions in the form of {@link net.viktorc.ppe4j.Submission} implementations which are executed on any 
- * one of the available active process shells maintained by the pool. While executing a submission, the shell cannot accept further 
- * submissions. The submissions are queued and executed as soon as there is an available shell. The size of the pool is always kept between 
- * the minimum pool size and the maximum pool size (both inclusive). The reserve size specifies the minimum number of processes that should 
- * always be available (there are no guarantees that there actually will be this many available shells at any given time).
+ * processes. The processes are executed in instances of an own {@link net.viktorc.ppe4j.ProcessShell} implementation. Each shell is 
+ * assigned an instance of an implementation of the {@link net.viktorc.ppe4j.ProcessManager} interface using an implementation of the 
+ * {@link net.viktorc.ppe4j.ProcessManagerFactory} interface. The pool accepts submissions in the form of {@link net.viktorc.ppe4j.Submission} 
+ * implementations which are executed on any one of the available active process shells maintained by the pool. While executing a submission, 
+ * the shell cannot accept further submissions. The submissions are queued and executed as soon as there is an available shell. The size of 
+ * the pool is always kept between the minimum pool size and the maximum pool size (both inclusive). The reserve size specifies the minimum 
+ * number of processes that should always be available (there are no guarantees that there actually will be this many available shells at 
+ * any given time).
  * 
  * @author Viktor
  *
  */
 public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	
+	/**
+	 * If the process cannot be started or an exception occurs which would make it impossible to retrieve the actual 
+	 * result code of the process.
+	 */
+	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -99;
 	/**
 	 * The number of milliseconds after which idle process shell instances and process shell executor threads are evicted if 
 	 * {@link #keepAliveTime} is non-positive.
@@ -56,15 +68,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	private final int reserveSize;
 	private final long keepAliveTime;
 	private final boolean verbose;
-	private final Thread submissionLoop;
 	private final ProcessShellExecutor shellExecutor;
 	private final ExecutorService auxExecutor;
 	private final ProcessShellPool shellPool;
 	// All shells borrowed from the pool including those that are in the startup or termination phases.
 	private final Queue<StandardProcessShell> activeShells;
-	// Shells borrowed from the pool that are ready for submissions or are currently executing submissions.
-	private final Queue<StandardProcessShell> hotShells;
-	private final BlockingQueue<InternalSubmission> submissions;
+	private final LinkedBlockingDeque<InternalSubmission> submissions;
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final CountDownLatch prestartLatch;
 	private final Object lock;
@@ -107,14 +116,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		this.keepAliveTime = Math.max(0, keepAliveTime);
 		this.verbose = verbose;
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
-		submissionLoop = new Thread(this::submissionLoop, "submissionLoop");
 		shellExecutor = new ProcessShellExecutor();
-		auxExecutor = Executors.newCachedThreadPool(new CustomizedThreadFactory("auxExecutor",
-				"Error while interacting with the process."));
+		auxExecutor = new ThreadPoolExecutor(actualMinSize, Integer.MAX_VALUE, keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME,
+				TimeUnit.MILLISECONDS, new SynchronousQueue<>(), new CustomizedThreadFactory("auxExecutor"));
 		shellPool = new ProcessShellPool();
 		activeShells = new LinkedBlockingQueue<>();
-		hotShells = new LinkedBlockingQueue<>();
-		submissions = new LinkedBlockingQueue<>();
+		submissions = new LinkedBlockingDeque<>();
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
 		lock = new Object();
@@ -126,11 +133,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		}
 		// Wait for the processes in the initial pool to start up.
 		prestartLatch.await();
-		// Start the thread responsible for submitting commands.
-		synchronized (lock) {
-			if (!close)
-				submissionLoop.start();
-		}
 	}
 	/**
 	 * Returns the <code>ProcessManagerFactory</code> assigned to the pool.
@@ -183,20 +185,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		return verbose;
 	}
 	/**
-	 * Returns the total number of running processes currently held in the pool.
+	 * Returns the number of running processes currently held in the pool.
 	 * 
-	 * @return The total number of running processes.
+	 * @return The number of running processes.
 	 */
-	public int getTotalNumOfProcesses() {
+	public int getNumOfProcesses() {
 		return activeShells.size();
-	}
-	/**
-	 * Returns the number of active, i.e. started up and not yet cancelled, processes held in the pool.
-	 * 
-	 * @return The number of active processes.
-	 */
-	public int getNumOfActiveProcesses() {
-		return hotShells.size();
 	}
 	/**
 	 * Returns the number of submissions currently being executed in the pool.
@@ -220,8 +214,8 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return "Total processes: " + activeShells.size() + "; acitve processes: " + hotShells.size() +
-				"; submitted commands: " + (numOfExecutingSubmissions.get() + submissions.size());
+		return "Active processes: " + activeShells.size() + "; submitted commands: " +
+				(numOfExecutingSubmissions.get() + submissions.size());
 	}
 	/**
 	 * Returns whether a new process {@link net.viktorc.ppe4j.StandardProcessShell} instance should be started.
@@ -255,79 +249,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		return true;
 	}
 	/**
-	 * A method that handles the submission of commands from the queue to the processes.
-	 */
-	private void submissionLoop() {
-		try {
-			InternalSubmission nextSubmission = null;
-			while (!close) {
-				// Wait until there is a command submitted.
-				if (nextSubmission == null)
-					nextSubmission = submissions.take();
-				InternalSubmission submission = nextSubmission;
-				// Execute it in any of the available processes.
-				for (StandardProcessShell shell : hotShells) {
-					if (submission.isCancelled()) {
-						synchronized (submission) {
-							submission.notifyAll();
-						}
-						submissions.remove(submission);
-						nextSubmission = null;
-						break;
-					}
-					if (shell.isReady()) {
-						Future<?> future = auxExecutor.submit(() -> {
-							try {
-								submission.semaphore.drainPermits();
-								if (shell.execute(submission)) {
-									if (verbose)
-										logger.info(String.format("Command(s) %s processed; submission delay: %.3f;" +
-												" execution time: %.3f.", submission,
-												(float) ((double) (submission.submittedTime.get() -
-												submission.receivedTime)/1000000000),
-												(float) ((double) (submission.processedTime.get() -
-												submission.submittedTime.get())/1000000000)));
-								} else
-									submission.semaphore.release();
-							} catch (InterruptedException | IOException e) {
-								if (verbose)
-									logger.log(Level.WARNING, "Exception while executing submission " +
-											submission + ".", e);
-								synchronized (submission) {
-									submission.exception = e;
-									submission.notifyAll();
-								}
-								if (submission.semaphore.availablePermits() == 0)
-									submission.semaphore.release();
-							}
-						});
-						submission.semaphore.acquire();
-						if (submission.submitted || submission.exception != null) {
-							synchronized (submission) {
-								submission.future = future;
-							}
-							submissions.remove(submission);
-							nextSubmission = null;
-							break;
-						}
-					}
-				}
-				// Extend the pool if needed.
-				synchronized (lock) {
-					if (doExtendPool())
-						startNewProcess(null);
-				}
-			}
-		} catch (InterruptedException e) {
-			// Let the thread terminate.
-			return;
-		} catch (Exception e) {
-			// Severe error, log regardless of verbosity.
-			logger.log(Level.SEVERE, "An error occurred while delegating submissions.", e);
-			shutdown();
-		}
-	}
-	/**
 	 * Executes the submission on any of the available processes in the pool.
 	 * 
 	 * @param submission The submission including all information necessary for executing and processing the command(s).
@@ -343,7 +264,13 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
 		InternalSubmission internalSubmission = new InternalSubmission(submission);
-		submissions.add(internalSubmission);
+		submissions.addLast(internalSubmission);
+		synchronized (lock) {
+			if (doExtendPool())
+				startNewProcess(null);
+		}
+		if (verbose)
+			logger.info("Submission " + submission + " received." + System.lineSeparator() + getPoolStats());
 		// Return a Future holding the total execution time including the submission delay.
 		return new InternalSubmissionFuture(internalSubmission);
 	}
@@ -363,7 +290,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 			close = true;
 			while (prestartLatch.getCount() != 0)
 				prestartLatch.countDown();
-			submissionLoop.interrupt();
 			if (verbose)
 				logger.info("Shutting down process shells...");
 			for (StandardProcessShell shell : activeShells) {
@@ -395,19 +321,15 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 
 		final ThreadFactory defaultFactory;
 		final String poolName;
-		final String executionErrorMessage;
 		
 		/**
 		 * Constructs an instance according to the specified parameters.
 		 * 
 		 * @param poolName The name of the thread pool. It will be prepended to the name of the created threads.
-		 * @param executionErrorMessage The error message to log in case an exception is thrown while 
-		 * executing the {@link java.lang.Runnable}.
 		 */
-		CustomizedThreadFactory(String poolName, String executionErrorMessage) {
+		CustomizedThreadFactory(String poolName) {
 			defaultFactory = Executors.defaultThreadFactory();
 			this.poolName = poolName;
-			this.executionErrorMessage = executionErrorMessage;
 		}
 		@Override
 		public Thread newThread(Runnable r) {
@@ -418,7 +340,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				@Override
 				public void uncaughtException(Thread t, Throwable e) {
 					// Log the exception whether verbose or not.
-					logger.log(Level.SEVERE, executionErrorMessage, e);
+					logger.log(Level.SEVERE, e.getMessage(), e);
 					StandardProcessPoolExecutor.this.shutdown();
 				}
 			});
@@ -458,7 +380,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							return tryTransfer(r);
 						}
 						
-					}, new CustomizedThreadFactory("shellExecutor", "Error while running the process."),
+					}, new CustomizedThreadFactory("shellExecutor"),
 					new RejectedExecutionHandler() {
 						
 						@Override
@@ -504,123 +426,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	}
 	
 	/**
-	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.ppe4j.StandardProcessShell} 
-	 * instances.
-	 * 
-	 * @author Viktor
-	 *
-	 */
-	private class ProcessShellPool extends GenericObjectPool<StandardProcessShell> {
-
-		/**
-		 * Constructs an object pool instance to facilitate the reuse of {@link net.viktorc.ppe4j.StandardProcessShell} instances. The pool 
-		 * does not block if there are no available objects, it accommodates <code>maxPoolSize</code> objects, and if there are more than 
-		 * <code>Math.max(minPoolSize, reserveSize)</code> idle objects in the pool, excess idle objects are eligible for eviction after 
-		 * <code>keepAliveTime</code> milliseconds, or if it is non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds. The eviction 
-		 * thread runs at the above specified intervals and performs at most <code>maxPoolSize - minPoolSize</code> evictions per run.
-		 */
-		ProcessShellPool() {
-			super(new PooledObjectFactory<StandardProcessShell>() {
-
-				@Override
-				public PooledObject<StandardProcessShell> makeObject() throws Exception {
-					PooledProcessManager manager = new PooledProcessManager(procManagerFactory.newProcessManager());
-					StandardProcessShell processShell = new StandardProcessShell(manager, keepAliveTime, auxExecutor);
-					manager.processShell = processShell;
-					return new DefaultPooledObject<StandardProcessShell>(processShell);
-				}
-				@Override
-				public void activateObject(PooledObject<StandardProcessShell> p) {
-					// No-operation.
-				}
-				@Override
-				public boolean validateObject(PooledObject<StandardProcessShell> p) {
-					return true;
-				}
-				@Override
-				public void passivateObject(PooledObject<StandardProcessShell> p) {
-					// No-operation
-				}
-				@Override
-				public void destroyObject(PooledObject<StandardProcessShell> p) {
-					// No-operation.
-				}
-				
-			});
-			setBlockWhenExhausted(false);
-			setMaxTotal(maxPoolSize);
-			setMaxIdle(Math.max(minPoolSize, reserveSize));
-			long evictTime = keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME;
-			setTimeBetweenEvictionRunsMillis(evictTime);
-			setSoftMinEvictableIdleTimeMillis(evictTime);
-			setNumTestsPerEvictionRun(maxPoolSize - minPoolSize);
-		}
-		
-	}
-	
-	/**
-	 * An implementation of the {@link net.viktorc.ppe4j.ProcessManager} interface for managing the life cycle of 
-	 * individual pooled processes.
-	 * 
-	 * @author Viktor
-	 *
-	 */
-	private class PooledProcessManager implements ProcessManager {
-		
-		final ProcessManager originalManager;
-		volatile StandardProcessShell processShell;
-		
-		/**
-		 * Constructs a wrapper around the specified process manager.
-		 * 
-		 * @param originalManager The original process manager.
-		 */
-		PooledProcessManager(ProcessManager originalManager) {
-			this.originalManager = originalManager;
-		}
-		@Override
-		public Process start() throws IOException {
-			return originalManager.start();
-		}
-		@Override
-		public boolean startsUpInstantly() {
-			return originalManager.startsUpInstantly();
-		}
-		@Override
-		public boolean isStartedUp(String output, boolean standard) {
-			return originalManager.isStartedUp(output, standard);
-		}
-		@Override
-		public void onStartup(ProcessShell shell) {
-			originalManager.onStartup(shell);
-			hotShells.add((StandardProcessShell) shell);
-			if (verbose)
-				logger.info("Process shell " + shell + " is hot." + System.lineSeparator() +
-						getPoolStats());
-			prestartLatch.countDown();
-		}
-		@Override
-		public boolean terminate(ProcessShell shell) {
-			return originalManager.terminate(shell);
-		}
-		@Override
-		public void onTermination(int resultCode) {
-			originalManager.onTermination(resultCode);
-			if (processShell != null) {
-				hotShells.remove(processShell);
-				if (verbose)
-					logger.info("Process shell " + processShell + " is cold." + System.lineSeparator() +
-							getPoolStats());
-			}
-		}
-		
-	}
-	
-	/**
-	 * An implementation of the {@link net.viktorc.ppe4j.Submission} interface for wrapping submissions into 'internal' 
-	 * submissions to keep track of the number of commands being executed at a time and to establish a mechanism for 
-	 * canceling submitted commands via the {@link java.util.concurrent.Future} returned by the 
-	 * {@link net.viktorc.ppe4j.StandardProcessPoolExecutor#submit(Submission)} method.
+	 * An implementation of the {@link net.viktorc.ppe4j.InternalSubmission} interface to keep track of the number of commands 
+	 * being executed at a time and to establish a mechanism for canceling submitted commands via the {@link java.util.concurrent.Future} 
+	 * returned by the {@link net.viktorc.ppe4j.StandardProcessPoolExecutor#submit(Submission)} method.
 	 * 
 	 * @author Viktor
 	 *
@@ -629,12 +437,11 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		
 		final Submission origSubmission;
 		final long receivedTime;
-		final Semaphore semaphore;
-		final AtomicLong submittedTime;
-		final AtomicLong processedTime;
-		Future<?> future;
-		volatile Exception exception;
-		volatile boolean submitted;
+		final Object lock;
+		Thread thread;
+		Exception exception;
+		volatile long submittedTime;
+		volatile long processedTime;
 		volatile boolean processed;
 		volatile boolean cancel;
 		
@@ -649,9 +456,28 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				throw new IllegalArgumentException("The submission cannot be null.");
 			this.origSubmission = originalSubmission;
 			receivedTime = System.nanoTime();
-			semaphore = new Semaphore(0);
-			submittedTime = new AtomicLong(-1);
-			processedTime = new AtomicLong(-1);
+			lock = new Object();
+		}
+		/**
+		 * Sets the thread that is executing the submission.
+		 * 
+		 * @param t The thread that executes the submission.
+		 */
+		public void setThread(Thread t) {
+			synchronized (lock) {
+				thread = t;
+			}
+		}
+		/**
+		 * Sets the exception thrown during the execution of the submission if there was any.
+		 * 
+		 * @param e The exception thrown during the execution of the submission.
+		 */
+		void setException(Exception e) {
+			synchronized (lock) {
+				exception = e;
+				lock.notifyAll();
+			}
 		}
 		@Override
 		public List<Command> getCommands() {
@@ -668,18 +494,16 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		@Override
 		public void onStartedProcessing() {
 			numOfExecutingSubmissions.incrementAndGet();
-			submittedTime.set(System.nanoTime());
-			submitted = true;
-			semaphore.release();
+			submittedTime = System.nanoTime();
 			origSubmission.onStartedProcessing();
 		}
 		@Override
 		public void onFinishedProcessing() {
 			origSubmission.onFinishedProcessing();
-			processedTime.set(System.nanoTime());
-			synchronized (this) {
+			processedTime = System.nanoTime();
+			synchronized (lock) {
 				processed = true;
-				notifyAll();
+				lock.notifyAll();
 			}
 			numOfExecutingSubmissions.decrementAndGet();
 		}
@@ -711,48 +535,46 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		}
 		@Override
 		public boolean cancel(boolean mayInterruptIfRunning) {
-			synchronized (submission) {
-				if (submission.isCancelled() || (submission.future != null &&
-						submission.future.cancel(mayInterruptIfRunning))) {
-					submission.cancel = true;
-					submission.notifyAll();
-					return true;
-				} else
-					return false;
+			synchronized (submission.lock) {
+				submission.cancel = true;
+				submission.lock.notifyAll();
+				if (mayInterruptIfRunning && submission.thread != null)
+					submission.thread.interrupt();
+				return true;
 			}
 		}
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
-			synchronized (submission) {
+			synchronized (submission.lock) {
 				while (!submission.processed && !submission.isCancelled() && submission.exception == null)
-					submission.wait();
+					submission.lock.wait();
+				if (submission.isCancelled())
+					throw new CancellationException();
+				if (submission.exception != null)
+					throw new ExecutionException(submission.exception);
+				return (long) Math.round(((double) (submission.processedTime - submission.receivedTime))/1000000);
 			}
-			if (submission.isCancelled())
-				throw new CancellationException();
-			if (submission.exception != null)
-				throw new ExecutionException(submission.exception);
-			return (long) Math.round(((double) (submission.processedTime.get() - submission.receivedTime))/1000000);
 		}
 		@Override
 		public Long get(long timeout, TimeUnit unit)
 				throws InterruptedException, ExecutionException, TimeoutException, CancellationException {
-			long timeoutNs = unit.toNanos(timeout);
-			long start = System.nanoTime();
-			synchronized (submission) {
+			synchronized (submission.lock) {
+				long timeoutNs = unit.toNanos(timeout);
+				long start = System.nanoTime();
 				while (!submission.processed && !submission.isCancelled() && submission.exception == null &&
 						timeoutNs > 0) {
-					submission.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
+					submission.lock.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
 					timeoutNs -= (System.nanoTime() - start);
 				}
+				if (submission.isCancelled())
+					throw new CancellationException();
+				if (submission.exception != null)
+					throw new ExecutionException(submission.exception);
+				if (timeoutNs <= 0)
+					throw new TimeoutException();
+				return timeoutNs <= 0 ? null : (long) Math.round(((double) (submission.processedTime -
+						submission.receivedTime))/1000000);
 			}
-			if (submission.isCancelled())
-				throw new CancellationException();
-			if (submission.exception != null)
-				throw new ExecutionException(submission.exception);
-			if (timeoutNs <= 0)
-				throw new TimeoutException();
-			return timeoutNs <= 0 ? null : (long) Math.round(((double) (submission.processedTime.get() -
-					submission.receivedTime))/1000000);
 		}
 		@Override
 		public boolean isCancelled() {
@@ -761,6 +583,402 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		@Override
 		public boolean isDone() {
 			return submission.processed;
+		}
+		
+	}
+	
+	/**
+	 * An implementation of the {@link net.viktorc.ppe4j.ProcessShell} interface for starting, managing, and interacting with a process. The 
+	 * life cycle of the associated process is the same as that of the {@link #run()} method of the instance. The process is not started until 
+	 * this method is called and the method does not terminate until the process does.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class StandardProcessShell implements ProcessShell, Runnable {
+		
+		final ProcessManager manager;
+		final KeepAliveTimer timer;
+		final Semaphore termSemaphore;
+		final ReentrantLock subLock;
+		final Object runLock;
+		Process process;
+		BufferedReader stdOutReader;
+		BufferedReader errOutReader;
+		BufferedWriter stdInWriter;
+		boolean startedUp;
+		volatile Command command;
+		volatile boolean commandProcessed;
+		volatile boolean running;
+		volatile boolean stop;
+		
+		/**
+		 * Constructs a shell for the specified process using two threads to listen to the out streams of the process, one for listening to the 
+		 * submission queue, and one thread for ensuring that the process is terminated once it times out if <code>keepAliveTime</code> is greater 
+		 * than 0.
+		 */
+		StandardProcessShell() {
+			timer = keepAliveTime > 0 ? new KeepAliveTimer() : null;
+			this.manager = procManagerFactory.newProcessManager();
+			subLock = new ReentrantLock();
+			termSemaphore = new Semaphore(0);
+			runLock = new Object();
+		}
+		/**
+		 * Returns whether the process is currently running and not cancelled.
+		 * 
+		 * @return Whether the process is currently running and not cancelled.
+		 */
+		boolean isActive() {
+			return running && !stop;
+		}
+		/**
+		 * Starts listening to an out stream of the process using the specified reader.
+		 * 
+		 * @param reader The buffered reader to use to listen to the steam.
+		 * @param standard Whether it is the standard out or the error out stream of the process.
+		 */
+		void startListeningToProcess(BufferedReader reader, boolean standard) {
+			try {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					line = line.trim();
+					if (line.isEmpty())
+						continue;
+					synchronized (subLock) {
+						if (startedUp) {
+							commandProcessed = command == null || command.onNewOutput(line, standard);
+							if (commandProcessed)
+								subLock.notifyAll();
+						} else {
+							startedUp = manager.isStartedUp(line, standard);
+							if (startedUp)
+								subLock.notifyAll();
+						}
+					}
+				}
+			} catch (IOException e) {
+				throw new ProcessException(e);
+			} finally {
+				termSemaphore.release();
+			}
+		}
+		/**
+		 * Starts waiting on the blocking queue of submissions executing available ones one at a time.
+		 */
+		void startHandlingSubmissions() {
+			try {
+				while (running && !stop) {
+					InternalSubmission submission = null;
+					try {
+						subLock.lock();
+						subLock.unlock();
+						submission = submissions.takeFirst();
+						submission.setThread(Thread.currentThread());
+						if (execute(submission)) {
+							if (verbose)
+								logger.info(String.format("Command(s) %s processed; submission delay: %.3f;" +
+										" execution time: %.3f.", this,
+										(float) ((double) (submission.submittedTime - submission.receivedTime)/1000000000),
+										(float) ((double) (submission.processedTime - submission.submittedTime)/1000000000)));
+							submission = null;
+						}
+					} catch (InterruptedException e) {
+						// Next round unless the process is stopped.
+						continue;
+					} catch (IOException e) {
+						// Signal the exception to the future.
+						if (submission != null)
+							submission.setException(e);
+					} finally {
+						if (submission != null) {
+							submission.setThread(null);
+							submissions.addFirst(submission);
+						}
+					}
+				}
+			} finally {
+				termSemaphore.release();
+			}
+		}
+		/**
+		 * It prompts the currently running process, if there is one, to terminate. Once the process has been successfully terminated, 
+		 * subsequent calls are ignored and return true unless the process is started again.
+		 * 
+		 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.ppe4j.ProcessManager#terminate(ProcessShell)} 
+		 * method of the {@link net.viktorc.ppe4j.ProcessManager} instance assigned to the shell. The latter might be ineffective if the 
+		 * process is currently executing a command or has not started up.
+		 * @return Whether the process was successfully terminated.
+		 */
+		boolean stop(boolean forcibly) {
+			synchronized (subLock) {
+				if (stop)
+					return true;
+				boolean success = true;
+				if (process != null) {
+					if (!forcibly)
+						success = manager.terminate(this);
+					else
+						process.destroy();
+				}
+				if (success) {
+					if (timer != null)
+						timer.stop();
+					stop = true;
+					subLock.notifyAll();
+				}
+				return success;
+			}
+		}
+		/**
+		 * Writes the specified commands to the standard in stream of the process and blocks until they are 
+		 * processed.
+		 * 
+		 * @param submission The submitted command(s) to execute.
+		 * @return Whether the submission was executed. If the shell is busy processing an other submission, 
+		 * it returns false; otherwise the submission is executed and true is returned once it's processed.
+		 * @throws InterruptedException If the thread is interrupted while executing the commands.
+		 * @throws IOException If the instruction cannot be written to the process' standard in stream.
+		 * @throws ProcessException If the submission requires the process to be terminated afterwards but 
+		 * all attempts at termination fail.
+		 */
+		@Override
+		public boolean execute(Submission submission) throws IOException, InterruptedException {
+			if (running && !stop && subLock.tryLock()) {
+				try {
+					if (timer != null)
+						timer.stop();
+					submission.onStartedProcessing();
+					List<Command> commands = submission.getCommands();
+					List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
+					synchronized (subLock) {
+						for (int i = 0; i < commands.size() && !submission.isCancelled() && running && !stop; i++) {
+							command = commands.get(i);
+							if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
+								continue;
+							commandProcessed = !command.generatesOutput();
+							stdInWriter.write(command.getInstruction());
+							stdInWriter.newLine();
+							stdInWriter.flush();
+							while (running && !stop && !commandProcessed)
+								subLock.wait();
+							if (i < commands.size() - 1)
+								processedCommands.add(command);
+							command = null;
+						}
+					}
+					if (running && !stop) {
+						if (submission.doTerminateProcessAfterwards()) {
+							if (!stop(false) && !stop(true)) {
+								// This should not happen as the second call cannot practically fail.
+								throw new ProcessException("The process could not be terminated.");
+							}
+						} else if (timer != null)
+							timer.start();
+					}
+					return true;
+				} finally {
+					try {
+						submission.onFinishedProcessing();
+					} finally {
+						commandProcessed = true;
+						command = null;
+						subLock.unlock();
+					}
+				}
+			}
+			return false;
+		}
+		@Override
+		public void run() {
+			synchronized (runLock) {
+				running = true;
+				command = null;
+				termSemaphore.drainPermits();
+				int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
+				try {
+					subLock.lock();
+					try {
+						// Start the process
+						synchronized (subLock) {
+							if (stop)
+								return;
+							process = manager.start();
+							stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+							errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+							stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+							startedUp = manager.startsUpInstantly();
+							auxExecutor.submit(() -> startListeningToProcess(stdOutReader, true));
+							auxExecutor.submit(() -> startListeningToProcess(errOutReader, false));
+							while (!startedUp) {
+								subLock.wait();
+								if (stop)
+									return;
+							}
+							manager.onStartup(this);
+							prestartLatch.countDown();
+							if (stop)
+								return;
+							auxExecutor.submit(this::startHandlingSubmissions);
+							if (timer != null) {
+								auxExecutor.submit(timer);
+								timer.start();
+							}
+						}
+					} catch (Exception e) {
+						termSemaphore.release(3);
+					} finally {
+						subLock.unlock();
+					}
+					rc = process.waitFor();
+				} catch (Exception e) {
+					throw new ProcessException(e);
+				} finally {
+					// Try to clean up and close all the resources.
+					if (process != null) {
+						if (process.isAlive())
+							process.destroy();
+						process = null;
+					}
+					if (timer != null)
+						timer.stop();
+					if (stdOutReader != null) {
+						try {
+							stdOutReader.close();
+						} catch (IOException e) { }
+					}
+					if (errOutReader != null) {
+						try {
+							errOutReader.close();
+						} catch (IOException e) { }
+					}
+					if (stdInWriter != null) {
+						try {
+							stdInWriter.close();
+						} catch (IOException e) { }
+					}
+					synchronized (subLock) {
+						running = false;
+						subLock.notifyAll();
+					}
+					try {
+						termSemaphore.acquire(3);
+					} catch (InterruptedException e) {
+						throw new ProcessException(e);
+					} finally {
+						manager.onTermination(rc);
+						stop = false;
+					}
+				}
+			}
+		}
+		
+		/**
+		 * A simple timer that stops the process after <code>keepAliveTime</code> milliseconds unless the process is inactive 
+		 * or the timer is cancelled. It also enables the timer to be restarted using the same thread.
+		 * 
+		 * @author Viktor
+		 *
+		 */
+		private class KeepAliveTimer implements Runnable {
+
+			boolean go;
+			
+			/**
+			 * Restarts the timer.
+			 */
+			synchronized void start() {
+				go = true;
+				notifyAll();
+			}
+			/**
+			 * Stops the timer.
+			 */
+			synchronized void stop() {
+				go = false;
+				notifyAll();
+			}
+			@Override
+			public synchronized void run() {
+				try {
+					while (isActive()) {
+						while (!go) {
+							wait();
+							if (!isActive())
+								return;
+						}
+						long waitTime = keepAliveTime;
+						while (go && waitTime > 0) {
+							long start = System.currentTimeMillis();
+							wait(waitTime);
+							waitTime -= (System.currentTimeMillis() - start);
+						}
+						if (go) {
+							if (!StandardProcessShell.this.stop(false))
+								StandardProcessShell.this.stop(true);
+						}
+					}
+				} catch (InterruptedException e) {
+					// Just let the thread terminate.
+				} catch (Exception e) {
+					throw new ProcessException(e);
+				} finally {
+					go = false;
+				}
+			}
+			
+		}
+		
+	}
+	
+	/**
+	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.ppe4j.StandardProcessShell} 
+	 * instances.
+	 * 
+	 * @author Viktor
+	 *
+	 */
+	private class ProcessShellPool extends GenericObjectPool<StandardProcessShell> {
+
+		/**
+		 * Constructs an object pool instance to facilitate the reuse of {@link net.viktorc.ppe4j.StandardProcessShell} instances. The pool 
+		 * does not block if there are no available objects, it accommodates <code>maxPoolSize</code> objects, and if there are more than 
+		 * <code>Math.max(minPoolSize, reserveSize)</code> idle objects in the pool, excess idle objects are eligible for eviction after 
+		 * <code>keepAliveTime</code> milliseconds, or if it is non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds. The eviction 
+		 * thread runs at the above specified intervals and performs at most <code>maxPoolSize - minPoolSize</code> evictions per run.
+		 */
+		ProcessShellPool() {
+			super(new PooledObjectFactory<StandardProcessShell>() {
+
+				@Override
+				public PooledObject<StandardProcessShell> makeObject() throws Exception {
+					return new DefaultPooledObject<StandardProcessShell>(new StandardProcessShell());
+				}
+				@Override
+				public void activateObject(PooledObject<StandardProcessShell> p) {
+					// No-operation.
+				}
+				@Override
+				public boolean validateObject(PooledObject<StandardProcessShell> p) {
+					return true;
+				}
+				@Override
+				public void passivateObject(PooledObject<StandardProcessShell> p) {
+					// No-operation
+				}
+				@Override
+				public void destroyObject(PooledObject<StandardProcessShell> p) {
+					// No-operation.
+				}
+				
+			});
+			setBlockWhenExhausted(false);
+			setMaxTotal(maxPoolSize);
+			setMaxIdle(Math.max(minPoolSize, reserveSize));
+			long evictTime = keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME;
+			setTimeBetweenEvictionRunsMillis(evictTime);
+			setSoftMinEvictableIdleTimeMillis(evictTime);
+			setNumTestsPerEvictionRun(maxPoolSize - minPoolSize);
 		}
 		
 	}
