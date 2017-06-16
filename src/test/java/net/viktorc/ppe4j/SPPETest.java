@@ -15,14 +15,11 @@ import net.viktorc.ppe4j.Submission;
 
 import java.io.File;
 import java.net.URISyntaxException;
-import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Future;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -130,7 +127,6 @@ public class SPPETest {
 					throws Exception {
 		long frequency = requests > 0 ? timeSpan/requests : 0;
 		List<Future<Long>> futures = new ArrayList<>(requests);
-		List<Entry<Semaphore,Long>> cancelTimes = cancelTime > 0 ? new ArrayList<>(requests) : null;
 		for (int i = 0; i < requests; i++) {
 			if (i != 0 && frequency > 0) {
 				try {
@@ -161,21 +157,7 @@ public class SPPETest {
 								return false;
 							}, (c, o) -> true));
 			}
-			Submission submission;
-			if (cancelTime > 0) {
-				Semaphore semaphore = new Semaphore(0);
-				submission = new SimpleSubmission(commands, !reuse) {
-					
-					@Override
-					public void onFinishedProcessing() {
-						semaphore.release();
-					}
-					
-				};
-				long startTime = System.nanoTime();
-				cancelTimes.add(new SimpleEntry<>(semaphore, startTime));
-			} else
-				submission = new SimpleSubmission(commands, !reuse);
+			Submission submission = new SimpleSubmission(commands, !reuse);
 			futures.add(processPool.submit(submission));
 		}
 		if (cancelTime > 0) {
@@ -191,11 +173,9 @@ public class SPPETest {
 				long time = waitTimeout > 0 ? future.get(waitTimeout, TimeUnit.MILLISECONDS) : future.get();
 				times.add(time);
 			} catch (CancellationException e) {
-				if (cancelTime > 0) {
-					Entry<Semaphore,Long> cancelEntry = cancelTimes.get(i);
-					cancelEntry.getKey().acquire();
-					times.add((long) Math.round(((double) (System.nanoTime() - cancelEntry.getValue()))/1000000));
-				} else
+				if (cancelTime > 0)
+					throw e;
+				else
 					times.add((long) 0);
 			}
 		}
@@ -297,16 +277,16 @@ public class SPPETest {
 	}
 	@Test
 	public void test06() throws Exception {
+		StandardProcessPoolExecutor pool = getCustomPool(10, 20, 0, 0, false, false, false);
 		exceptionRule.expect(IllegalArgumentException.class);
 		exceptionRule.expectMessage("The commands cannot be null.");
-		StandardProcessPoolExecutor pool = getCustomPool(10, 20, 0, 0, false, false, false);
 		perfTest("Test 6", pool, false, null, 100, 10000, 0, false, false, 0, 4995, 6200);
 	}
 	@Test
 	public void test07() throws Exception {
+		StandardProcessPoolExecutor pool = getCustomPool( 10, 20, 0, 0, false, false, false);
 		exceptionRule.expect(IllegalArgumentException.class);
 		exceptionRule.expectMessage("The commands cannot be empty.");
-		StandardProcessPoolExecutor pool = getCustomPool( 10, 20, 0, 0, false, false, false);
 		perfTest("Test 7", pool, false, new int[0], 100, 10000, 0, false, false, 0, 4995, 6200);
 	}
 	// Performance testing.
@@ -382,22 +362,26 @@ public class SPPETest {
 	@Test
 	public void test21() throws Exception {
 		StandardProcessPoolExecutor pool = getCustomPool(10, 30, 5, 0, true, true, false);
+		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 21", pool, false, new int[] { 5 }, 20, 0, 2500, true, false, 0, 2495, 2520));
 	}
 	@Test
 	public void test22() throws Exception {
 		StandardProcessPoolExecutor pool = getCustomPool(20, 20, 0, 0, false, false, false);
+		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 22", pool, false, new int[] { 5 }, 20, 0, 2500, false, false, 0, 4995, 5120));
 	}
 	@Test
 	public void test23() throws Exception {
 		StandardProcessPoolExecutor pool = getCustomPool(10, 30, 5, 0, true, true, false);
+		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 23", pool, false, new int[] { 5, 5, 3 }, 20, 0, 2500, true, false, 0, 2495,
 				2520));
 	}
 	@Test
 	public void test24() throws Exception {
 		StandardProcessPoolExecutor pool = getCustomPool(20, 20, 0, 0, true, true, false);
+		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 24", pool, false, new int[] { 5, 5, 3 }, 20, 0, 3000, false, false, 0, 4995,
 				5120));
 	}
@@ -449,15 +433,15 @@ public class SPPETest {
 	// Wait with timeout testing.
 	@Test
 	public void test31() throws Exception {
-		exceptionRule.expect(TimeoutException.class);
 		StandardProcessPoolExecutor pool = getCustomPool(20, 50, 10, 0, true, true, false);
+		exceptionRule.expect(TimeoutException.class);
 		Assert.assertTrue(perfTest("Test 31", pool, false, new int[] { 5 }, 40, 0, 0, false, false, 3000, 3000,
 				3000));
 	}
 	@Test
 	public void test32() throws Exception {
-		exceptionRule.expect(TimeoutException.class);
 		StandardProcessPoolExecutor pool = getCustomPool(20, 50, 0, 0, true, true, false);
+		exceptionRule.expect(TimeoutException.class);
 		Assert.assertTrue(perfTest("Test 32", pool, false, new int[] { 5, 5 }, 40, 0, 0, false, false, 5000, 5000,
 				5000));
 	}

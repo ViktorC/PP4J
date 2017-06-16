@@ -52,8 +52,8 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	
 	/**
-	 * If the process cannot be started or an exception occurs which would make it impossible to retrieve the actual 
-	 * result code of the process.
+	 * If a process cannot be started or an exception occurs which would make it impossible to retrieve the actual 
+	 * return code of the process.
 	 */
 	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -99;
 	/**
@@ -68,6 +68,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	private final int reserveSize;
 	private final long keepAliveTime;
 	private final boolean verbose;
+	private final boolean doTime;
 	private final ProcessShellExecutor shellExecutor;
 	private final ExecutorService auxExecutor;
 	private final ProcessShellPool shellPool;
@@ -116,9 +117,13 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		this.keepAliveTime = Math.max(0, keepAliveTime);
 		this.verbose = verbose;
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
+		doTime = keepAliveTime > 0;
 		shellExecutor = new ProcessShellExecutor();
-		auxExecutor = new ThreadPoolExecutor(actualMinSize, Integer.MAX_VALUE, keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME,
-				TimeUnit.MILLISECONDS, new SynchronousQueue<>(), new CustomizedThreadFactory("auxExecutor"));
+		/* If keepAliveTime is positive, one process requires 4 auxiliary threads (std_out listener, err_out listener,
+		 * submission handler, timer); if it is not, only 3 are required. */
+		auxExecutor = new ThreadPoolExecutor(doTime ? 4*actualMinSize : 3*actualMinSize, Integer.MAX_VALUE,
+				doTime ? keepAliveTime : DEFAULT_EVICT_TIME, TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
+				new CustomizedThreadFactory("auxExecutor"));
 		shellPool = new ProcessShellPool();
 		activeShells = new LinkedBlockingQueue<>();
 		submissions = new LinkedBlockingDeque<>();
@@ -368,7 +373,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		 * </code> milliseconds, or if it is non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds.
 		 */
 		ProcessShellExecutor() {
-			super(Math.max(minPoolSize, reserveSize), maxPoolSize, keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME,
+			super(Math.max(minPoolSize, reserveSize), maxPoolSize, doTime ? keepAliveTime : DEFAULT_EVICT_TIME,
 					TimeUnit.MILLISECONDS, new LinkedTransferQueue<Runnable>() {
 				
 						private static final long serialVersionUID = 7747592632597608014L;
@@ -427,7 +432,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	
 	/**
 	 * An implementation of the {@link net.viktorc.ppe4j.InternalSubmission} interface to keep track of the number of commands 
-	 * being executed at a time and to establish a mechanism for canceling submitted commands via the {@link java.util.concurrent.Future} 
+	 * being executed at a time and to establish a mechanism for cancelling submitted commands via the {@link java.util.concurrent.Future} 
 	 * returned by the {@link net.viktorc.ppe4j.StandardProcessPoolExecutor#submit(Submission)} method.
 	 * 
 	 * @author Viktor
@@ -607,18 +612,19 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		BufferedReader errOutReader;
 		BufferedWriter stdInWriter;
 		boolean startedUp;
+		volatile Thread subThread;
 		volatile Command command;
 		volatile boolean commandProcessed;
 		volatile boolean running;
 		volatile boolean stop;
 		
 		/**
-		 * Constructs a shell for the specified process using two threads to listen to the out streams of the process, one for listening to the 
-		 * submission queue, and one thread for ensuring that the process is terminated once it times out if <code>keepAliveTime</code> is greater 
-		 * than 0.
+		 * Constructs a shell for the specified process using two threads to listen to the out streams of the process, one for listening 
+		 * to the submission queue, and one thread for ensuring that the process is terminated once it times out if <code>keepAliveTime
+		 * </code> is greater than 0.
 		 */
 		StandardProcessShell() {
-			timer = keepAliveTime > 0 ? new KeepAliveTimer() : null;
+			timer = doTime ? new KeepAliveTimer() : null;
 			this.manager = procManagerFactory.newProcessManager();
 			subLock = new ReentrantLock();
 			termSemaphore = new Semaphore(0);
@@ -667,6 +673,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		 * Starts waiting on the blocking queue of submissions executing available ones one at a time.
 		 */
 		void startHandlingSubmissions() {
+			subThread = Thread.currentThread();
 			try {
 				while (running && !stop) {
 					InternalSubmission submission = null;
@@ -674,7 +681,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						subLock.lock();
 						subLock.unlock();
 						submission = submissions.takeFirst();
-						submission.setThread(Thread.currentThread());
+						submission.setThread(subThread);
 						if (execute(submission)) {
 							if (verbose)
 								logger.info(String.format("Command(s) %s processed; submission delay: %.3f;" +
@@ -722,7 +729,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						process.destroy();
 				}
 				if (success) {
-					if (timer != null)
+					if (doTime)
 						timer.stop();
 					stop = true;
 					subLock.notifyAll();
@@ -745,8 +752,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		@Override
 		public boolean execute(Submission submission) throws IOException, InterruptedException {
 			if (running && !stop && subLock.tryLock()) {
+				Exception exception = null;
 				try {
-					if (timer != null)
+					if (doTime)
 						timer.stop();
 					submission.onStartedProcessing();
 					List<Command> commands = submission.getCommands();
@@ -773,13 +781,17 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 								// This should not happen as the second call cannot practically fail.
 								throw new ProcessException("The process could not be terminated.");
 							}
-						} else if (timer != null)
+						} else if (doTime)
 							timer.start();
 					}
 					return true;
+				} catch (Exception e) {
+					exception = e;
+					throw e;
 				} finally {
 					try {
-						submission.onFinishedProcessing();
+						if (exception == null)
+							submission.onFinishedProcessing();
 					} finally {
 						commandProcessed = true;
 						command = null;
@@ -820,13 +832,13 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							if (stop)
 								return;
 							auxExecutor.submit(this::startHandlingSubmissions);
-							if (timer != null) {
+							if (doTime) {
 								auxExecutor.submit(timer);
 								timer.start();
 							}
 						}
 					} catch (Exception e) {
-						termSemaphore.release(3);
+						termSemaphore.release(doTime ? 4 : 3);
 					} finally {
 						subLock.unlock();
 					}
@@ -840,31 +852,44 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							process.destroy();
 						process = null;
 					}
-					if (timer != null)
+					if (doTime)
 						timer.stop();
 					if (stdOutReader != null) {
 						try {
 							stdOutReader.close();
-						} catch (IOException e) { }
+						} catch (IOException e) {
+							// Ignore it.
+						}
 					}
 					if (errOutReader != null) {
 						try {
 							errOutReader.close();
-						} catch (IOException e) { }
+						} catch (IOException e) {
+							// Ignore it.
+						}
 					}
 					if (stdInWriter != null) {
 						try {
 							stdInWriter.close();
-						} catch (IOException e) { }
+						} catch (IOException e) {
+							// Ignore it.
+						}
 					}
 					synchronized (subLock) {
 						running = false;
 						subLock.notifyAll();
 					}
+//					subLock.lock();
+//					try {
+//						if (subThread != null)
+//							subThread.interrupt();
+//					} finally {
+//						subLock.unlock();
+//					}
 					try {
-						termSemaphore.acquire(3);
+						termSemaphore.acquire(doTime ? 4 : 3);
 					} catch (InterruptedException e) {
-						throw new ProcessException(e);
+						// The runnable is anyway terminating.
 					} finally {
 						manager.onTermination(rc);
 						stop = false;
@@ -924,6 +949,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 					throw new ProcessException(e);
 				} finally {
 					go = false;
+					termSemaphore.release();
 				}
 			}
 			
@@ -975,7 +1001,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 			setBlockWhenExhausted(false);
 			setMaxTotal(maxPoolSize);
 			setMaxIdle(Math.max(minPoolSize, reserveSize));
-			long evictTime = keepAliveTime > 0 ? keepAliveTime : DEFAULT_EVICT_TIME;
+			long evictTime = doTime ? keepAliveTime : DEFAULT_EVICT_TIME;
 			setTimeBetweenEvictionRunsMillis(evictTime);
 			setSoftMinEvictableIdleTimeMillis(evictTime);
 			setNumTestsPerEvictionRun(maxPoolSize - minPoolSize);
