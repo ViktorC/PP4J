@@ -43,7 +43,7 @@ public class SimpleProcessManager extends AbstractProcessManager {
 		return false;
 	}
 	@Override
-	public void onTermination(int resultCode) {
+	public void onTermination(int resultCode, long lifeTime) {
 		// Don't do anything.
 	}
 

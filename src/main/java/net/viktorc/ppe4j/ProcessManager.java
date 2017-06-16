@@ -72,7 +72,8 @@ public interface ProcessManager {
 	 * activities.
 	 * 
 	 * @param resultCode The result code the process returned.
+	 * @param lifeTime The life time of the process in milliseconds.
 	 */
-	void onTermination(int resultCode);
+	void onTermination(int resultCode, long lifeTime);
 	
 }
