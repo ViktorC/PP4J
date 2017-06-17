@@ -25,7 +25,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A test class for the standard process pool.
+ * A test class for the process pool executor.
  * 
  * @author Viktor
  *
@@ -96,9 +96,10 @@ public class PPE4JTest {
 	 */
 	public StandardProcessPoolExecutor getCustomPool(int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime,
 			boolean verifyStartup, boolean manuallyTerminate, boolean verbose) throws InterruptedException {
-		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) ProcessPoolExecutors.newCustomProcessPool(
-				new TestProcessManagerFactory(verifyStartup, manuallyTerminate), minPoolSize, maxPoolSize, reserveSize,
-				keepAliveTime, verbose);
+		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) (keepAliveTime > 0 || verbose ?
+				ProcessPoolExecutors.newCustomProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate),
+				minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose) : ProcessPoolExecutors.newCustomProcessPool(
+				new TestProcessManagerFactory(verifyStartup, manuallyTerminate), minPoolSize, maxPoolSize, reserveSize));
 		checkPool(pool, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verifyStartup, manuallyTerminate, verbose);
 		return pool;
 	}
@@ -115,8 +116,10 @@ public class PPE4JTest {
 	 */
 	public StandardProcessPoolExecutor getFixedPool(int poolSize, long keepAliveTime, boolean verifyStartup,
 			boolean manuallyTerminate) throws InterruptedException {
-		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) ProcessPoolExecutors.newFixedProcessPool(
-				new TestProcessManagerFactory(verifyStartup, manuallyTerminate), poolSize, keepAliveTime);
+		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) (keepAliveTime > 0 ?
+				ProcessPoolExecutors.newFixedProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate),
+				poolSize, keepAliveTime) : ProcessPoolExecutors.newFixedProcessPool(new TestProcessManagerFactory(verifyStartup,
+				manuallyTerminate), poolSize));
 		checkPool(pool, poolSize, poolSize, 0, keepAliveTime, verifyStartup, manuallyTerminate, false);
 		return pool;
 	}
@@ -132,8 +135,10 @@ public class PPE4JTest {
 	 */
 	public StandardProcessPoolExecutor getCachedPool(long keepAliveTime, boolean verifyStartup, boolean manuallyTerminate)
 			throws InterruptedException {
-		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) ProcessPoolExecutors.newCachedProcessPool(
-				new TestProcessManagerFactory(verifyStartup, manuallyTerminate), keepAliveTime);
+		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) (keepAliveTime > 0 ?
+				ProcessPoolExecutors.newCachedProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate),
+				keepAliveTime) : ProcessPoolExecutors.newCachedProcessPool(new TestProcessManagerFactory(verifyStartup,
+				manuallyTerminate)));
 		checkPool(pool, 0, Integer.MAX_VALUE, 0, keepAliveTime, verifyStartup, manuallyTerminate, false);
 		return pool;
 	}
@@ -149,8 +154,10 @@ public class PPE4JTest {
 	 */
 	public StandardProcessPoolExecutor getSinglePool(long keepAliveTime, boolean verifyStartup,
 			boolean manuallyTerminate) throws InterruptedException {
-		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) ProcessPoolExecutors.newSingleProcessPool(
-				new TestProcessManagerFactory(verifyStartup, manuallyTerminate), keepAliveTime);
+		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) (keepAliveTime > 0 ?
+				ProcessPoolExecutors.newSingleProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate),
+				keepAliveTime) : ProcessPoolExecutors.newSingleProcessPool(new TestProcessManagerFactory(verifyStartup,
+				manuallyTerminate)));
 		checkPool(pool, 1, 1, 0, keepAliveTime, verifyStartup, manuallyTerminate, false);
 		return pool;
 	}
@@ -534,11 +541,12 @@ public class PPE4JTest {
 				
 				@Override
 				public boolean startsUpInstantly() {
-					return !verifyStartup;
+					return !verifyStartup && super.startsUpInstantly();
 				}
 				@Override
 				public boolean isStartedUp(String output, boolean standard) {
-					return standard && "hi".equals(output);
+					return (!verifyStartup && super.isStartedUp(output, standard)) ||
+							(standard && "hi".equals(output));
 				}
 				@Override
 				public boolean terminate(ProcessShell shell) {
@@ -555,7 +563,7 @@ public class PPE4JTest {
 							e.printStackTrace();
 						}
 					}
-					return false;
+					return super.terminate(shell);
 				}
 			};
 		}

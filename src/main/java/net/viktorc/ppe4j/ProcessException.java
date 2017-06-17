@@ -15,14 +15,6 @@ public class ProcessException extends RuntimeException {
 	private static final long serialVersionUID = 1L;
 	
 	/**
-	 * Constructs an exception with the specified message.
-	 * 
-	 * @param message The exception message.
-	 */
-	public ProcessException(String message) {
-		super(message);
-	}
-	/**
 	 * Constructs a wrapper for the specified exception.
 	 * 
 	 * @param e The source exception.
