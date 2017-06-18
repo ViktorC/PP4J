@@ -574,7 +574,7 @@ public class PPE4JTest {
 	// Startup exception testing.
 	@Test
 	public void test37() throws Exception {
-		getFixedPool(20, 0, false, false, true);
+		ProcessPoolExecutors.newFixedProcessPool(new TestProcessManagerFactory(false, false, true), 20);
 		Assert.assertTrue(true);
 	}
 	
