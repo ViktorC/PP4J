@@ -247,6 +247,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		}
 		shellExecutor.execute(processShell);
 		activeShells.add(processShell);
+		if (verbose)
+			logger.info("Process shell " + processShell + " started." + System.lineSeparator() +
+					getPoolStats());
 		return true;
 	}
 	/**
@@ -398,18 +401,12 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 					});
 		}
 		@Override
-		protected void beforeExecute(Thread t, Runnable r) {
-			if (verbose)
-				logger.info("Process shell " + (StandardProcessShell) r + " started running." + System.lineSeparator() +
-						getPoolStats());
-		}
-		@Override
 		protected void afterExecute(Runnable r, Throwable t) {
 			super.afterExecute(r, t);
 			StandardProcessShell shell = (StandardProcessShell) r;
 			activeShells.remove(shell);
 			if (verbose)
-				logger.info("Process shell " + shell + " stopped running." + System.lineSeparator() +
+				logger.info("Process shell " + shell + " stopped." + System.lineSeparator() +
 						getPoolStats());
 			if (t == null) {
 				synchronized (mainLock) {
@@ -499,7 +496,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		}
 		@Override
 		public void onStartedProcessing() {
-			numOfExecutingSubmissions.incrementAndGet();
 			submittedTime = System.nanoTime();
 			origSubmission.onStartedProcessing();
 		}
@@ -511,7 +507,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				processed = true;
 				lock.notifyAll();
 			}
-			numOfExecutingSubmissions.decrementAndGet();
 		}
 		@Override
 		public String toString() {
@@ -760,29 +755,20 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 				return success;
 			}
 		}
-		/**
-		 * Writes the specified commands to the standard in stream of the process and blocks until they are 
-		 * processed.
-		 * 
-		 * @param submission The submitted command(s) to execute.
-		 * @return Whether the submission was executed. If the shell is busy processing an other submission, 
-		 * it returns false; otherwise the submission is executed and true is returned once it's processed.
-		 * @throws InterruptedException If the thread is interrupted while executing the commands.
-		 * @throws IOException If the instruction cannot be written to the process' standard in stream.
-		 * @throws ProcessException If the submission requires the process to be terminated afterwards but 
-		 * all attempts at termination fail.
-		 */
 		@Override
 		public boolean execute(Submission submission) throws IOException, InterruptedException {
 			if (running && !stop && subLock.tryLock()) {
-				Exception exception = null;
-				try {
-					if (doTime)
-						timer.stop();
-					submission.onStartedProcessing();
-					List<Command> commands = submission.getCommands();
-					List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
-					synchronized (execLock) {
+				numOfExecutingSubmissions.incrementAndGet();
+				synchronized (execLock) {
+					boolean success = false;
+					if (!running || stop)
+						return success;
+					try {
+						if (doTime)
+							timer.stop();
+						submission.onStartedProcessing();
+						List<Command> commands = submission.getCommands();
+						List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
 						for (int i = 0; i < commands.size() && !submission.isCancelled() && running && !stop; i++) {
 							command = commands.get(i);
 							if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
@@ -793,32 +779,33 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							stdInWriter.flush();
 							while (running && !stop && !commandProcessed)
 								execLock.wait();
+							if (!commandProcessed)
+								return success;
 							if (i < commands.size() - 1)
 								processedCommands.add(command);
 							command = null;
 						}
-					}
-					if (running && !stop) {
-						if (submission.doTerminateProcessAfterwards()) {
-							if (!stop(false) && !stop(true)) {
-								// This should not happen as the second call cannot practically fail.
-								throw new ProcessException(new Exception("The process could not be terminated."));
-							}
-						} else if (doTime)
-							timer.start();
-					}
-					return true;
-				} catch (Exception e) {
-					exception = e;
-					throw e;
-				} finally {
-					try {
-						if (exception == null)
-							submission.onFinishedProcessing();
+						if (running && !stop) {
+							if (submission.doTerminateProcessAfterwards()) {
+								if (!stop(false) && !stop(true)) {
+									// This should not happen as the second call cannot practically fail.
+									throw new ProcessException(new Exception("The process could not be terminated."));
+								}
+							} else if (doTime)
+								timer.start();
+						}
+						success = true;
+						return success;
 					} finally {
-						commandProcessed = true;
-						command = null;
-						subLock.unlock();
+						try {
+							if (success)
+								submission.onFinishedProcessing();
+						} finally {
+							commandProcessed = true;
+							command = null;
+							numOfExecutingSubmissions.decrementAndGet();
+							subLock.unlock();
+						}
 					}
 				}
 			}
