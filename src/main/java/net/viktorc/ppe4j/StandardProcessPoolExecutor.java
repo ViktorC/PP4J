@@ -314,16 +314,17 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	
 	/**
 	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that provides more descriptive thread names and 
-	 * extends the {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by logging the uncaught exceptions and 
-	 * shutting down the enclosing {@link net.viktorc.ppe4j.StandardProcessPoolExecutor} instance.
+	 * extends the {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by logging the uncaught exceptions if 
+	 * the enclosing {@link net.viktorc.ppe4j.StandardProcessPoolExecutor} instance is verbose. It also attempts to shut down the 
+	 * enclosing pool if a {@link net.viktorc.ppe4j.ProcessException} is thrown in one of the threads it created.
 	 * 
 	 * @author Viktor
 	 *
 	 */
 	private class CustomizedThreadFactory implements ThreadFactory {
 
-		final ThreadFactory defaultFactory;
 		final String poolName;
+		final ThreadFactory defaultFactory;
 		
 		/**
 		 * Constructs an instance according to the specified parameters.
@@ -331,8 +332,8 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		 * @param poolName The name of the thread pool. It will be prepended to the name of the created threads.
 		 */
 		CustomizedThreadFactory(String poolName) {
-			defaultFactory = Executors.defaultThreadFactory();
 			this.poolName = poolName;
+			defaultFactory = Executors.defaultThreadFactory();
 		}
 		@Override
 		public Thread newThread(Runnable r) {
@@ -408,21 +409,11 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 			if (verbose)
 				logger.info("Process shell " + shell + " stopped." + System.lineSeparator() +
 						getPoolStats());
-			if (t == null) {
-				synchronized (mainLock) {
-					if (doExtendPool())
-						startNewProcess(shell);
-					else
-						shellPool.returnObject(shell);
-				}
-			} else {
-				try {
-					shellPool.invalidateObject(shell);
-				} catch (Exception e) {
-					// This cannot practically happen.
-					if (verbose)
-						logger.log(Level.WARNING, "Error while invalidating process shell " + shell + ".", e);
-				}
+			synchronized (mainLock) {
+				if (doExtendPool())
+					startNewProcess(shell);
+				else
+					shellPool.returnObject(shell);
 			}
 		}
 		
@@ -610,9 +601,9 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		BufferedReader errOutReader;
 		BufferedWriter stdInWriter;
 		Thread subThread;
+		Command command;
+		boolean commandProcessed;
 		boolean startedUp;
-		volatile Command command;
-		volatile boolean commandProcessed;
 		volatile boolean running;
 		volatile boolean stop;
 		
@@ -789,7 +780,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							if (submission.doTerminateProcessAfterwards()) {
 								if (!stop(false) && !stop(true)) {
 									// This should not happen as the second call cannot practically fail.
-									throw new ProcessException(new Exception("The process could not be terminated."));
+									throw new ProcessException("The process could not be terminated.");
 								}
 							} else if (doTime)
 								timer.start();
@@ -801,7 +792,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							if (success)
 								submission.onFinishedProcessing();
 						} finally {
-							commandProcessed = true;
 							command = null;
 							numOfExecutingSubmissions.decrementAndGet();
 							subLock.unlock();
@@ -815,7 +805,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		public void run() {
 			synchronized (runLock) {
 				running = true;
-				command = null;
 				termSemaphore.drainPermits();
 				int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 				long lifeTime = 0;
@@ -826,6 +815,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						synchronized (execLock) {
 							if (stop)
 								return;
+							command = null;
 							process = manager.start();
 							lifeTime = System.currentTimeMillis();
 							stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -851,6 +841,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						}
 					} catch (Exception e) {
 						termSemaphore.release(doTime ? 4 : 3);
+						throw e;
 					} finally {
 						subLock.unlock();
 					}
@@ -955,9 +946,13 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							wait(waitTime);
 							waitTime -= (System.currentTimeMillis() - start);
 						}
-						if (go) {
-							if (!StandardProcessShell.this.stop(false))
-								StandardProcessShell.this.stop(true);
+						if (go && subLock.tryLock()) {
+							try {
+								if (!StandardProcessShell.this.stop(false) && go)
+									StandardProcessShell.this.stop(true);
+							} finally {
+								subLock.unlock();
+							}
 						}
 					}
 				} catch (InterruptedException e) {
