@@ -7,7 +7,7 @@ import java.io.IOException;
  * defines methods that start the process, determine and handle its startup behavior, and allow for its 
  * orderly termination.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public interface ProcessManager {

@@ -7,7 +7,7 @@ import java.util.List;
  * An abstract implementation of the {@link net.viktorc.ppe4j.Command} interface that stores all lines output to the process' standard 
  * out and error out in response to the command.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public abstract class AbstractCommand implements Command {

@@ -3,7 +3,7 @@ package net.viktorc.ppe4j;
 /**
  * An interface that defines a shell that encapsulates a process and serves as a handle for having the process execute commands.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public interface ProcessShell {

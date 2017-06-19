@@ -4,7 +4,7 @@ package net.viktorc.ppe4j;
  * A functional interface that defines a method for creating new instances of an implementation of the 
  * {@link net.viktorc.ppe4j.ProcessManager} interface.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public interface ProcessManagerFactory {

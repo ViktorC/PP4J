@@ -4,7 +4,7 @@ package net.viktorc.ppe4j;
  * A class for convenience and factory methods for creating instances of implementations of the {@link net.viktorc.ppe4j.ProcessPoolExecutor} 
  * interface.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public class ProcessPoolExecutors {

@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * A test class for the process pool executor.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public class PPE4JTest {
@@ -582,7 +582,7 @@ public class PPE4JTest {
 	/**
 	 * An implementation of the {@link net.viktorc.ppe4j.ProcessManagerFactory} interface for testing purposes.
 	 * 
-	 * @author Viktor
+	 * @author Viktor Csomor
 	 *
 	 */
 	private class TestProcessManagerFactory implements ProcessManagerFactory {

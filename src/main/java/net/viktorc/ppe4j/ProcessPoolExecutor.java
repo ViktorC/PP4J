@@ -7,7 +7,7 @@ import java.util.concurrent.Future;
  * the tracking of the progress of the execution via {@link java.util.concurrent.Future} instances. The interface also defines a method for 
  * shutting down the process pool and releasing the associated resources.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public interface ProcessPoolExecutor {

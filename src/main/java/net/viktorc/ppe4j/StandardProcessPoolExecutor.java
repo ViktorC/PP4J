@@ -46,7 +46,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
  * number of processes that should always be available (there are no guarantees that there actually will be this many available shells at 
  * any given time).
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
@@ -318,7 +318,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * the enclosing {@link net.viktorc.ppe4j.StandardProcessPoolExecutor} instance is verbose. It also attempts to shut down the 
 	 * enclosing pool if a {@link net.viktorc.ppe4j.ProcessException} is thrown in one of the threads it created.
 	 * 
-	 * @author Viktor
+	 * @author Viktor Csomor
 	 *
 	 */
 	private class CustomizedThreadFactory implements ThreadFactory {
@@ -361,7 +361,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * question</a> to facilitate a queueing logic that has the pool first increase the number of its threads and only really queue tasks 
 	 * once the maximum pool size has been reached.
 	 * 
-	 * @author Viktor
+	 * @author Viktor Csomor
 	 *
 	 */
 	private class ProcessShellExecutor extends ThreadPoolExecutor {
@@ -424,7 +424,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * being executed at a time and to establish a mechanism for cancelling submitted commands via the {@link java.util.concurrent.Future} 
 	 * returned by the {@link net.viktorc.ppe4j.StandardProcessPoolExecutor#submit(Submission)} method.
 	 * 
-	 * @author Viktor
+	 * @author Viktor Csomor
 	 *
 	 */
 	private class InternalSubmission implements Submission {
@@ -510,7 +510,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * An implementation of {@link java.util.concurrent.Future} that returns the time it took to process the 
 	 * submission.
 	 * 
-	 * @author Viktor
+	 * @author Viktor Csomor
 	 *
 	 */
 	private class InternalSubmissionFuture implements Future<Long> {
@@ -584,7 +584,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * life cycle of the associated process is the same as that of the {@link #run()} method of the instance. The process is not started until 
 	 * this method is called and the method does not terminate until the process does.
 	 * 
-	 * @author Viktor
+	 * @author Viktor Csomor
 	 *
 	 */
 	private class StandardProcessShell implements ProcessShell, Runnable {
@@ -846,8 +846,6 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						subLock.unlock();
 					}
 					rc = process.waitFor();
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
 				} catch (Exception e) {
 					throw new ProcessException(e);
 				} finally {
@@ -907,8 +905,11 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							// Ignore it.
 						}
 					}
-					manager.onTermination(rc, lifeTime);
-					stop = false;
+					try {
+						manager.onTermination(rc, lifeTime);
+					} finally {
+						stop = false;
+					}
 				}
 			}
 		}
@@ -917,7 +918,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		 * A simple timer that stops the process after <code>keepAliveTime</code> milliseconds unless the process is inactive 
 		 * or the timer is cancelled. It also enables the timer to be restarted using the same thread.
 		 * 
-		 * @author Viktor
+		 * @author Viktor Csomor
 		 *
 		 */
 		private class KeepAliveTimer implements Runnable {
@@ -980,7 +981,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of {@link net.viktorc.ppe4j.StandardProcessShell} 
 	 * instances.
 	 * 
-	 * @author Viktor
+	 * @author Viktor Csomor
 	 *
 	 */
 	private class ProcessShellPool extends GenericObjectPool<StandardProcessShell> {

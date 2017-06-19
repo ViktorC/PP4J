@@ -9,7 +9,7 @@ import java.util.List;
  * instance returned by the {@link net.viktorc.ppe4j.ProcessPoolExecutor#submit(Submission) submit} method of the implementations 
  * of the {@link net.viktorc.ppe4j.ProcessPoolExecutor} interface.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public class SimpleSubmission extends AbstractSubmission {

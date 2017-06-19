@@ -4,7 +4,7 @@ package net.viktorc.ppe4j;
  * An exception thrown if an unexpected error occurs while running or interacting with a process that solicits the 
  * instantaneous termination of the process and possibly the entire pool.
  * 
- * @author Viktor
+ * @author Viktor Csomor
  *
  */
 public class ProcessException extends RuntimeException {
