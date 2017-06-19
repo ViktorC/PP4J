@@ -750,11 +750,11 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 		public boolean execute(Submission submission) throws IOException, InterruptedException {
 			if (running && !stop && subLock.tryLock()) {
 				numOfExecutingSubmissions.incrementAndGet();
+				boolean success = false;
 				synchronized (execLock) {
-					boolean success = false;
-					if (!running || stop)
-						return success;
 					try {
+						if (!running || stop)
+							return success;
 						if (doTime)
 							timer.stop();
 						if (stop)
