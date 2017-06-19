@@ -757,6 +757,8 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 					try {
 						if (doTime)
 							timer.stop();
+						if (stop)
+							return success;
 						submission.onStartedProcessing();
 						List<Command> commands = submission.getCommands();
 						List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
@@ -778,10 +780,8 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						}
 						if (running && !stop) {
 							if (submission.doTerminateProcessAfterwards()) {
-								if (!stop(false) && !stop(true)) {
-									// This should not happen as the second call cannot practically fail.
-									throw new ProcessException("The process could not be terminated.");
-								}
+								if (!stop(false))
+									stop(true);
 							} else if (doTime)
 								timer.start();
 						}
@@ -846,18 +846,46 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						subLock.unlock();
 					}
 					rc = process.waitFor();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
 				} catch (Exception e) {
 					throw new ProcessException(e);
 				} finally {
 					// Try to clean up and close all the resources.
 					if (process != null) {
-						if (process.isAlive())
+						if (process.isAlive()) {
 							process.destroy();
+							try {
+								process.waitFor();
+							} catch (InterruptedException e) {
+								Thread.currentThread().interrupt();
+							}
+						}
 						process = null;
 					}
 					lifeTime = System.currentTimeMillis() - lifeTime;
+					if (verbose)
+						logger.info(String.format("Process runtime in shell %s: %.3f", this, ((float) lifeTime)/1000));
 					if (doTime)
 						timer.stop();
+					subLock.lock();
+					try {
+						synchronized (helperLock) {
+							if (subThread != null)
+								subThread.interrupt();
+						}
+					} finally {
+						subLock.unlock();
+					}
+					synchronized (execLock) {
+						running = false;
+						execLock.notifyAll();
+					}
+					try {
+						termSemaphore.acquire(doTime ? 4 : 3);
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+					}
 					if (stdOutReader != null) {
 						try {
 							stdOutReader.close();
@@ -879,29 +907,8 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 							// Ignore it.
 						}
 					}
-					synchronized (execLock) {
-						running = false;
-						execLock.notifyAll();
-					}
-					subLock.lock();
-					try {
-						synchronized (helperLock) {
-							if (subThread != null)
-								subThread.interrupt();
-						}
-					} finally {
-						subLock.unlock();
-					}
-					try {
-						termSemaphore.acquire(doTime ? 4 : 3);
-					} catch (InterruptedException e) {
-						// The runnable is anyway terminating.
-					} finally {
-						if (verbose)
-							logger.info(String.format("Process runtime in shell %s: %.3f", this, ((float) lifeTime)/1000));
-						manager.onTermination(rc, lifeTime);
-						stop = false;
-					}
+					manager.onTermination(rc, lifeTime);
+					stop = false;
 				}
 			}
 		}
@@ -948,7 +955,7 @@ public class StandardProcessPoolExecutor implements ProcessPoolExecutor {
 						}
 						if (go && subLock.tryLock()) {
 							try {
-								if (!StandardProcessShell.this.stop(false) && go)
+								if (!StandardProcessShell.this.stop(false))
 									StandardProcessShell.this.stop(true);
 							} finally {
 								subLock.unlock();
