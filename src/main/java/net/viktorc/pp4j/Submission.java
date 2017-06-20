@@ -1,9 +1,9 @@
-package net.viktorc.ppe4j;
+package net.viktorc.pp4j;
 
 import java.util.List;
 
 /**
- * An interface that defines methods necessary for the submission and execution commands in {@link net.viktorc.ppe4j.ProcessShell} 
+ * An interface that defines methods necessary for the submission and execution commands in {@link net.viktorc.pp4j.ProcessExecutor} 
  * instances. It also defines methods to call once the processing of the submitted commands has started or finished which are by 
  * default no-operations.
  * 

@@ -1,4 +1,4 @@
-package net.viktorc.ppe4j;
+package net.viktorc.pp4j;
 
 import java.util.List;
 
@@ -51,7 +51,7 @@ public interface Command {
 	 * @param outputLine The new line of output printed to the standard out of the process.
 	 * @param standard Whether this line has been output to the standard out or to the error out.
 	 * @return Whether this line of output denotes that the process has finished processing the command. The 
-	 * {@link net.viktorc.ppe4j.ProcessShell} instance executing the command will not accept new commands until the 
+	 * {@link net.viktorc.pp4j.ProcessExecutor} instance executing the command will not accept new commands until the 
 	 * processing of the command is completed.
 	 */
 	boolean onNewOutput(String outputLine, boolean standard);

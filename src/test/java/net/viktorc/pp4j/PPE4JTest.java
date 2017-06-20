@@ -1,17 +1,21 @@
-package net.viktorc.ppe4j;
+package net.viktorc.pp4j;
 
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import net.viktorc.ppe4j.Command;
-import net.viktorc.ppe4j.ProcessShell;
-import net.viktorc.ppe4j.SimpleCommand;
-import net.viktorc.ppe4j.SimpleProcessManager;
-import net.viktorc.ppe4j.SimpleSubmission;
-import net.viktorc.ppe4j.StandardProcessPoolExecutor;
-import net.viktorc.ppe4j.Submission;
+import net.viktorc.pp4j.Command;
+import net.viktorc.pp4j.ProcessException;
+import net.viktorc.pp4j.ProcessManager;
+import net.viktorc.pp4j.ProcessManagerFactory;
+import net.viktorc.pp4j.ProcessPools;
+import net.viktorc.pp4j.ProcessExecutor;
+import net.viktorc.pp4j.SimpleCommand;
+import net.viktorc.pp4j.SimpleProcessManager;
+import net.viktorc.pp4j.SimpleSubmission;
+import net.viktorc.pp4j.StandardProcessPool;
+import net.viktorc.pp4j.Submission;
 
 import java.io.File;
 import java.net.URISyntaxException;
@@ -61,7 +65,7 @@ public class PPE4JTest {
 	 * @param keepAliveTime The time after which idled processes are killed.
 	 * @param verbose Whether the events relating to the management of the pool should be logged to the console.
 	 */
-	private void checkPool(StandardProcessPoolExecutor pool, int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime,
+	private void checkPool(StandardProcessPool pool, int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime,
 			boolean verbose) {
 		// Basic pool statistics checks.
 		assert minPoolSize == pool.getMinSize() : "Different min pool sizes: " + minPoolSize + " and " +
@@ -94,12 +98,12 @@ public class PPE4JTest {
 	 * @return The process pool created according to the specified parameters.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
 	 */
-	public StandardProcessPoolExecutor getCustomPool(int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime,
+	public StandardProcessPool getCustomPool(int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime,
 			boolean verifyStartup, boolean manuallyTerminate, boolean verbose, boolean throwStartupException)
 					throws InterruptedException {
-		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) (keepAliveTime > 0 || verbose ?
-				ProcessPoolExecutors.newCustomProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
-				throwStartupException), minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose) : ProcessPoolExecutors
+		StandardProcessPool pool = (StandardProcessPool) (keepAliveTime > 0 || verbose ?
+				ProcessPools.newCustomProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
+				throwStartupException), minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose) : ProcessPools
 				.newCustomProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate, throwStartupException),
 				minPoolSize, maxPoolSize, reserveSize));
 		checkPool(pool, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose);
@@ -116,11 +120,11 @@ public class PPE4JTest {
 	 * @return The process pool created according to the specified parameters.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
 	 */
-	public StandardProcessPoolExecutor getFixedPool(int poolSize, long keepAliveTime, boolean verifyStartup,
+	public StandardProcessPool getFixedPool(int poolSize, long keepAliveTime, boolean verifyStartup,
 			boolean manuallyTerminate, boolean throwStartupException) throws InterruptedException {
-		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) (keepAliveTime > 0 ?
-				ProcessPoolExecutors.newFixedProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
-				throwStartupException), poolSize, keepAliveTime) : ProcessPoolExecutors.newFixedProcessPool(
+		StandardProcessPool pool = (StandardProcessPool) (keepAliveTime > 0 ?
+				ProcessPools.newFixedProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
+				throwStartupException), poolSize, keepAliveTime) : ProcessPools.newFixedProcessPool(
 				new TestProcessManagerFactory(verifyStartup, manuallyTerminate, throwStartupException), poolSize));
 		checkPool(pool, poolSize, poolSize, 0, keepAliveTime, false);
 		return pool;
@@ -135,11 +139,11 @@ public class PPE4JTest {
 	 * @return The process pool created according to the specified parameters.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
 	 */
-	public StandardProcessPoolExecutor getCachedPool(long keepAliveTime, boolean verifyStartup, boolean manuallyTerminate,
+	public StandardProcessPool getCachedPool(long keepAliveTime, boolean verifyStartup, boolean manuallyTerminate,
 			boolean throwStartupException) throws InterruptedException {
-		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) (keepAliveTime > 0 ?
-				ProcessPoolExecutors.newCachedProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
-				throwStartupException), keepAliveTime) : ProcessPoolExecutors.newCachedProcessPool(
+		StandardProcessPool pool = (StandardProcessPool) (keepAliveTime > 0 ?
+				ProcessPools.newCachedProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
+				throwStartupException), keepAliveTime) : ProcessPools.newCachedProcessPool(
 				new TestProcessManagerFactory(verifyStartup, manuallyTerminate, throwStartupException)));
 		checkPool(pool, 0, Integer.MAX_VALUE, 0, keepAliveTime, false);
 		return pool;
@@ -154,11 +158,11 @@ public class PPE4JTest {
 	 * @return The process pool created according to the specified parameters.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
 	 */
-	public StandardProcessPoolExecutor getSinglePool(long keepAliveTime, boolean verifyStartup,
+	public StandardProcessPool getSinglePool(long keepAliveTime, boolean verifyStartup,
 			boolean manuallyTerminate, boolean throwStartupException) throws InterruptedException {
-		StandardProcessPoolExecutor pool = (StandardProcessPoolExecutor) (keepAliveTime > 0 ?
-				ProcessPoolExecutors.newSingleProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
-				throwStartupException), keepAliveTime) : ProcessPoolExecutors.newSingleProcessPool(
+		StandardProcessPool pool = (StandardProcessPool) (keepAliveTime > 0 ?
+				ProcessPools.newSingleProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
+				throwStartupException), keepAliveTime) : ProcessPools.newSingleProcessPool(
 				new TestProcessManagerFactory(verifyStartup, manuallyTerminate, throwStartupException)));
 		checkPool(pool, 1, 1, 0, keepAliveTime, false);
 		return pool;
@@ -186,7 +190,7 @@ public class PPE4JTest {
 	 * @return A list of the total execution times of the commands.
 	 * @throws Exception
 	 */
-	private List<Long> testBase(StandardProcessPoolExecutor processPool, boolean reuse, int[] procTimes,
+	private List<Long> testBase(StandardProcessPool processPool, boolean reuse, int[] procTimes,
 			int requests, long timeSpan, boolean throwExecutionException, long cancelTime, boolean forcedCancel,
 			boolean earlyClose, long waitTimeout) throws Exception {
 		long frequency = requests > 0 ? timeSpan/requests : 0;
@@ -282,7 +286,7 @@ public class PPE4JTest {
 	 * @return Whether the test passes.
 	 * @throws Exception If the process pool cannot be created.
 	 */
-	private boolean perfTest(String testName, StandardProcessPoolExecutor processPool, boolean reuse, int[] procTimes,
+	private boolean perfTest(String testName, StandardProcessPool processPool, boolean reuse, int[] procTimes,
 			int requests, long timeSpan, boolean throwExecutionException, long cancelTime, boolean forcedCancel,
 			boolean earlyClose, long waitTimeout, long lowerBound, long upperBound) throws Exception {
 		List<Long> times = testBase(processPool, reuse, procTimes, requests, timeSpan, throwExecutionException, cancelTime,
@@ -323,7 +327,7 @@ public class PPE4JTest {
 	public void test01() throws Exception {
 		exceptionRule.expect(IllegalArgumentException.class);
 		exceptionRule.expectMessage("The minimum pool size has to be greater than 0.");
-		StandardProcessPoolExecutor pool = getCustomPool(-1, 5, 0, 0, false, false, false, false);
+		StandardProcessPool pool = getCustomPool(-1, 5, 0, 0, false, false, false, false);
 		perfTest("Test 1", pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, 0, 4995, 6200);
 	}
 	@Test
@@ -354,14 +358,14 @@ public class PPE4JTest {
 	}
 	@Test
 	public void test06() throws Exception {
-		StandardProcessPoolExecutor pool = getCachedPool(0, false, false, false);
+		StandardProcessPool pool = getCachedPool(0, false, false, false);
 		exceptionRule.expect(IllegalArgumentException.class);
 		exceptionRule.expectMessage("The commands cannot be null.");
 		perfTest("Test 6", pool, false, null, 100, 10000, false, 0, false, false, 0, 4995, 6200);
 	}
 	@Test
 	public void test07() throws Exception {
-		StandardProcessPoolExecutor pool = getCachedPool(0, false, false, false);
+		StandardProcessPool pool = getCachedPool(0, false, false, false);
 		exceptionRule.expect(IllegalArgumentException.class);
 		exceptionRule.expectMessage("The commands cannot be empty.");
 		perfTest("Test 7", pool, false, new int[0], 100, 10000, false, 0, false, false, 0, 4995, 6200);
@@ -369,108 +373,108 @@ public class PPE4JTest {
 	// Performance testing.
 	@Test
 	public void test08() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(0, 100, 0, 0, true, false, false, false);
+		StandardProcessPool pool = getCustomPool(0, 100, 0, 0, true, false, false, false);
 		Assert.assertTrue(perfTest("Test 8", pool, true, new int[] { 5 }, 100, 10000, false, 0, false, false, 0, 4995,
 				6250));
 	}
 	@Test
 	public void test09() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(50, 150, 20, 0, false, false, false, false);
+		StandardProcessPool pool = getCustomPool(50, 150, 20, 0, false, false, false, false);
 		Assert.assertTrue(perfTest("Test 9", pool, true, new int[] { 5 }, 100, 5000, false, 0, false, false, 0, 4995,
 				5100));
 	}
 	@Test
 	public void test10() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(10, 25, 5, 15000, true, false, false, false);
+		StandardProcessPool pool = getCustomPool(10, 25, 5, 15000, true, false, false, false);
 		Assert.assertTrue(perfTest("Test 10", pool, true, new int[] { 5 }, 20, 10000, false, 0, false, false, 0, 4995,
 				5100));
 	}
 	@Test
 	public void test11() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(50, 150, 20, 0, false, true, false, false);
+		StandardProcessPool pool = getCustomPool(50, 150, 20, 0, false, true, false, false);
 		Assert.assertTrue(perfTest("Test 11", pool, true, new int[] { 5 }, 100, 5000, false, 0, false, false, 0, 4995,
 				5100));
 	}
 	@Test
 	public void test12() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(10, 50, 5, 15000, true, false, false, false);
+		StandardProcessPool pool = getCustomPool(10, 50, 5, 15000, true, false, false, false);
 		Assert.assertTrue(perfTest("Test 12", pool, true, new int[] { 5, 3, 2 }, 50, 10000, false, 0, false, false, 0,
 				9995, 10340));
 	}
 	@Test
 	public void test13() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(100, 250, 20, 0, true, true, false, false);
+		StandardProcessPool pool = getCustomPool(100, 250, 20, 0, true, true, false, false);
 		Assert.assertTrue(perfTest("Test 13", pool, true, new int[] { 5 }, 800, 20000, false, 0, false, false, 0, 4995,
 				6000));
 	}
 	@Test
 	public void test14() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(0, 100, 0, 0, false, false, false, false);
+		StandardProcessPool pool = getCustomPool(0, 100, 0, 0, false, false, false, false);
 		Assert.assertTrue(perfTest("Test 14", pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, 0, 4995,
 				6500));
 	}
 	@Test
 	public void test15() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(50, 150, 10, 0, true, false, false, false);
+		StandardProcessPool pool = getCustomPool(50, 150, 10, 0, true, false, false, false);
 		Assert.assertTrue(perfTest("Test 15", pool, false, new int[] { 5 }, 100, 5000, false, 0, false, false, 0, 4995,
 				5620));
 	}
 	@Test
 	public void test16() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(10, 25, 5, 15000, false, true, false, false);
+		StandardProcessPool pool = getCustomPool(10, 25, 5, 15000, false, true, false, false);
 		Assert.assertTrue(perfTest("Test 16", pool, false, new int[] { 5 }, 20, 10000, false, 0, false, false, 0, 4995,
 				5100));
 	}
 	@Test
 	public void test17() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(50, 150, 10, 0, true, true, false, false);
+		StandardProcessPool pool = getCustomPool(50, 150, 10, 0, true, true, false, false);
 		Assert.assertTrue(perfTest("Test 17", pool, false, new int[] { 5 }, 100, 5000, false, 0, false, false, 0, 4995,
 				5600));
 	}
 	@Test
 	public void test18() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(10, 50, 5, 15000, false, false, false, false);
+		StandardProcessPool pool = getCustomPool(10, 50, 5, 15000, false, false, false, false);
 		Assert.assertTrue(perfTest("Test 18", pool, false, new int[] { 5, 3, 2 }, 50, 10000, false, 0, false, false, 0,
 				9995, 10350));
 	}
 	@Test
 	public void test19() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(50, 250, 20, 0, true, true, false, false);
+		StandardProcessPool pool = getCustomPool(50, 250, 20, 0, true, true, false, false);
 		Assert.assertTrue(perfTest("Test 19", pool, false, new int[] { 5 }, 800, 20000, false, 0, false, false, 0, 4995,
 				6000));
 	}
 	// Keep alive timer and logging test.
 	@Test
 	public void test20() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(20, 40, 4, 250, true, true, true, false);
+		StandardProcessPool pool = getCustomPool(20, 40, 4, 250, true, true, true, false);
 		Assert.assertTrue(perfTest("Test 20", pool, false, new int[] { 5 }, 50, 5000, false, 0, false, false, 0, 4995,
 				8200));
 	}
 	// Cancellation testing.
 	@Test
 	public void test21() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(10, 30, 5, 0, true, true, false, false);
+		StandardProcessPool pool = getCustomPool(10, 30, 5, 0, true, true, false, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 21", pool, false, new int[] { 5 }, 20, 0, false, 2500, true, false, 0, 2495,
 				2520));
 	}
 	@Test
 	public void test22() throws Exception {
-		StandardProcessPoolExecutor pool = getFixedPool(20, 0, false, false, false);
+		StandardProcessPool pool = getFixedPool(20, 0, false, false, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 22", pool, false, new int[] { 5 }, 20, 0, false, 2500, false, false, 0, 4995,
 				5120));
 	}
 	@Test
 	public void test23() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(10, 30, 5, 0, true, true, false, false);
+		StandardProcessPool pool = getCustomPool(10, 30, 5, 0, true, true, false, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 23", pool, false, new int[] { 5, 5, 3 }, 20, 0, false, 2500, true, false, 0,
 				2495, 2520));
 	}
 	@Test
 	public void test24() throws Exception {
-		StandardProcessPoolExecutor pool = getFixedPool(20, 0, true, true, false);
+		StandardProcessPool pool = getFixedPool(20, 0, true, true, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 24", pool, false, new int[] { 5, 5, 3 }, 20, 0, false, 3000, false, false, 0,
 				4995, 5120));
@@ -478,14 +482,14 @@ public class PPE4JTest {
 	// Early shutdown testing.
 	@Test
 	public void test25() throws Exception {
-		StandardProcessPoolExecutor pool = getFixedPool(100, 5000, true, false, false);
+		StandardProcessPool pool = getFixedPool(100, 5000, true, false, false);
 		Assert.assertTrue(perfTest("Test 25", pool, false, new int[] { 5 }, 100, 0, false, 0, false, true, 0, 0, 0));
 	}
 	// Interrupted construction testing.
 	@Test
 	public void test26() throws Exception {
 		Thread t = new Thread(() -> {
-			StandardProcessPoolExecutor pool;
+			StandardProcessPool pool;
 			try {
 				pool = getCustomPool(20, 30, 0, 0, false, false, false, false);
 				exceptionRule.expect(InterruptedException.class);
@@ -501,40 +505,40 @@ public class PPE4JTest {
 	// Single process pool performance testing.
 	@Test
 	public void test27() throws Exception {
-		StandardProcessPoolExecutor pool = getSinglePool(20000, true, true, false);
+		StandardProcessPool pool = getSinglePool(20000, true, true, false);
 		Assert.assertTrue(perfTest("Test 27", pool, false, new int[] { 5 }, 5, 30000, false, 0, false, false, 0, 4995,
 				5200));
 	}
 	@Test
 	public void test28() throws Exception {
-		StandardProcessPoolExecutor pool = getSinglePool(0, true, false, false);
+		StandardProcessPool pool = getSinglePool(0, true, false, false);
 		Assert.assertTrue(perfTest("Test 28", pool, false, new int[] { 5 }, 5, 20000, false, 0, false, false, 0, 4995,
 				13200));
 	}
 	// Fixed size process pool performance testing.
 	@Test
 	public void test29() throws Exception {
-		StandardProcessPoolExecutor pool = getFixedPool(20, 0, true, false, false);
+		StandardProcessPool pool = getFixedPool(20, 0, true, false, false);
 		Assert.assertTrue(perfTest("Test 29", pool, false, new int[] { 5 }, 20, 5000, false, 0, false, false, 0, 4995,
 				5200));
 	}
 	@Test
 	public void test30() throws Exception {
-		StandardProcessPoolExecutor pool = getFixedPool(20, 0, true, false, false);
+		StandardProcessPool pool = getFixedPool(20, 0, true, false, false);
 		Assert.assertTrue(perfTest("Test 30", pool, false, new int[] { 5 }, 40, 10000, false, 0, false, false, 0, 4995, 
 				6200));
 	}
 	// Wait with timeout testing.
 	@Test
 	public void test31() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(20, 50, 10, 0, true, true, false, false);
+		StandardProcessPool pool = getCustomPool(20, 50, 10, 0, true, true, false, false);
 		exceptionRule.expect(TimeoutException.class);
 		Assert.assertTrue(perfTest("Test 31", pool, false, new int[] { 5 }, 40, 0, false, 0, false, false, 3000, 3000,
 				3000));
 	}
 	@Test
 	public void test32() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(20, 50, 0, 0, true, true, false, false);
+		StandardProcessPool pool = getCustomPool(20, 50, 0, 0, true, true, false, false);
 		exceptionRule.expect(TimeoutException.class);
 		Assert.assertTrue(perfTest("Test 32", pool, false, new int[] { 5, 5 }, 40, 0, false, 0, false, false, 5000,
 				5000, 5000));
@@ -542,14 +546,14 @@ public class PPE4JTest {
 	// Wait with timeout plus cancellation testing.
 	@Test
 	public void test33() throws Exception {
-		StandardProcessPoolExecutor pool = getCustomPool(10, 30, 5, 0, true, true, false, false);
+		StandardProcessPool pool = getCustomPool(10, 30, 5, 0, true, true, false, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 33", pool, false, new int[] { 5 }, 20, 0, false, 2500, true, false, 5000, 2495,
 				2520));
 	}
 	@Test
 	public void test34() throws Exception {
-		StandardProcessPoolExecutor pool = getFixedPool(20, 0, false, false, false);
+		StandardProcessPool pool = getFixedPool(20, 0, false, false, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest("Test 34", pool, false, new int[] { 5 }, 20, 0, false, 2500, false, false, 3000, 4995,
 				5120));
@@ -557,7 +561,7 @@ public class PPE4JTest {
 	// Execution exception testing.
 	@Test
 	public void test35() throws Exception {
-		StandardProcessPoolExecutor pool = getCachedPool(0, false, false, false);
+		StandardProcessPool pool = getCachedPool(0, false, false, false);
 		exceptionRule.expect(ExecutionException.class);
 		exceptionRule.expectMessage("Test execution exception.");
 		Assert.assertTrue(perfTest("Test 35", pool, false, new int[] { 5 }, 20, 4000, true, 0, false, false, 0, 4995,
@@ -565,7 +569,7 @@ public class PPE4JTest {
 	}
 	@Test
 	public void test36() throws Exception {
-		StandardProcessPoolExecutor pool = getCachedPool(0, false, false, false);
+		StandardProcessPool pool = getCachedPool(0, false, false, false);
 		exceptionRule.expect(ExecutionException.class);
 		exceptionRule.expectMessage("Test execution exception.");
 		Assert.assertTrue(perfTest("Test 36", pool, false, new int[] { 5 }, 20, 4000, true, 0, false, false, 1000, 4995,
@@ -574,13 +578,13 @@ public class PPE4JTest {
 	// Startup exception testing.
 	@Test
 	public void test37() throws Exception {
-		ProcessPoolExecutors.newFixedProcessPool(new TestProcessManagerFactory(false, false, true), 20);
+		ProcessPools.newFixedProcessPool(new TestProcessManagerFactory(false, false, true), 20);
 		Assert.assertTrue(true);
 	}
 	
 	
 	/**
-	 * An implementation of the {@link net.viktorc.ppe4j.ProcessManagerFactory} interface for testing purposes.
+	 * An implementation of the {@link net.viktorc.pp4j.ProcessManagerFactory} interface for testing purposes.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -627,11 +631,11 @@ public class PPE4JTest {
 							(standard && "hi".equals(output));
 				}
 				@Override
-				public boolean terminate(ProcessShell shell) {
+				public boolean terminate(ProcessExecutor executor) {
 					if (manuallyTerminate) {
 						try {
 							AtomicBoolean success = new AtomicBoolean(true);
-							if (shell.execute(new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o),
+							if (executor.execute(new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o),
 									(c, o) -> {
 										success.set(false);
 										return true;
@@ -641,7 +645,7 @@ public class PPE4JTest {
 							e.printStackTrace();
 						}
 					}
-					return super.terminate(shell);
+					return super.terminate(executor);
 				}
 			};
 		}

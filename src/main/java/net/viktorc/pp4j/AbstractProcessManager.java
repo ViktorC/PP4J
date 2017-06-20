@@ -1,9 +1,9 @@
-package net.viktorc.ppe4j;
+package net.viktorc.pp4j;
 
 import java.io.IOException;
 
 /**
- * An abstract implementation of the {@link net.viktorc.ppe4j.ProcessManager} interface.
+ * An abstract implementation of the {@link net.viktorc.pp4j.ProcessManager} interface.
  * 
  * 
  * @author Viktor Csomor

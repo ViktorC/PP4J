@@ -1,10 +1,10 @@
-package net.viktorc.ppe4j;
+package net.viktorc.pp4j;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * An abstract implementation of the {@link net.viktorc.ppe4j.Command} interface that stores all lines output to the process' standard 
+ * An abstract implementation of the {@link net.viktorc.pp4j.Command} interface that stores all lines output to the process' standard 
  * out and error out in response to the command.
  * 
  * @author Viktor Csomor
@@ -64,7 +64,7 @@ public abstract class AbstractCommand implements Command {
 	}
 	/**
 	 * Clears the lists holding the lines output to the out streams of the underlying process. Recommended in case the 
-	 * {@link net.viktorc.ppe4j.Command} instance is reused.
+	 * {@link net.viktorc.pp4j.Command} instance is reused.
 	 */
 	public void reset() {
 		stdOutLines.clear();
