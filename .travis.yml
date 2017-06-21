@@ -17,7 +17,7 @@ notifications:
     email: false
 deploy:
     provider: pages
-    local_dir: /home/travis/build/ViktorC/PPE4J/docs
+    local_dir: /home/travis/build/ViktorC/PP4J/docs
     skip_cleanup: true
     github_token: $GITHUB_TOKEN
     on:
