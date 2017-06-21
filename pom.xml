@@ -21,9 +21,9 @@
 		</developer>
 	</developers>
 	<scm>
-		<connection>scm:git:git@github.com:ViktorC/PSPPool.git</connection>
-		<developerConnection>scm:git:git@github.com:ViktorC/PSPPool.git</developerConnection>
-		<url>https://github.com/ViktorC/PSPPool</url>
+		<connection>scm:git:git@github.com:ViktorC/PP4J.git</connection>
+		<developerConnection>scm:git:git@github.com:ViktorC/PP4J.git</developerConnection>
+		<url>https://github.com/ViktorC/PP4J</url>
 	</scm>
 	<profiles>
 		<profile>
