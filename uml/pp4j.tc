@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><TransformationConfiguration forwardTransformation="com.ibm.xtools.transform.java.uml.Java-to-UML" reverseTransformation="com.ibm.xtools.transform.uml2.java5.internal.UML2JavaTransform" reverseTransformationEnabled="false" version="8.0.0">
+<!--xtools2_universal_type_manager-->
+<Property id="CONTEXT_SOURCE" value="@49,5@com.ibm.xtools.transform.core.metatype.Collection/PP4Jjava.util.ArrayList,57&lt;ELEM_START&gt;@46,=@com.ibm.xtools.transform.core.metatype.project/PP4J"/>
+<Property id="CONTEXT_TARGET_CONTAINER" value="@46,=@com.ibm.xtools.transform.core.metatype.project/PP4J"/>
+<Property id="DCMP" value="@43,10@com.ibm.xtools.transform.core.metatype.DCMPConceptual1"/>
+<Property id="EnableReverseTransformation" value="@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse"/>
+<Property id="FORWARD_TRANSFORMATION_EXTENSIONS_STATUS" value="@42,114@com.ibm.xtools.transform.core.metatype.Mapcom.ibm.xtools.transform.java.uml.varargextension=false, com.ibm.xtools.transform.java.enumext.j2u.transform=falsejava.util.HashMap,100,57,102,57&lt;ELEM_START&gt;@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.transform.java.uml.varargextension,@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse,@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.transform.java.enumext.j2u.transform,@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse"/>
+<Property id="PARENT_CONFIG_URIS" value="@49,0@com.ibm.xtools.transform.core.metatype.Collectionjava.util.ArrayList&lt;ELEM_START&gt;"/>
+<Property id="REVERSE_TRANSFORMATION_EXTENSIONS_STATUS" value="@42,466@com.ibm.xtools.transform.core.metatype.Mapcom.ibm.xtools.transform.java.extensions.customGetterSetter=false, com.ibm.xtools.transform.umlal.java.UAL2JavaTranslator=true, com.ibm.xtools.transform.java.enumext.u2j.transform=false, com.ibm.xtools.transform.umlal.java.UAL2JavaPSMTranslator=true, com.ibm.xtools.transform.uml2.java.sm.PassiveClassStatemachineExtension=true, com.ibm.xtools.patterns.content.gof.transform.gofTransformationExtension5=true, com.ibm.xtools.transform.uml2.java5.varargextension=falsejava.util.HashMap,110,57,105,56,102,57,108,56,122,56,124,56,102,57&lt;ELEM_START&gt;@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.transform.java.extensions.customGetterSetter,@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse,@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.transform.umlal.java.UAL2JavaTranslator,@46,=@com.ibm.xtools.transform.core.metatype.booleantrue,@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.transform.java.enumext.u2j.transform,@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse,@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.transform.umlal.java.UAL2JavaPSMTranslator,@46,=@com.ibm.xtools.transform.core.metatype.booleantrue,@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.transform.uml2.java.sm.PassiveClassStatemachineExtension,@46,=@com.ibm.xtools.transform.core.metatype.booleantrue,@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.patterns.content.gof.transform.gofTransformationExtension5,@46,=@com.ibm.xtools.transform.core.metatype.booleantrue,@45,=@com.ibm.xtools.transform.core.metatype.stringcom.ibm.xtools.transform.uml2.java5.varargextension,@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse"/>
+<Property id="TRANSFORM_FORWARD_SILENT" value="@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse"/>
+<Property id="TRANSFORM_REVERSE_SILENT" value="@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse"/>
+<Property id="com.ibm.xtools.transform.java.uml.GenerateAssociations" value="@45,=@com.ibm.xtools.transform.core.metatype.stringfalse"/>
+<Property id="com.ibm.xtools.transform.java.uml.GeneratePrimitiveAssociations" value="@45,=@com.ibm.xtools.transform.core.metatype.stringfalse"/>
+<Property id="com.ibm.xtools.transform.java.uml.GenerateVizAssociations" value="@45,=@com.ibm.xtools.transform.core.metatype.stringfalse"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.FileDeleteChoice" value="@45,=@com.ibm.xtools.transform.core.metatype.string0"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.Bag" value="@45,=@com.ibm.xtools.transform.core.metatype.stringjava.util.Collection"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.GenerateAccessors" value="@45,=@com.ibm.xtools.transform.core.metatype.stringfalse"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.GenerateFlatPackages" value="@45,=@com.ibm.xtools.transform.core.metatype.stringfalse"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.OrderedSet" value="@45,=@com.ibm.xtools.transform.core.metatype.stringjava.util.SortedSet"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.Sequence" value="@45,=@com.ibm.xtools.transform.core.metatype.stringjava.util.List"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.Set" value="@45,=@com.ibm.xtools.transform.core.metatype.stringjava.util.Set"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.UseJava5" value="@45,=@com.ibm.xtools.transform.core.metatype.stringtrue"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.UseLimitedWrite" value="@45,=@com.ibm.xtools.transform.core.metatype.stringfalse"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.shouldGenerateDependencies" value="@45,=@com.ibm.xtools.transform.core.metatype.stringtrue"/>
+<Property id="com.ibm.xtools.transform.uml2.java5.internal.useJDTSetter" value="@45,=@com.ibm.xtools.transform.core.metatype.stringtrue"/>
+<Property id="com.ibm.xtools.transform.umlal.java.LanguagePreferenceProperty" value="@49,4@com.ibm.xtools.transform.core.metatype.CollectionJavajava.util.ArrayList,55&lt;ELEM_START&gt;@45,=@com.ibm.xtools.transform.core.metatype.stringJava"/>
+<Property id="createSourceToTargetRelationships" value="@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse"/>
+<Property id="isWorkspacePath" value="@46,=@com.ibm.xtools.transform.core.metatype.booleantrue"/>
+<Property id="logTrace" value="@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse"/>
+<Property id="mappingMode" value="@58,15@com.ibm.xtools.transform.uml2.mapping.metatype.mappingModeNo Mapping Mode1"/>
+<Property id="mappingModelName" value="@45,=@com.ibm.xtools.transform.core.metatype.string"/>
+<Property id="replaceUML" value="@46,=@com.ibm.xtools.transform.core.metatype.booleanfalse"/>
+</TransformationConfiguration>

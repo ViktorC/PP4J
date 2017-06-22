@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--xtools2_universal_type_manager-->
+<?com.ibm.xtools.emf.core.signature <signature id="com.ibm.xtools.mmi.ui.signatures.topic" version="7.0.0"><feature description="" name="Rational Modeling Platform (com.ibm.xtools.rmp)" url="" version="7.0.0"/></signature>?>
+<topic:TopicQuery xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:topic="http://www.ibm.com/xtools/6.0.0/Topic" xmlns:uml="http://www.eclipse.org/uml2/3.0.0/UML" xmi:id="_9Vv0MFeUEeeO4sxxtTZfEA" topicId="com.ibm.xtools.modeler.ui.editor.RelatedModelingElements:Modeler.Presets.AllRelationshipsQuery" name="topicdiagram">
+  <eAnnotations xmi:id="_9Vv0MVeUEeeO4sxxtTZfEA" source="com.ibm.xtools.topic.query_attributes">
+    <details xmi:id="_9Vv0MleUEeeO4sxxtTZfEA" key="expansionType" value="3"/>
+    <details xmi:id="_9Vv0M1eUEeeO4sxxtTZfEA" key="expandIndefinitely" value="false"/>
+    <details xmi:id="_9Vv0NFeUEeeO4sxxtTZfEA" key="expandLevels" value="1"/>
+    <details xmi:id="_9Vv0NVeUEeeO4sxxtTZfEA" key="layoutType" value="DEFAULT"/>
+    <details xmi:id="_9Vv0NleUEeeO4sxxtTZfEA" key="stoppingList" value="NONE"/>
+    <details xmi:id="_9Vv0N1eUEeeO4sxxtTZfEA" key="selections" value="~Relationships.Modeler.AllRelationships~Relationships.Modeler.Associations~uml.BidirectionalAssociation~uml.CompositionAssociation~uml.UninavigableAssociation~uml.BidirectionalSharedAssociation~uml.SharedAssociation~uml.AssociationClass~uml.CommunicationPath~uml.Extension~Relationships.Modeler.Dependencies~uml.Abstraction~uml.UsageCall~uml.UsageCreate~uml.Dependency~uml.Deployment~uml.DerivedAbstraction~uml.Instantiate~uml.Manifestation~uml.Realization~uml.ComponentRealization~uml.InterfaceRealization~uml.AbstractionRefine~uml.UsageSend~uml.Substitution~uml.AbstractionTrace~uml.Usage~uml.UsageResponsibility~uml.TemplateBinding~uml.ElementImport~uml.Extend~uml.Generalization~uml.Include~uml.PackageImport~uml.PackageMerge~uml.InstanceSpecification~uml.InformationFlow~uml.ProfileApplication~uml2.OwnedElement~uml.Reference~uml.StereotypeApplication~Relationships.Modeler.References~uml.Comment~uml.Constraint~uml.Url~uml.UrlLink"/>
+  </eAnnotations>
+  <context xmi:type="uml:Class" href="../../pp4j.emx#_naLUwFeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/StandardProcessPool?"/>
+  <context xmi:type="uml:Interface" href="../../pp4j.emx#_naZXMVeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/Command?"/>
+  <context xmi:type="uml:Interface" href="../../pp4j.emx#_naQNQFeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/ProcessExecutor?"/>
+  <context xmi:type="uml:Interface" href="../../pp4j.emx#_naXiAVeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/ProcessManager?"/>
+  <context xmi:type="uml:Interface" href="../../pp4j.emx#_nabMYleUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/ProcessManagerFactory?"/>
+  <context xmi:type="uml:Interface" href="../../pp4j.emx#_naVFwFeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/ProcessPool?"/>
+  <context xmi:type="uml:Interface" href="../../pp4j.emx#_nabzcleUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/Submission?"/>
+</topic:TopicQuery>

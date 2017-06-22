@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--xtools2_universal_type_manager-->
+<?com.ibm.xtools.emf.core.signature <signature id="com.ibm.xtools.mmi.ui.signatures.diagram" version="7.0.0"><feature description="" name="Rational Modeling Platform (com.ibm.xtools.rmp)" url="" version="7.0.0"/></signature>?>
+<umlnotation:UMLDiagram xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:notation="http://www.eclipse.org/gmf/runtime/1.0.2/notation" xmlns:uml="http://www.eclipse.org/uml2/3.0.0/UML" xmlns:umlnotation="http://www.ibm.com/xtools/1.5.3/Umlnotation" xmi:id="_DZ2rsFeVEeeO4sxxtTZfEA" type="Class" name="classdiagram1.dnx">
+  <eAnnotations xmi:id="_DZ3SwFeVEeeO4sxxtTZfEA" source="com.ibm.xtools.common.ui.reduction.editingCapabilities">
+    <details xmi:id="_DZ3SwVeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBAbstractionRelation" value="1"/>
+    <details xmi:id="_DZ3SwleVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBObjectDiagram" value="1"/>
+    <details xmi:id="_DZ3Sw1eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBClassTemplateParameter" value="1"/>
+    <details xmi:id="_DZ3SxFeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBStereotypedDeployment1" value="1"/>
+    <details xmi:id="_DZ3SxVeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBTimingDiagram" value="1"/>
+    <details xmi:id="_DZ3SxleVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBDeploymentSpecification" value="1"/>
+    <details xmi:id="_DZ3Sx1eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBRelationship2" value="1"/>
+    <details xmi:id="_DZ3SyFeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBRelationship1" value="1"/>
+    <details xmi:id="_DZ3SyVeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBRelationship3" value="1"/>
+    <details xmi:id="_DZ3SyleVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBCollaborationUse" value="1"/>
+    <details xmi:id="_DZ3Sy1eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBInteractionOverview" value="1"/>
+    <details xmi:id="_DZ3SzFeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBCollaboration" value="1"/>
+    <details xmi:id="_DZ3SzVeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBElementImport2" value="1"/>
+    <details xmi:id="_DZ3SzleVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBInterface" value="1"/>
+    <details xmi:id="_DZ3Sz1eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBAction" value="1"/>
+    <details xmi:id="_DZ3S0FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBRealization" value="1"/>
+    <details xmi:id="_DZ3S0VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBPackageTemplateParameter" value="1"/>
+    <details xmi:id="_DZ3S0leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBCommunication" value="1"/>
+    <details xmi:id="_DZ3S01eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBPrimitiveTypeTemplateParameter" value="1"/>
+    <details xmi:id="_DZ3S1FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBInterfaceTemplateParameter" value="1"/>
+    <details xmi:id="_DZ350FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBSequenceDiagram" value="1"/>
+    <details xmi:id="_DZ350VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBElementImport1" value="1"/>
+    <details xmi:id="_DZ350leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBComponent" value="1"/>
+    <details xmi:id="_DZ3501eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBStereotypedClass" value="1"/>
+    <details xmi:id="_DZ351FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBArtifact" value="1"/>
+    <details xmi:id="_DZ351VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBStateMachine2" value="1"/>
+    <details xmi:id="_DZ351leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBStateMachine1" value="1"/>
+    <details xmi:id="_DZ3511eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBTemplate" value="1"/>
+    <details xmi:id="_DZ352FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBUsage" value="1"/>
+    <details xmi:id="_DZ352VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBClass" value="1"/>
+    <details xmi:id="_DZ352leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBCommunicationDiagram" value="1"/>
+    <details xmi:id="_DZ3521eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBInteractionOverviewDiagram" value="1"/>
+    <details xmi:id="_DZ353FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBSubsystem" value="1"/>
+    <details xmi:id="_DZ353VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBStructureDiagram" value="1"/>
+    <details xmi:id="_DZ353leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBSequence2" value="1"/>
+    <details xmi:id="_DZ3531eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBSequence1" value="1"/>
+    <details xmi:id="_DZ354FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBTypes1" value="1"/>
+    <details xmi:id="_DZ354VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBConstraint" value="1"/>
+    <details xmi:id="_DZ354leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBFragment" value="1"/>
+    <details xmi:id="_DZ3541eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBSpecificInstanceType1" value="1"/>
+    <details xmi:id="_DZ355FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBSpecificInstanceType2" value="1"/>
+    <details xmi:id="_DZ355VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBStereotypedArtifact" value="1"/>
+    <details xmi:id="_DZ355leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBProfile" value="1"/>
+    <details xmi:id="_DZ3551eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBUseCaseDiagram" value="1"/>
+    <details xmi:id="_DZ356FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBSignal" value="1"/>
+    <details xmi:id="_DZ356VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBInstance" value="1"/>
+    <details xmi:id="_DZ356leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBLifeLine" value="1"/>
+    <details xmi:id="_DZ3561eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBDependancy" value="1"/>
+    <details xmi:id="_DZ357FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBPackage" value="1"/>
+    <details xmi:id="_DZ357VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.javaVisualizerActivity" value="1"/>
+    <details xmi:id="_DZ357leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBComponentTemplateParameter" value="1"/>
+    <details xmi:id="_DZ3571eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBTypes4" value="1"/>
+    <details xmi:id="_DZ358FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBActivityDiagram" value="1"/>
+    <details xmi:id="_DZ358VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBTypes2" value="1"/>
+    <details xmi:id="_DZ4g4FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBTypes3" value="1"/>
+    <details xmi:id="_DZ4g4VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBFunctionTemplateParameter" value="1"/>
+    <details xmi:id="_DZ4g4leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBDeployment1" value="1"/>
+    <details xmi:id="_DZ4g41eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBDeployment2" value="1"/>
+    <details xmi:id="_DZ4g5FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBTiming" value="1"/>
+    <details xmi:id="_DZ4g5VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBComment3" value="1"/>
+    <details xmi:id="_DZ4g5leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBComment2" value="1"/>
+    <details xmi:id="_DZ4g51eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBActivity1" value="1"/>
+    <details xmi:id="_DZ4g6FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBFreeFormDiagram" value="1"/>
+    <details xmi:id="_DZ4g6VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBComment1" value="1"/>
+    <details xmi:id="_DZ4g6leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBProfileApplication" value="1"/>
+    <details xmi:id="_DZ4g61eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBActivity3" value="1"/>
+    <details xmi:id="_DZ4g7FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBFunction" value="1"/>
+    <details xmi:id="_DZ4g7VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBActivity2" value="1"/>
+    <details xmi:id="_DZ4g7leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBEvent2" value="1"/>
+    <details xmi:id="_DZ4g71eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBActivity4" value="1"/>
+    <details xmi:id="_DZ4g8FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBEvent1" value="1"/>
+    <details xmi:id="_DZ4g8VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBStereotypedComponent" value="1"/>
+    <details xmi:id="_DZ4g8leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBStateChartDiagram" value="1"/>
+    <details xmi:id="_DZ4g81eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBInformationFlow" value="1"/>
+    <details xmi:id="_DZ4g9FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBCompositeStructure2" value="1"/>
+    <details xmi:id="_DZ4g9VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBCompositeStructure1" value="1"/>
+    <details xmi:id="_DZ4g9leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBInteraction" value="1"/>
+    <details xmi:id="_DZ4g91eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBComponentDiagram" value="1"/>
+    <details xmi:id="_DZ4g-FeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBClassDiagram" value="1"/>
+    <details xmi:id="_DZ4g-VeVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBUseCase1" value="1"/>
+    <details xmi:id="_DZ4g-leVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBDeploymentDiagram" value="1"/>
+    <details xmi:id="_DZ4g-1eVEeeO4sxxtTZfEA" key="com.ibm.xtools.activities.umlBBUseCase2" value="1"/>
+  </eAnnotations>
+  <children xmi:type="umlnotation:UMLClassifierShape" xmi:id="_DerhUFeVEeeO4sxxtTZfEA" fontHeight="8" transparency="0" lineColor="14263149" lineWidth="1" showStereotype="Label" useClassifierShape="true">
+    <children xmi:type="notation:DecorationNode" xmi:id="_DeukoFeVEeeO4sxxtTZfEA" type="ImageCompartment">
+      <layoutConstraint xmi:type="notation:Size" xmi:id="_DeukoVeVEeeO4sxxtTZfEA" width="530" height="530"/>
+    </children>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_DeukoleVEeeO4sxxtTZfEA" type="Stereotype"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Deuko1eVEeeO4sxxtTZfEA" type="Kind"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_DeukpFeVEeeO4sxxtTZfEA" type="Name"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_DeukpVeVEeeO4sxxtTZfEA" type="Parent"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_DevLsFeVEeeO4sxxtTZfEA" type="AttributeCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_DevLsVeVEeeO4sxxtTZfEA" type="OperationCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_DevLsleVEeeO4sxxtTZfEA" visible="false" type="SignalCompartment"/>
+    <element xmi:type="uml:Interface" href="../../pp4j.emx#_naZXMVeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/Command?"/>
+    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_DerhUVeVEeeO4sxxtTZfEA" x="16002" y="6604"/>
+  </children>
+  <children xmi:type="umlnotation:UMLClassifierShape" xmi:id="_DevLs1eVEeeO4sxxtTZfEA" fontHeight="8" transparency="0" lineColor="14263149" lineWidth="1" showStereotype="Label" useClassifierShape="true">
+    <children xmi:type="notation:DecorationNode" xmi:id="_DevywFeVEeeO4sxxtTZfEA" type="ImageCompartment">
+      <layoutConstraint xmi:type="notation:Size" xmi:id="_DevywVeVEeeO4sxxtTZfEA" width="530" height="530"/>
+    </children>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_DevywleVEeeO4sxxtTZfEA" type="Stereotype"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Devyw1eVEeeO4sxxtTZfEA" type="Kind"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_DevyxFeVEeeO4sxxtTZfEA" type="Name"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_DewZ0FeVEeeO4sxxtTZfEA" type="Parent"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_DewZ0VeVEeeO4sxxtTZfEA" type="AttributeCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_DewZ0leVEeeO4sxxtTZfEA" type="OperationCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_DewZ01eVEeeO4sxxtTZfEA" visible="false" type="SignalCompartment"/>
+    <element xmi:type="uml:Interface" href="../../pp4j.emx#_naQNQFeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/ProcessExecutor?"/>
+    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_DevLtFeVEeeO4sxxtTZfEA" x="7620" y="5715"/>
+  </children>
+  <children xmi:type="umlnotation:UMLClassifierShape" xmi:id="_DewZ1FeVEeeO4sxxtTZfEA" fontHeight="8" transparency="0" lineColor="14263149" lineWidth="1" showStereotype="Label" useClassifierShape="true">
+    <children xmi:type="notation:DecorationNode" xmi:id="_DexA4FeVEeeO4sxxtTZfEA" type="ImageCompartment">
+      <layoutConstraint xmi:type="notation:Size" xmi:id="_DexA4VeVEeeO4sxxtTZfEA" width="530" height="530"/>
+    </children>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_DexA4leVEeeO4sxxtTZfEA" type="Stereotype"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Dexn8FeVEeeO4sxxtTZfEA" type="Kind"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Dexn8VeVEeeO4sxxtTZfEA" type="Name"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Dexn8leVEeeO4sxxtTZfEA" type="Parent"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_Dexn81eVEeeO4sxxtTZfEA" type="AttributeCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_Dexn9FeVEeeO4sxxtTZfEA" type="OperationCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_Dexn9VeVEeeO4sxxtTZfEA" visible="false" type="SignalCompartment"/>
+    <element xmi:type="uml:Interface" href="../../pp4j.emx#_naXiAVeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/ProcessManager?"/>
+    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_DewZ1VeVEeeO4sxxtTZfEA" x="11811" y="5334"/>
+  </children>
+  <children xmi:type="umlnotation:UMLClassifierShape" xmi:id="_DeyPAFeVEeeO4sxxtTZfEA" fontHeight="8" transparency="0" lineColor="14263149" lineWidth="1" showStereotype="Label" useClassifierShape="true">
+    <children xmi:type="notation:DecorationNode" xmi:id="_DeyPAleVEeeO4sxxtTZfEA" type="ImageCompartment">
+      <layoutConstraint xmi:type="notation:Size" xmi:id="_DeyPA1eVEeeO4sxxtTZfEA" width="530" height="530"/>
+    </children>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Dey2EFeVEeeO4sxxtTZfEA" type="Stereotype"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Dey2EVeVEeeO4sxxtTZfEA" type="Kind"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Dey2EleVEeeO4sxxtTZfEA" type="Name"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_Dey2E1eVEeeO4sxxtTZfEA" type="Parent"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_Dey2FFeVEeeO4sxxtTZfEA" type="AttributeCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_Dey2FVeVEeeO4sxxtTZfEA" type="OperationCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_DezdIFeVEeeO4sxxtTZfEA" visible="false" type="SignalCompartment"/>
+    <element xmi:type="uml:Interface" href="../../pp4j.emx#_nabMYleUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/ProcessManagerFactory?"/>
+    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_DeyPAVeVEeeO4sxxtTZfEA" x="11176" y="3175"/>
+  </children>
+  <children xmi:type="umlnotation:UMLClassifierShape" xmi:id="_DezdIVeVEeeO4sxxtTZfEA" fontHeight="8" transparency="0" lineColor="14263149" lineWidth="1" showStereotype="Label" useClassifierShape="true">
+    <children xmi:type="notation:DecorationNode" xmi:id="_De0EMFeVEeeO4sxxtTZfEA" type="ImageCompartment">
+      <layoutConstraint xmi:type="notation:Size" xmi:id="_De0EMVeVEeeO4sxxtTZfEA" width="530" height="530"/>
+    </children>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_De0EMleVEeeO4sxxtTZfEA" type="Stereotype"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_De0EM1eVEeeO4sxxtTZfEA" type="Kind"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_De0ENFeVEeeO4sxxtTZfEA" type="Name"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_De0rQFeVEeeO4sxxtTZfEA" type="Parent"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_De0rQVeVEeeO4sxxtTZfEA" type="AttributeCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_De0rQleVEeeO4sxxtTZfEA" type="OperationCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_De0rQ1eVEeeO4sxxtTZfEA" visible="false" type="SignalCompartment"/>
+    <element xmi:type="uml:Interface" href="../../pp4j.emx#_naVFwFeUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/ProcessPool?"/>
+    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_DezdIleVEeeO4sxxtTZfEA" x="7620" y="3175"/>
+  </children>
+  <children xmi:type="umlnotation:UMLClassifierShape" xmi:id="_De1SUFeVEeeO4sxxtTZfEA" fontHeight="8" transparency="0" lineColor="14263149" lineWidth="1" showStereotype="Label" useClassifierShape="true">
+    <children xmi:type="notation:DecorationNode" xmi:id="_De1SUleVEeeO4sxxtTZfEA" type="ImageCompartment">
+      <layoutConstraint xmi:type="notation:Size" xmi:id="_De1SU1eVEeeO4sxxtTZfEA" width="530" height="530"/>
+    </children>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_De15YFeVEeeO4sxxtTZfEA" type="Stereotype"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_De15YVeVEeeO4sxxtTZfEA" type="Kind"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_De15YleVEeeO4sxxtTZfEA" type="Name"/>
+    <children xmi:type="notation:BasicDecorationNode" xmi:id="_De15Y1eVEeeO4sxxtTZfEA" type="Parent"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_De15ZFeVEeeO4sxxtTZfEA" type="AttributeCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_De15ZVeVEeeO4sxxtTZfEA" type="OperationCompartment"/>
+    <children xmi:type="notation:SemanticListCompartment" xmi:id="_De2gcFeVEeeO4sxxtTZfEA" visible="false" type="SignalCompartment"/>
+    <element xmi:type="uml:Interface" href="../../pp4j.emx#_nabzcleUEeeO4sxxtTZfEA?pp4j/net/viktorc/pp4j/Submission?"/>
+    <layoutConstraint xmi:type="notation:Bounds" xmi:id="_De1SUVeVEeeO4sxxtTZfEA" x="16383" y="3175"/>
+  </children>
+  <element xsi:nil="true"/>
+</umlnotation:UMLDiagram>

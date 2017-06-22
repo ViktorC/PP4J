@@ -572,28 +572,22 @@ public class StandardProcessPool implements ProcessPool {
 								logger.info(String.format("Submission %s processed; delay: %.3f; execution time: %.3f.", submission,
 										(float) ((double) (submission.submittedTime - submission.receivedTime)/1000000000),
 										(float) ((double) (submission.processedTime - submission.submittedTime)/1000000000)));
-							synchronized (helperLock) {
-								submission = null;
-							}
+							submission = null;
 						}
 					} catch (InterruptedException e) {
 						// Next round (unless the process is stopped).
 						continue;
 					} catch (Exception e) {
 						// Signal the exception to the future and do not put the submission back into the queue.
-						synchronized (helperLock) {
-							if (submission != null) {
-								submission.setException(e);
-								submission = null;
-							}
+						if (submission != null) {
+							submission.setException(e);
+							submission = null;
 						}
 					} finally {
 						// If the execute method failed and there was no exception thrown, put the submission back into the queue at the front.
-						synchronized (helperLock) {
-							if (submission != null) {
-								submission.setThread(null);
-								submissions.addFirst(submission);
-							}
+						if (submission != null) {
+							submission.setThread(null);
+							submissions.addFirst(submission);
 						}
 					}
 				}
@@ -619,15 +613,17 @@ public class StandardProcessPool implements ProcessPool {
 					return true;
 				synchronized (execLock) {
 					boolean success = true;
-					if (process != null) {
+					if (running) {
 						if (!forcibly)
 							success = manager.terminate(this);
-						else
-							process.destroy();
+						else {
+							synchronized (helperLock) {
+								if (process != null)
+									process.destroy();
+							}
+						}
 					}
 					if (success) {
-						if (doTime)
-							timer.stop();
 						stop = true;
 						execLock.notifyAll();
 					}
@@ -705,7 +701,9 @@ public class StandardProcessPool implements ProcessPool {
 							if (stop)
 								return;
 							command = null;
-							process = manager.start();
+							synchronized (helperLock) {
+								process = manager.start();
+							}
 							lifeTime = System.currentTimeMillis();
 							stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 							errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
@@ -741,16 +739,18 @@ public class StandardProcessPool implements ProcessPool {
 					// Try to clean up and close all the resources.
 					if (doTime)
 						timer.stop();
-					if (process != null) {
-						if (process.isAlive()) {
-							process.destroy();
-							try {
-								process.waitFor();
-							} catch (InterruptedException e) {
-								Thread.currentThread().interrupt();
+					synchronized (helperLock) {
+						if (process != null) {
+							if (process.isAlive()) {
+								process.destroy();
+								try {
+									process.waitFor();
+								} catch (InterruptedException e) {
+									Thread.currentThread().interrupt();
+								}
 							}
+							process = null;
 						}
-						process = null;
 					}
 					lifeTime = lifeTime == 0 ? 0 : System.currentTimeMillis() - lifeTime;
 					if (verbose)
