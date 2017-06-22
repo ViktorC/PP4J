@@ -517,14 +517,6 @@ public class StandardProcessPool implements ProcessPool {
 			helperLock = new Object();
 		}
 		/**
-		 * Returns whether the process is currently running and not cancelled.
-		 * 
-		 * @return Whether the process is currently running and not cancelled.
-		 */
-		boolean isActive() {
-			return running && !stop;
-		}
-		/**
 		 * Starts listening to an out stream of the process using the specified reader.
 		 * 
 		 * @param reader The buffered reader to use to listen to the steam.
@@ -747,6 +739,8 @@ public class StandardProcessPool implements ProcessPool {
 					throw new ProcessException(e);
 				} finally {
 					// Try to clean up and close all the resources.
+					if (doTime)
+						timer.stop();
 					if (process != null) {
 						if (process.isAlive()) {
 							process.destroy();
@@ -758,11 +752,9 @@ public class StandardProcessPool implements ProcessPool {
 						}
 						process = null;
 					}
-					lifeTime = System.currentTimeMillis() - lifeTime;
+					lifeTime = lifeTime == 0 ? 0 : System.currentTimeMillis() - lifeTime;
 					if (verbose)
 						logger.info(String.format("Process runtime in executor %s: %.3f", this, ((float) lifeTime)/1000));
-					if (doTime)
-						timer.stop();
 					subLock.lock();
 					try {
 						synchronized (execLock) {
@@ -773,6 +765,9 @@ public class StandardProcessPool implements ProcessPool {
 							if (subThread != null)
 								subThread.interrupt();
 						}
+						// Make sure that the timer sees the new value of 'running'.
+						if (doTime)
+							timer.stop();
 					} finally {
 						subLock.unlock();
 					}
@@ -839,16 +834,18 @@ public class StandardProcessPool implements ProcessPool {
 			@Override
 			public synchronized void run() {
 				try {
-					while (isActive()) {
+					while (running && !stop) {
 						while (!go) {
 							wait();
-							if (!isActive())
+							if (!running || stop)
 								return;
 						}
 						long waitTime = keepAliveTime;
 						while (go && waitTime > 0) {
 							long start = System.currentTimeMillis();
 							wait(waitTime);
+							if (!running || stop)
+								return;
 							waitTime -= (System.currentTimeMillis() - start);
 						}
 						if (go && subLock.tryLock()) {

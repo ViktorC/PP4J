@@ -411,7 +411,7 @@ public class PPE4JTest {
 	public void test14() throws Exception {
 		StandardProcessPool pool = getCustomPool(0, 100, 0, 0, false, false, false, false);
 		Assert.assertTrue(perfTest("Test 14", pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, 0, 4995,
-				6500));
+				6600));
 	}
 	@Test
 	public void test15() throws Exception {
@@ -507,13 +507,13 @@ public class PPE4JTest {
 	public void test27() throws Exception {
 		StandardProcessPool pool = getSinglePool(20000, true, true, false);
 		Assert.assertTrue(perfTest("Test 27", pool, false, new int[] { 5 }, 5, 30000, false, 0, false, false, 0, 4995,
-				5200));
+				5250));
 	}
 	@Test
 	public void test28() throws Exception {
 		StandardProcessPool pool = getSinglePool(0, true, false, false);
 		Assert.assertTrue(perfTest("Test 28", pool, false, new int[] { 5 }, 5, 20000, false, 0, false, false, 0, 4995,
-				13200));
+				13250));
 	}
 	// Fixed size process pool performance testing.
 	@Test
