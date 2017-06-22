@@ -487,6 +487,7 @@ public class StandardProcessPool implements ProcessPool {
 		final Semaphore termSemaphore;
 		final ReentrantLock subLock;
 		final Object runLock;
+		final Object stopLock;
 		final Object execLock;
 		final Object helperLock;
 		Process process;
@@ -511,6 +512,7 @@ public class StandardProcessPool implements ProcessPool {
 			termSemaphore = new Semaphore(0);
 			subLock = new ReentrantLock();
 			runLock = new Object();
+			stopLock = new Object();
 			execLock = new Object();
 			helperLock = new Object();
 		}
@@ -620,23 +622,25 @@ public class StandardProcessPool implements ProcessPool {
 		 * @return Whether the process was successfully terminated.
 		 */
 		boolean stop(boolean forcibly) {
-			synchronized (execLock) {
+			synchronized (stopLock) {
 				if (stop)
 					return true;
-				boolean success = true;
-				if (process != null) {
-					if (!forcibly)
-						success = manager.terminate(this);
-					else
-						process.destroy();
+				synchronized (execLock) {
+					boolean success = true;
+					if (process != null) {
+						if (!forcibly)
+							success = manager.terminate(this);
+						else
+							process.destroy();
+					}
+					if (success) {
+						if (doTime)
+							timer.stop();
+						stop = true;
+						execLock.notifyAll();
+					}
+					return success;
 				}
-				if (success) {
-					if (doTime)
-						timer.stop();
-					stop = true;
-					execLock.notifyAll();
-				}
-				return success;
 			}
 		}
 		@Override
@@ -761,16 +765,16 @@ public class StandardProcessPool implements ProcessPool {
 						timer.stop();
 					subLock.lock();
 					try {
+						synchronized (execLock) {
+							running = false;
+							execLock.notifyAll();
+						}
 						synchronized (helperLock) {
 							if (subThread != null)
 								subThread.interrupt();
 						}
 					} finally {
 						subLock.unlock();
-					}
-					synchronized (execLock) {
-						running = false;
-						execLock.notifyAll();
 					}
 					try {
 						termSemaphore.acquire(doTime ? 4 : 3);
