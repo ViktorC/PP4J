@@ -350,7 +350,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * 
 		 * @param t The thread that executes the submission.
 		 */
-		public void setThread(Thread t) {
+		void setThread(Thread t) {
 			synchronized (lock) {
 				thread = t;
 			}
