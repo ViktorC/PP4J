@@ -958,6 +958,7 @@ public class StandardProcessPool implements ProcessPool {
 					logger.log(Level.SEVERE, e.getMessage(), e);
 					StandardProcessPool.this.shutdown();
 				}
+				
 			});
 			return t;
 		}
@@ -1010,6 +1011,7 @@ public class StandardProcessPool implements ProcessPool {
 								Thread.currentThread().interrupt();
 							}
 						}
+						
 					});
 		}
 		@Override
