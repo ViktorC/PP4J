@@ -411,7 +411,7 @@ public class PPE4JTest {
 	public void test14() throws Exception {
 		StandardProcessPool pool = getCustomPool(0, 100, 0, 0, false, false, false, false);
 		Assert.assertTrue(perfTest("Test 14", pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, 0, 4995,
-				6600));
+				6850));
 	}
 	@Test
 	public void test15() throws Exception {

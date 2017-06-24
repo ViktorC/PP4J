@@ -69,10 +69,10 @@ public class StandardProcessPool implements ProcessPool {
 	private final long keepAliveTime;
 	private final boolean verbose;
 	private final boolean doTime;
-	private final ExecutorService procExecThreadPool;
+	private final ExecutorService procExecutorThreadPool;
 	private final ExecutorService auxThreadPool;
-	private final Queue<StandardProcessExecutor> activeExecutors;
-	private final StandardProcessExecutorPool executorPool;
+	private final Queue<StandardProcessExecutor> activeProcExecutors;
+	private final StandardProcessExecutorPool procExecutorPool;
 	private final LinkedBlockingDeque<InternalSubmission> submissions;
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final CountDownLatch prestartLatch;
@@ -117,14 +117,14 @@ public class StandardProcessPool implements ProcessPool {
 		this.verbose = verbose;
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		doTime = keepAliveTime > 0;
-		procExecThreadPool = new ProcessExecutorThreadPool();
+		procExecutorThreadPool = new ProcessExecutorThreadPool();
 		/* If keepAliveTime is positive, one process requires 4 auxiliary threads (std_out listener, err_out listener,
 		 * submission handler, timer); if it is not, only 3 are required. */
 		auxThreadPool = new ThreadPoolExecutor(doTime ? 4*actualMinSize : 3*actualMinSize, Integer.MAX_VALUE,
 				doTime ? keepAliveTime : DEFAULT_EVICT_TIME, TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
 				new CustomizedThreadFactory("auxThreadPool"));
-		activeExecutors = new LinkedBlockingQueue<>();
-		executorPool = new StandardProcessExecutorPool();
+		activeProcExecutors = new LinkedBlockingQueue<>();
+		procExecutorPool = new StandardProcessExecutorPool();
 		submissions = new LinkedBlockingDeque<>();
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
@@ -194,7 +194,7 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return The number of running processes.
 	 */
 	public int getNumOfProcesses() {
-		return activeExecutors.size();
+		return activeProcExecutors.size();
 	}
 	/**
 	 * Returns the number of submissions currently being executed in the pool.
@@ -218,7 +218,7 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return "Active processes: " + activeExecutors.size() + "; submitted commands: " +
+		return "Active processes: " + activeProcExecutors.size() + "; submitted commands: " +
 				(numOfExecutingSubmissions.get() + submissions.size());
 	}
 	/**
@@ -227,7 +227,7 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return Whether the process pool should be extended.
 	 */
 	private boolean doExtendPool() {
-		return !close && (activeExecutors.size() < minPoolSize || (activeExecutors.size() < Math.min(maxPoolSize,
+		return !close && (activeProcExecutors.size() < minPoolSize || (activeProcExecutors.size() < Math.min(maxPoolSize,
 				numOfExecutingSubmissions.get() + submissions.size() + reserveSize)));
 	}
 	/**
@@ -240,13 +240,13 @@ public class StandardProcessPool implements ProcessPool {
 	private boolean startNewProcess(StandardProcessExecutor executor) {
 		if (executor == null) {
 			try {
-				executor = executorPool.borrowObject();
+				executor = procExecutorPool.borrowObject();
 			} catch (Exception e) {
 				return false;
 			}
 		}
-		procExecThreadPool.execute(executor);
-		activeExecutors.add(executor);
+		procExecutorThreadPool.execute(executor);
+		activeProcExecutors.add(executor);
 		if (verbose)
 			logger.info("Process executor " + executor + " started." + System.lineSeparator() +
 					getPoolStats());
@@ -296,7 +296,7 @@ public class StandardProcessPool implements ProcessPool {
 				prestartLatch.countDown();
 			if (verbose)
 				logger.info("Shutting down process executors...");
-			for (StandardProcessExecutor executor : activeExecutors) {
+			for (StandardProcessExecutor executor : activeProcExecutors) {
 				if (!executor.stop(true)) {
 					// This should never happen.
 					logger.log(Level.SEVERE, "Process executor " + executor + " could not be stopped.");
@@ -304,9 +304,9 @@ public class StandardProcessPool implements ProcessPool {
 			}
 			if (verbose)
 				logger.info("Shutting down thread pools...");
-			procExecThreadPool.shutdown();
+			procExecutorThreadPool.shutdown();
 			auxThreadPool.shutdown();
-			executorPool.close();
+			procExecutorPool.close();
 			if (verbose)
 				logger.info("Process pool shut down.");
 		}
@@ -380,6 +380,7 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public void onStartedProcessing() {
+			numOfExecutingSubmissions.incrementAndGet();
 			submittedTime = System.nanoTime();
 			origSubmission.onStartedProcessing();
 		}
@@ -391,6 +392,7 @@ public class StandardProcessPool implements ProcessPool {
 				processed = true;
 				lock.notifyAll();
 			}
+			numOfExecutingSubmissions.decrementAndGet();
 		}
 		@Override
 		public String toString() {
@@ -558,33 +560,26 @@ public class StandardProcessPool implements ProcessPool {
 				while (running && !stop) {
 					InternalSubmission submission = null;
 					try {
-						/* Wait until the startup phase is over and the mainLock is available to avoid retrieving a submission only to find that it cannot 
-						 * be executed and thus has to be put back into the queue. */
 						subLock.lock();
 						subLock.unlock();
-						// Wait for an available submission.
 						submission = submissions.takeFirst();
 						submission.setThread(subThread);
-						/* It can happen of course that in the mean time, the mainLock has been stolen (for terminating the process) or that the process 
-						 * is already terminated, and thus the execute method fails. In this case, the submission is put back into the queue. */
 						if (execute(submission)) {
 							if (verbose)
-								logger.info(String.format("Submission %s processed; delay: %.3f; execution time: %.3f.", submission,
-										(float) ((double) (submission.submittedTime - submission.receivedTime)/1000000000),
-										(float) ((double) (submission.processedTime - submission.submittedTime)/1000000000)));
+								logger.info(String.format("Submission %s processed; delay: %.3f;" +
+										"execution time: %.3f.", submission, (float) ((double) (submission.submittedTime -
+										submission.receivedTime)/1000000000), (float) ((double) (submission.processedTime -
+										submission.submittedTime)/1000000000)));
 							submission = null;
 						}
 					} catch (InterruptedException e) {
-						// Next round (unless the process is stopped).
 						continue;
 					} catch (Exception e) {
-						// Signal the exception to the future and do not put the submission back into the queue.
 						if (submission != null) {
 							submission.setException(e);
 							submission = null;
 						}
 					} finally {
-						// If the execute method failed and there was no exception thrown, put the submission back into the queue at the front.
 						if (submission != null) {
 							submission.setThread(null);
 							submissions.addFirst(submission);
@@ -634,7 +629,6 @@ public class StandardProcessPool implements ProcessPool {
 		@Override
 		public boolean execute(Submission submission) throws IOException, InterruptedException {
 			if (running && !stop && subLock.tryLock()) {
-				numOfExecutingSubmissions.incrementAndGet();
 				boolean success = false;
 				synchronized (execLock) {
 					try {
@@ -678,7 +672,6 @@ public class StandardProcessPool implements ProcessPool {
 								submission.onFinishedProcessing();
 						} finally {
 							command = null;
-							numOfExecutingSubmissions.decrementAndGet();
 							subLock.unlock();
 						}
 					}
@@ -1018,7 +1011,7 @@ public class StandardProcessPool implements ProcessPool {
 		protected void afterExecute(Runnable r, Throwable t) {
 			super.afterExecute(r, t);
 			StandardProcessExecutor executor = (StandardProcessExecutor) r;
-			activeExecutors.remove(executor);
+			activeProcExecutors.remove(executor);
 			if (verbose)
 				logger.info("Process executor " + executor + " stopped." + System.lineSeparator() +
 						getPoolStats());
@@ -1026,7 +1019,7 @@ public class StandardProcessPool implements ProcessPool {
 				if (doExtendPool())
 					startNewProcess(executor);
 				else
-					executorPool.returnObject(executor);
+					procExecutorPool.returnObject(executor);
 			}
 		}
 		
