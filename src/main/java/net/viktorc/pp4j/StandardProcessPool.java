@@ -76,7 +76,7 @@ public class StandardProcessPool implements ProcessPool {
 	private final LinkedBlockingDeque<InternalSubmission> submissions;
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final CountDownLatch prestartLatch;
-	private final Object mainLock;
+	private final Object poolLock;
 	private final Logger logger;
 	private volatile boolean close;
 
@@ -128,10 +128,10 @@ public class StandardProcessPool implements ProcessPool {
 		submissions = new LinkedBlockingDeque<>();
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
-		mainLock = new Object();
+		poolLock = new Object();
 		logger = Logger.getAnonymousLogger();
 		for (int i = 0; i < actualMinSize && !close; i++) {
-			synchronized (mainLock) {
+			synchronized (poolLock) {
 				startNewProcess(null);
 			}
 		}
@@ -269,7 +269,8 @@ public class StandardProcessPool implements ProcessPool {
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
 		InternalSubmission internalSubmission = new InternalSubmission(submission);
 		submissions.addLast(internalSubmission);
-		synchronized (mainLock) {
+		// If necessary, adjust the pool size given the new submission.
+		synchronized (poolLock) {
 			if (doExtendPool())
 				startNewProcess(null);
 		}
@@ -286,7 +287,7 @@ public class StandardProcessPool implements ProcessPool {
 	 */
 	@Override
 	public synchronized void shutdown() {
-		synchronized (mainLock) {
+		synchronized (poolLock) {
 			if (close)
 				throw new IllegalStateException("The pool has already been shut down.");
 			if (verbose)
@@ -361,6 +362,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * @param e The exception thrown during the execution of the submission.
 		 */
 		void setException(Exception e) {
+			// Notify the InternalSubmissionFuture that an exception was thrown while processing the submission.
 			synchronized (lock) {
 				exception = e;
 				lock.notifyAll();
@@ -380,6 +382,7 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public void onStartedProcessing() {
+			// Increment the executing submissions counter to keep track of the number of busy processes.
 			numOfExecutingSubmissions.incrementAndGet();
 			submittedTime = System.nanoTime();
 			origSubmission.onStartedProcessing();
@@ -388,10 +391,12 @@ public class StandardProcessPool implements ProcessPool {
 		public void onFinishedProcessing() {
 			origSubmission.onFinishedProcessing();
 			processedTime = System.nanoTime();
+			// Notify the InternalSubmissionFuture that the submission has been processed.
 			synchronized (lock) {
 				processed = true;
 				lock.notifyAll();
 			}
+			// Decrement the executing submissions counter to keep track of the number of busy processes.
 			numOfExecutingSubmissions.decrementAndGet();
 		}
 		@Override
@@ -423,6 +428,7 @@ public class StandardProcessPool implements ProcessPool {
 		@Override
 		public boolean cancel(boolean mayInterruptIfRunning) {
 			synchronized (submission.lock) {
+				// If mayInterruptIfRunning, interrupt the executor thread if it is not null.
 				if (mayInterruptIfRunning && submission.thread != null)
 					submission.thread.interrupt();
 				submission.cancel = true;
@@ -432,6 +438,7 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
+			// Wait until the submission is processed, or cancelled, or fails.
 			synchronized (submission.lock) {
 				while (!submission.processed && !submission.isCancelled() && submission.exception == null)
 					submission.lock.wait();
@@ -445,6 +452,7 @@ public class StandardProcessPool implements ProcessPool {
 		@Override
 		public Long get(long timeout, TimeUnit unit)
 				throws InterruptedException, ExecutionException, TimeoutException, CancellationException {
+			// Wait until the submission is processed, or cancelled, or fails, or the method times out.
 			synchronized (submission.lock) {
 				long timeoutNs = unit.toNanos(timeout);
 				long start = System.nanoTime();
@@ -491,7 +499,8 @@ public class StandardProcessPool implements ProcessPool {
 		final Object runLock;
 		final Object stopLock;
 		final Object execLock;
-		final Object helperLock;
+		final Object threadLock;
+		final Object processLock;
 		Process process;
 		BufferedReader stdOutReader;
 		BufferedReader errOutReader;
@@ -516,7 +525,8 @@ public class StandardProcessPool implements ProcessPool {
 			runLock = new Object();
 			stopLock = new Object();
 			execLock = new Object();
-			helperLock = new Object();
+			threadLock = new Object();
+			processLock = new Object();
 		}
 		/**
 		 * Starts listening to an out stream of the process using the specified reader.
@@ -531,6 +541,7 @@ public class StandardProcessPool implements ProcessPool {
 					line = line.trim();
 					if (line.isEmpty())
 						continue;
+					// Make sure that the submission executor thread is waiting.
 					synchronized (execLock) {
 						if (startedUp) {
 							commandProcessed = command == null || command.onNewOutput(line, standard);
@@ -553,33 +564,42 @@ public class StandardProcessPool implements ProcessPool {
 		 * Starts waiting on the blocking queue of submissions executing available ones one at a time.
 		 */
 		void startHandlingSubmissions() {
-			synchronized (helperLock) {
+			synchronized (threadLock) {
 				subThread = Thread.currentThread();
 			}
 			try {
 				while (running && !stop) {
 					InternalSubmission submission = null;
 					try {
+						/* Wait until the startup phase is over and the mainLock is available to avoid retrieving a submission only to find 
+						 * that it cannot be executed and thus has to be put back into the queue. */
 						subLock.lock();
 						subLock.unlock();
+						// Wait for an available submission.
 						submission = submissions.takeFirst();
 						submission.setThread(subThread);
+						/* It can happen of course that in the mean time, the mainLock has been stolen (for terminating the process) or that 
+						 * the process is already terminated, and thus the execute method fails. In this case, the submission is put back into 
+						 * the queue. */
 						if (execute(submission)) {
 							if (verbose)
-								logger.info(String.format("Submission %s processed; delay: %.3f;" +
+								logger.info(String.format("Submission %s processed; delay: %.3f; " +
 										"execution time: %.3f.", submission, (float) ((double) (submission.submittedTime -
 										submission.receivedTime)/1000000000), (float) ((double) (submission.processedTime -
 										submission.submittedTime)/1000000000)));
 							submission = null;
 						}
 					} catch (InterruptedException e) {
+						// Next round (unless the process is stopped).
 						continue;
 					} catch (Exception e) {
+						// Signal the exception to the future and do not put the submission back into the queue.
 						if (submission != null) {
 							submission.setException(e);
 							submission = null;
 						}
 					} finally {
+						// If the execute method failed and there was no exception thrown, put the submission back into the queue at the front.
 						if (submission != null) {
 							submission.setThread(null);
 							submissions.addFirst(submission);
@@ -587,7 +607,7 @@ public class StandardProcessPool implements ProcessPool {
 					}
 				}
 			} finally {
-				synchronized (helperLock) {
+				synchronized (threadLock) {
 					subThread = null;
 				}
 				termSemaphore.release();
@@ -612,7 +632,7 @@ public class StandardProcessPool implements ProcessPool {
 						if (!forcibly)
 							success = manager.terminate(this);
 						else {
-							synchronized (helperLock) {
+							synchronized (processLock) {
 								if (process != null)
 									process.destroy();
 							}
@@ -628,12 +648,15 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public boolean execute(Submission submission) throws IOException, InterruptedException {
-			if (running && !stop && subLock.tryLock()) {
-				boolean success = false;
+			if (subLock.tryLock()) {
+				// Make sure that the reader thread can only process output lines if this one is ready and waiting.
 				synchronized (execLock) {
+					boolean success = false;
 					try {
+						// If the process has terminated or the ProcessExecutor has been stopped while acquiring the execLock, return.
 						if (!running || stop)
 							return success;
+						// Stop the timer as the process is not idle anymore.
 						if (doTime)
 							timer.stop();
 						if (stop)
@@ -651,6 +674,7 @@ public class StandardProcessPool implements ProcessPool {
 							stdInWriter.flush();
 							while (running && !stop && !commandProcessed)
 								execLock.wait();
+							// If the process has terminated or the ProcessExecutor has been stopped, return false to signal failure.
 							if (!commandProcessed)
 								return success;
 							if (i < commands.size() - 1)
@@ -682,25 +706,28 @@ public class StandardProcessPool implements ProcessPool {
 		@Override
 		public void run() {
 			synchronized (runLock) {
-				running = true;
 				termSemaphore.drainPermits();
 				int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 				long lifeTime = 0;
 				try {
 					subLock.lock();
+					boolean orderly = false;
 					try {
 						// Start the process
 						synchronized (execLock) {
 							if (stop)
 								return;
+							running = true;
 							command = null;
-							synchronized (helperLock) {
+							// Start the process.
+							synchronized (processLock) {
 								process = manager.start();
 							}
 							lifeTime = System.currentTimeMillis();
 							stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 							errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 							stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+							// Handle the startup.
 							startedUp = manager.startsUpInstantly();
 							auxThreadPool.submit(() -> startListeningToProcess(stdOutReader, true));
 							auxThreadPool.submit(() -> startListeningToProcess(errOutReader, false));
@@ -713,26 +740,33 @@ public class StandardProcessPool implements ProcessPool {
 							prestartLatch.countDown();
 							if (stop)
 								return;
+							// Start accepting handling submissions.
 							auxThreadPool.submit(this::startHandlingSubmissions);
 							if (doTime) {
+								// Start the timer.
 								auxThreadPool.submit(timer);
 								timer.start();
 							}
+							orderly = true;
 						}
-					} catch (Exception e) {
-						termSemaphore.release(doTime ? 4 : 3);
-						throw e;
 					} finally {
+						/* If the start up was not orderly, e.g. the process was stopped prematurely or an exception was thrown, release 
+						 * as many permits as there are slave threads to ensure that the semaphore does not block in the finally clause. */
+						if (!orderly)
+							termSemaphore.release(doTime ? 4 : 3);
 						subLock.unlock();
 					}
-					rc = process.waitFor();
+					// If the startup failed, the process might not be initialized. Otherwise, wait for the process to terminate.
+					if (orderly)
+						rc = process.waitFor();
 				} catch (Exception e) {
 					throw new ProcessException(e);
 				} finally {
-					// Try to clean up and close all the resources.
+					// Stop the timer.
 					if (doTime)
 						timer.stop();
-					synchronized (helperLock) {
+					// Make sure the process itself has terminated.
+					synchronized (processLock) {
 						if (process != null) {
 							if (process.isAlive()) {
 								process.destroy();
@@ -748,27 +782,33 @@ public class StandardProcessPool implements ProcessPool {
 					lifeTime = lifeTime == 0 ? 0 : System.currentTimeMillis() - lifeTime;
 					if (verbose)
 						logger.info(String.format("Process runtime in executor %s: %.3f", this, ((float) lifeTime)/1000));
+					// Make sure that there are no submission currently being executed...
 					subLock.lock();
 					try {
+						// Set running to false...
 						synchronized (execLock) {
 							running = false;
 							execLock.notifyAll();
 						}
-						synchronized (helperLock) {
+						/* And interrupt the submission handler thread to avoid having it stuck waiting for submissions forever in case 
+						 * the queue is empty. */
+						synchronized (threadLock) {
 							if (subThread != null)
 								subThread.interrupt();
 						}
-						// Make sure that the timer sees the new value of 'running'.
+						// Make sure that the timer sees the new value of running and the timer thread can terminate.
 						if (doTime)
 							timer.stop();
 					} finally {
 						subLock.unlock();
 					}
+					// Wait for all the slave threads to finish.
 					try {
 						termSemaphore.acquire(doTime ? 4 : 3);
 					} catch (InterruptedException e) {
 						Thread.currentThread().interrupt();
 					}
+					// Try to close all the streams.
 					if (stdOutReader != null) {
 						try {
 							stdOutReader.close();
@@ -790,10 +830,13 @@ public class StandardProcessPool implements ProcessPool {
 							// Ignore it.
 						}
 					}
+					// The process life cycle is over.
 					try {
 						manager.onTermination(rc, lifeTime);
 					} finally {
-						stop = false;
+						synchronized (execLock) {
+							stop = false;
+						}
 					}
 				}
 			}
@@ -841,6 +884,13 @@ public class StandardProcessPool implements ProcessPool {
 								return;
 							waitTime -= (System.currentTimeMillis() - start);
 						}
+						/* Normally, the timer should not be running while a submission is being processed, i.e. if the timer gets to this 
+						 * point with go set to true, subLock should be available to the timer thread. However, if the execute method acquires 
+						 * the subLock right after the timer's wait time elapses, it will not be able to disable the timer until it enters the 
+						 * wait method in the next cycle and gives up its intrinsic lock. Therefore, the first call of the stop method of the 
+						 * StandardProcessExecutor would fail due to the lock held by the thread running the execute method, triggering the 
+						 * forcible shutdown of the process even though it is not idle. To avoid this behavior, first the subLock is attempted 
+						 * to be acquired to ensure that the process is indeed idle. */
 						if (go && subLock.tryLock()) {
 							try {
 								if (!StandardProcessExecutor.this.stop(false))
@@ -1015,7 +1065,9 @@ public class StandardProcessPool implements ProcessPool {
 			if (verbose)
 				logger.info("Process executor " + executor + " stopped." + System.lineSeparator() +
 						getPoolStats());
-			synchronized (mainLock) {
+			/* A process has terminated. Extend the pool if necessary by directly reusing the ProcessExecutor instance. If not, return it to 
+			 * the pool. */
+			synchronized (poolLock) {
 				if (doExtendPool())
 					startNewProcess(executor);
 				else
