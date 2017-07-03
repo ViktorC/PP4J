@@ -122,7 +122,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * submission handler, timer); if it is not, only 3 are required. */
 		auxThreadPool = new ThreadPoolExecutor(doTime ? 4*actualMinSize : 3*actualMinSize, Integer.MAX_VALUE,
 				doTime ? keepAliveTime : DEFAULT_EVICT_TIME, TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
-				new CustomizedThreadFactory(this + " - auxThreadPool"));
+				new CustomizedThreadFactory(this + "-auxThreadPool"));
 		activeProcExecutors = new LinkedBlockingQueue<>();
 		procExecutorPool = new StandardProcessExecutorPool();
 		submissions = new LinkedBlockingDeque<>();
@@ -314,12 +314,18 @@ public class StandardProcessPool implements ProcessPool {
 			}
 			if (verbose)
 				logger.info("Shutting down thread pools...");
-			procExecutorThreadPool.shutdown();
 			auxThreadPool.shutdown();
+			procExecutorThreadPool.shutdown();
 			procExecutorPool.close();
-			if (verbose)
-				logger.info("Process pool shut down.");
 		}
+		try {
+			auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+			procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		if (verbose)
+			logger.info("Process pool shut down.");
 	}
 	
 	/**
@@ -391,10 +397,11 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public void onStartedProcessing() {
-			// Increment the executing submissions counter to keep track of the number of busy processes.
-			numOfExecutingSubmissions.incrementAndGet();
-			submittedTime = System.nanoTime();
-			origSubmission.onStartedProcessing();
+			// If it is the first time the submission is submitted to a process...
+			if (submittedTime == 0) {
+				submittedTime = System.nanoTime();
+				origSubmission.onStartedProcessing();
+			}
 		}
 		@Override
 		public void onFinishedProcessing() {
@@ -405,8 +412,6 @@ public class StandardProcessPool implements ProcessPool {
 				processed = true;
 				lock.notifyAll();
 			}
-			// Decrement the executing submissions counter to keep track of the number of busy processes.
-			numOfExecutingSubmissions.decrementAndGet();
 		}
 		@Override
 		public String toString() {
@@ -505,8 +510,8 @@ public class StandardProcessPool implements ProcessPool {
 		final KeepAliveTimer timer;
 		final Semaphore termSemaphore;
 		final ReentrantLock subLock;
+		final ReentrantLock stopLock;
 		final Object runLock;
-		final Object stopLock;
 		final Object execLock;
 		final Object threadLock;
 		final Object processLock;
@@ -531,8 +536,8 @@ public class StandardProcessPool implements ProcessPool {
 			this.manager = procManagerFactory.newProcessManager();
 			termSemaphore = new Semaphore(0);
 			subLock = new ReentrantLock();
+			stopLock = new ReentrantLock();
 			runLock = new Object();
-			stopLock = new Object();
 			execLock = new Object();
 			threadLock = new Object();
 			processLock = new Object();
@@ -579,6 +584,7 @@ public class StandardProcessPool implements ProcessPool {
 			try {
 				while (running && !stop) {
 					InternalSubmission submission = null;
+					boolean submissionRetrieved = false;
 					try {
 						/* Wait until the startup phase is over and the mainLock is available to avoid retrieving a submission only to find 
 						 * that it cannot be executed and thus has to be put back into the queue. */
@@ -586,6 +592,9 @@ public class StandardProcessPool implements ProcessPool {
 						subLock.unlock();
 						// Wait for an available submission.
 						submission = submissions.takeFirst();
+						// Increment the counter for executing submissions to keep track of the number of busy processes.
+						numOfExecutingSubmissions.incrementAndGet();
+						submissionRetrieved = true;
 						submission.setThread(subThread);
 						/* It can happen of course that in the mean time, the mainLock has been stolen (for terminating the process) or that 
 						 * the process is already terminated, and thus the execute method fails. In this case, the submission is put back into 
@@ -604,6 +613,8 @@ public class StandardProcessPool implements ProcessPool {
 					} catch (Exception e) {
 						// Signal the exception to the future and do not put the submission back into the queue.
 						if (submission != null) {
+							if (verbose)
+								logger.info(String.format("Exception while executing submission %s: %s", submission, e));
 							submission.setException(e);
 							submission = null;
 						}
@@ -613,6 +624,9 @@ public class StandardProcessPool implements ProcessPool {
 							submission.setThread(null);
 							submissions.addFirst(submission);
 						}
+						// Decrement the executing submissions counter if it was incremented in this cycle.
+						if (submissionRetrieved)
+							numOfExecutingSubmissions.decrementAndGet();
 					}
 				}
 			} finally {
@@ -632,7 +646,8 @@ public class StandardProcessPool implements ProcessPool {
 		 * @return Whether the process was successfully terminated.
 		 */
 		boolean stop(boolean forcibly) {
-			synchronized (stopLock) {
+			stopLock.lock();
+			try {
 				if (stop)
 					return true;
 				synchronized (execLock) {
@@ -653,10 +668,12 @@ public class StandardProcessPool implements ProcessPool {
 					}
 					return success;
 				}
+			} finally {
+				stopLock.unlock();
 			}
 		}
 		@Override
-		public boolean execute(Submission submission) throws IOException, InterruptedException {
+		public boolean execute(Submission submission) throws IOException, InterruptedException, CancellationException {
 			if (subLock.tryLock()) {
 				// Make sure that the reader thread can only process output lines if this one is ready and waiting.
 				synchronized (execLock) {
@@ -673,7 +690,7 @@ public class StandardProcessPool implements ProcessPool {
 						submission.onStartedProcessing();
 						List<Command> commands = submission.getCommands();
 						List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
-						for (int i = 0; i < commands.size() && !submission.isCancelled() && running && !stop; i++) {
+						for (int i = 0; i < commands.size() && !submission.isCancelled(); i++) {
 							command = commands.get(i);
 							if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
 								continue;
@@ -690,13 +707,17 @@ public class StandardProcessPool implements ProcessPool {
 								processedCommands.add(command);
 							command = null;
 						}
-						if (running && !stop) {
-							if (submission.doTerminateProcessAfterwards()) {
+						if (running && !stop && submission.doTerminateProcessAfterwards() && stopLock.tryLock()) {
+							try {
 								if (!stop(false))
 									stop(true);
-							} else if (doTime)
-								timer.start();
+							} finally {
+								stopLock.unlock();
+							}
 						}
+						// If the submission is cancelled, throw an exception.
+						if (submission.isCancelled())
+							throw new CancellationException();
 						success = true;
 						return success;
 					} finally {
@@ -705,6 +726,8 @@ public class StandardProcessPool implements ProcessPool {
 								submission.onFinishedProcessing();
 						} finally {
 							command = null;
+							if (running && !stop && doTime)
+								timer.start();
 							subLock.unlock();
 						}
 					}
@@ -1051,7 +1074,7 @@ public class StandardProcessPool implements ProcessPool {
 							return tryTransfer(r);
 						}
 						
-					}, new CustomizedThreadFactory(StandardProcessPool.this + " - procExecThreadPool"),
+					}, new CustomizedThreadFactory(StandardProcessPool.this + "-procExecThreadPool"),
 					new RejectedExecutionHandler() {
 						
 						@Override
