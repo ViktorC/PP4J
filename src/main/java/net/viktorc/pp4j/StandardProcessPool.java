@@ -67,7 +67,6 @@ public class StandardProcessPool implements ProcessPool {
 	private final int maxPoolSize;
 	private final int reserveSize;
 	private final long keepAliveTime;
-	private final boolean verbose;
 	private final boolean doTime;
 	private final ExecutorService procExecutorThreadPool;
 	private final ExecutorService auxThreadPool;
@@ -78,6 +77,7 @@ public class StandardProcessPool implements ProcessPool {
 	private final CountDownLatch prestartLatch;
 	private final Object poolLock;
 	private final Logger logger;
+	private volatile boolean verbose;
 	private volatile boolean close;
 
 	/**
@@ -122,7 +122,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * submission handler, timer); if it is not, only 3 are required. */
 		auxThreadPool = new ThreadPoolExecutor(doTime ? 4*actualMinSize : 3*actualMinSize, Integer.MAX_VALUE,
 				doTime ? keepAliveTime : DEFAULT_EVICT_TIME, TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
-				new CustomizedThreadFactory("auxThreadPool"));
+				new CustomizedThreadFactory(this + " - auxThreadPool"));
 		activeProcExecutors = new LinkedBlockingQueue<>();
 		procExecutorPool = new StandardProcessExecutorPool();
 		submissions = new LinkedBlockingDeque<>();
@@ -189,6 +189,15 @@ public class StandardProcessPool implements ProcessPool {
 		return verbose;
 	}
 	/**
+	 * Sets whether events relating to the management of the processes held by the pool should be logged to the 
+	 * console. 
+	 * 
+	 * @param verbose Whether the pool should be verbose.
+	 */
+	public void setVerbose(boolean verbose) {
+		this.verbose = verbose;
+	}
+	/**
 	 * Returns the number of running processes currently held in the pool.
 	 * 
 	 * @return The number of running processes.
@@ -218,7 +227,7 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return "Active processes: " + activeProcExecutors.size() + "; submitted commands: " +
+		return this + " - Active processes: " + activeProcExecutors.size() + "; submitted commands: " +
 				(numOfExecutingSubmissions.get() + submissions.size());
 	}
 	/**
@@ -737,7 +746,6 @@ public class StandardProcessPool implements ProcessPool {
 									return;
 							}
 							manager.onStartup(this);
-							prestartLatch.countDown();
 							if (stop)
 								return;
 							// Start accepting handling submissions.
@@ -748,12 +756,16 @@ public class StandardProcessPool implements ProcessPool {
 								timer.start();
 							}
 							orderly = true;
+							prestartLatch.countDown();
 						}
 					} finally {
-						/* If the start up was not orderly, e.g. the process was stopped prematurely or an exception was thrown, release 
-						 * as many permits as there are slave threads to ensure that the semaphore does not block in the finally clause. */
-						if (!orderly)
+						/* If the startup was not orderly, e.g. the process was stopped prematurely or an exception was thrown, release 
+						 * as many permits as there are slave threads to ensure that the semaphore does not block in the finally clause;
+						 * also count down on the pre-start latch to avoid having the pool wait on the failed startup. */
+						if (!orderly) {
 							termSemaphore.release(doTime ? 4 : 3);
+							prestartLatch.countDown();
+						}
 						subLock.unlock();
 					}
 					// If the startup failed, the process might not be initialized. Otherwise, wait for the process to terminate.
@@ -1039,7 +1051,7 @@ public class StandardProcessPool implements ProcessPool {
 							return tryTransfer(r);
 						}
 						
-					}, new CustomizedThreadFactory("procExecThreadPool"),
+					}, new CustomizedThreadFactory(StandardProcessPool.this + " - procExecThreadPool"),
 					new RejectedExecutionHandler() {
 						
 						@Override
