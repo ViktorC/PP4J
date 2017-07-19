@@ -1,5 +1,7 @@
 package net.viktorc.pp4j;
 
+import org.slf4j.Logger;
+
 /**
  * A class for convenience and factory methods for creating instances of implementations of the {@link net.viktorc.pp4j.ProcessPool} 
  * interface.
@@ -19,7 +21,7 @@ public class ProcessPools {
 	 * Returns a pool of processes. The initial size of the pool is the greater of the minimum pool size and the reserve size. This 
 	 * method blocks until the initial number of processes started up. The size of the pool is dynamically adjusted based on the pool 
 	 * parameters and the rate of incoming submissions. It is a proxy method for the constructor
-	 * {@link net.viktorc.pp4j.StandardProcessPool#StandardProcessPool(ProcessManagerFactory, int, int, int, long, boolean)}.
+	 * {@link net.viktorc.pp4j.StandardProcessPool#StandardProcessPool(ProcessManagerFactory, int, int, int, long, Logger)}.
 	 * 
 	 * @param managerFactory  A {@link net.viktorc.pp4j.ProcessManagerFactory} instance that is used to build 
 	 * {@link net.viktorc.pp4j.ProcessManager} instances that manage the processes' life cycle in the pool.
@@ -28,19 +30,20 @@ public class ProcessPools {
 	 * @param reserveSize The number of available processes to keep in the pool.
 	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is <code>0</code> 
 	 * or less, the life-cycle of the processes will not be limited.
-	 * @param verbose Whether events relating to the management of the pool should be logged.
+	 * @param logger The logger used for logging events related to the management of the pool. If it is null, no logging is 
+	 * performed.
 	 * @return A pool of process executors each hosting a process.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the processes to start up.
 	 */
 	public static ProcessPool newCustomProcessPool(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize,
-			int reserveSize, long keepAliveTime, boolean verbose) throws InterruptedException {
-		return new StandardProcessPool(managerFactory, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose);
+			int reserveSize, long keepAliveTime, Logger logger) throws InterruptedException {
+		return new StandardProcessPool(managerFactory, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, logger);
 	}
 	/**
 	 * Returns a pool of processes. The initial size of the pool is the greater of the minimum pool size and the reserve size. This 
 	 * method blocks until the initial number of processes started up. The size of the pool is dynamically adjusted based on the pool 
 	 * parameters and the rate of incoming submissions. It is a convenience method for calling the method
-	 * {@link #newCustomProcessPool(ProcessManagerFactory, int, int, int, long, boolean)} with <code>verbose</code> set to 
+	 * {@link #newCustomProcessPool(ProcessManagerFactory, int, int, int, long, Logger)} with <code>verbose</code> set to 
 	 * <code>false</code>.
 	 * 
 	 * @param managerFactory  A {@link net.viktorc.pp4j.ProcessManagerFactory} instance that is used to build 
@@ -55,7 +58,7 @@ public class ProcessPools {
 	 */
 	public static ProcessPool newCustomProcessPool(ProcessManagerFactory managerFactory, int minPoolSize, int maxPoolSize,
 			int reserveSize, long keepAliveTime) throws InterruptedException {
-		return newCustomProcessPool(managerFactory, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, false);
+		return newCustomProcessPool(managerFactory, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, null);
 	}
 	/**
 	 * Returns a pool of processes. The initial size of the pool is the greater of the minimum pool size and the reserve size. This 

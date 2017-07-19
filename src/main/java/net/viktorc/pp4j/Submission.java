@@ -33,14 +33,10 @@ public interface Submission {
 	/**
 	 * A method that is executed once the processing of the submitted commands has begun.
 	 */
-	default void onStartedProcessing() {
-		
-	}
+	default void onStartedProcessing() { }
 	/**
 	 * A method to execute once the processing of the submitted commands has completed.
 	 */
-	default void onFinishedProcessing() {
-		
-	}
+	default void onFinishedProcessing() { }
 	
 }

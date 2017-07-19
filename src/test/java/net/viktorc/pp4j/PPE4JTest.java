@@ -4,6 +4,9 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 import net.viktorc.pp4j.Command;
 import net.viktorc.pp4j.ProcessException;
@@ -43,6 +46,7 @@ public class PPE4JTest {
 	public final ExpectedException exceptionRule = ExpectedException.none();
 	
 	private final String programLocation;
+	private final Logger logger;
 	
 	/**
 	 * Resolves the path to the test program and ensures that it is executable.
@@ -56,6 +60,7 @@ public class PPE4JTest {
 				.toURI().getPath()).getAbsolutePath();
 		File file = new File(programLocation);
 		file.setExecutable(true);
+		logger = LoggerFactory.getLogger(getClass());
 	}
 	/**
 	 * Performs some basic checks on the pool concerning its size and other parameters.
@@ -78,7 +83,8 @@ public class PPE4JTest {
 				pool.getReserveSize() + ".";
 		assert Math.max(0, keepAliveTime) == pool.getKeepAliveTime() : "Different keep alive times: " +
 				Math.max(0, keepAliveTime) + " and " + pool.getKeepAliveTime() + ".";
-		assert verbose == pool.isVerbose() : "Different verbosity: " + verbose + " and " + pool.isVerbose() + ".";
+		assert verbose == (!NOPLogger.NOP_LOGGER.equals(pool.getLogger())) : "Different verbosity: " + verbose + " and " +
+				(pool.getLogger() != null) + ".";
 		assert pool.getNumOfQueuedSubmissions() == 0 : "Non-zero number of queued submissions on startup: " +
 				pool.getNumOfQueuedSubmissions() + ".";
 		assert pool.getNumOfExecutingSubmissions() == 0 : "Non-zero number of executing submissions on startup: " +
@@ -105,9 +111,9 @@ public class PPE4JTest {
 					throws InterruptedException {
 		StandardProcessPool pool = (StandardProcessPool) (keepAliveTime > 0 || verbose ?
 				ProcessPools.newCustomProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
-				throwStartupException), minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose) : ProcessPools
-				.newCustomProcessPool(new TestProcessManagerFactory(verifyStartup, manuallyTerminate, throwStartupException),
-				minPoolSize, maxPoolSize, reserveSize));
+				throwStartupException), minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose ?
+				logger : null) : ProcessPools.newCustomProcessPool(new TestProcessManagerFactory(verifyStartup,
+				manuallyTerminate, throwStartupException), minPoolSize, maxPoolSize, reserveSize));
 		checkPool(pool, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose);
 		return pool;
 	}
@@ -218,9 +224,8 @@ public class PPE4JTest {
 											"Unexpected numbers of output lines: " + c.getStandardOutLines().size() + 
 											" instead of " + procTime + " and " + c.getErrorOutLines().size() + 
 											" instead of " + 0 + ".";
-									if (processPool.isVerbose())
-										System.out.println(("Std: " + c.getJointStandardOutLines() + "; Err: " +
-												c.getJointErrorOutLines()).replaceAll("\n", " "));
+									processPool.getLogger().debug("Std: {}; Err: {}", c.getJointStandardOutLines()
+											.replaceAll("\n", " "), c.getJointErrorOutLines().replaceAll("\n", " "));
 									c.reset();
 									return true;
 								}
@@ -233,7 +238,6 @@ public class PPE4JTest {
 										throw new ProcessException("Test execution exception.");
 									return super.generatesOutput();
 								}
-								
 							});
 			}
 			Submission submission = new SimpleSubmission(commands, !reuse);
@@ -301,11 +305,12 @@ public class PPE4JTest {
 				"lowerBound: %.3f; upperBound: %.3f;%n",
 				processPool.getMinSize(), processPool.getMaxSize(), processPool.getReserveSize(),
 				processPool.getKeepAliveTime(), Boolean.toString(((TestProcessManagerFactory) processPool.getProcessManagerFactory())
-				.throwStartupException), Boolean.toString(processPool.isVerbose()), Boolean.toString(((TestProcessManagerFactory) processPool
-				.getProcessManagerFactory()).verifyStartup), Boolean.toString(((TestProcessManagerFactory) processPool
-				.getProcessManagerFactory()).manuallyTerminate), Boolean.toString(reuse), Arrays.toString(procTimes), requests, timeSpan,
-				Boolean.toString(throwExecutionException), cancelTime, Boolean.toString(forcedCancel), Boolean.toString(earlyClose),
-				(float) (((double) waitTimeout)/1000), (float) (((double) lowerBound)/1000), (float) (((double) upperBound)/1000));
+				.throwStartupException), Boolean.toString(!NOPLogger.NOP_LOGGER.equals(processPool.getLogger())),
+				Boolean.toString(((TestProcessManagerFactory) processPool.getProcessManagerFactory()).verifyStartup),
+				Boolean.toString(((TestProcessManagerFactory) processPool.getProcessManagerFactory()).manuallyTerminate),
+				Boolean.toString(reuse), Arrays.toString(procTimes), requests, timeSpan, Boolean.toString(throwExecutionException),
+				cancelTime, Boolean.toString(forcedCancel), Boolean.toString(earlyClose), (float) (((double) waitTimeout)/1000),
+				(float) (((double) lowerBound)/1000), (float) (((double) upperBound)/1000));
 		System.out.println("-------------------------------------------------------------------------------------" +
 				"---------------");
 		if (times.size() == requests) {
@@ -508,7 +513,6 @@ public class PPE4JTest {
 	public void test25() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 25");
 		StandardProcessPool pool = getFixedPool(100, 5000, true, false, false);
-		pool.setVerbose(true);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 0, false, 0, false, true, 0, 0, 0));
 	}
 	// Interrupted construction testing.
@@ -526,7 +530,6 @@ public class PPE4JTest {
 				public void run() {
 					thread.interrupt();
 				}
-				
 			}, 500);
 			pool = getCustomPool(20, 30, 0, 0, false, false, true, false);
 		} finally {

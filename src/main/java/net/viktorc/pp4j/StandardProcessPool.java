@@ -27,13 +27,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.slf4j.Logger;
+import org.slf4j.helpers.NOPLogger;
 
 /**
  * An implementation of the {@link net.viktorc.pp4j.ProcessPool} interface for maintaining and managing a pool of pre-started 
@@ -67,6 +67,7 @@ public class StandardProcessPool implements ProcessPool {
 	private final int maxPoolSize;
 	private final int reserveSize;
 	private final long keepAliveTime;
+	private final Logger logger;
 	private final boolean doTime;
 	private final ExecutorService procExecutorThreadPool;
 	private final ExecutorService auxThreadPool;
@@ -76,8 +77,6 @@ public class StandardProcessPool implements ProcessPool {
 	private final AtomicInteger numOfExecutingSubmissions;
 	private final CountDownLatch prestartLatch;
 	private final Object poolLock;
-	private final Logger logger;
-	private volatile boolean verbose;
 	private volatile boolean close;
 
 	/**
@@ -92,14 +91,15 @@ public class StandardProcessPool implements ProcessPool {
 	 * @param reserveSize The number of available processes to keep in the pool.
 	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
 	 * life-cycle of the processes will not be limited.
-	 * @param verbose Whether events relating to the management of the pool should be logged.
+	 * @param logger The logger used for logging events related to the management of the pool. If it is null, no logging is 
+	 * performed.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
 	 * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the 
 	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
 	 * pool size.
 	 */
 	public StandardProcessPool(ProcessManagerFactory procManagerFactory, int minPoolSize, int maxPoolSize, int reserveSize,
-			long keepAliveTime, boolean verbose) throws InterruptedException {
+			long keepAliveTime, Logger logger) throws InterruptedException {
 		if (procManagerFactory == null)
 			throw new IllegalArgumentException("The process manager factory cannot be null.");
 		if (minPoolSize < 0)
@@ -114,10 +114,10 @@ public class StandardProcessPool implements ProcessPool {
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
 		this.keepAliveTime = Math.max(0, keepAliveTime);
-		this.verbose = verbose;
-		int actualMinSize = Math.max(minPoolSize, reserveSize);
+		this.logger = logger == null ? NOPLogger.NOP_LOGGER : logger;
 		doTime = keepAliveTime > 0;
 		procExecutorThreadPool = new ProcessExecutorThreadPool();
+		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		/* If keepAliveTime is positive, one process requires 4 auxiliary threads (std_out listener, err_out listener,
 		 * submission handler, timer); if it is not, only 3 are required. */
 		auxThreadPool = new ThreadPoolExecutor(doTime ? 4*actualMinSize : 3*actualMinSize, Integer.MAX_VALUE,
@@ -129,7 +129,6 @@ public class StandardProcessPool implements ProcessPool {
 		numOfExecutingSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
 		poolLock = new Object();
-		logger = Logger.getAnonymousLogger();
 		for (int i = 0; i < actualMinSize && !close; i++) {
 			synchronized (poolLock) {
 				startNewProcess(null);
@@ -180,22 +179,13 @@ public class StandardProcessPool implements ProcessPool {
 		return keepAliveTime;
 	}
 	/**
-	 * Returns whether events relating to the management of the processes held by the pool are logged to the 
-	 * console.
+	 * Returns the logger associated with the process pool instance.
 	 * 
-	 * @return Whether the pool is verbose.
+	 * @return The logger associated with the process pool or {@link org.slf4j.helpers.NOPLogger#NOP_LOGGER} if no 
+	 * has been specified.
 	 */
-	public boolean isVerbose() {
-		return verbose;
-	}
-	/**
-	 * Sets whether events relating to the management of the processes held by the pool should be logged to the 
-	 * console. 
-	 * 
-	 * @param verbose Whether the pool should be verbose.
-	 */
-	public void setVerbose(boolean verbose) {
-		this.verbose = verbose;
+	public Logger getLogger() {
+		return logger;
 	}
 	/**
 	 * Returns the number of running processes currently held in the pool.
@@ -256,9 +246,7 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		procExecutorThreadPool.execute(executor);
 		activeProcExecutors.add(executor);
-		if (verbose)
-			logger.info("Process executor " + executor + " started." + System.lineSeparator() +
-					getPoolStats());
+		logger.debug("Process executor {} started.{}", executor, System.lineSeparator() + getPoolStats());
 		return true;
 	}
 	/**
@@ -283,8 +271,7 @@ public class StandardProcessPool implements ProcessPool {
 			if (doExtendPool())
 				startNewProcess(null);
 		}
-		if (verbose)
-			logger.info("Submission " + submission + " received." + System.lineSeparator() + getPoolStats());
+		logger.debug("Submission {} received.{}", submission, System.lineSeparator() + getPoolStats());
 		// Return a Future holding the total execution time including the submission delay.
 		return new InternalSubmissionFuture(internalSubmission);
 	}
@@ -299,21 +286,18 @@ public class StandardProcessPool implements ProcessPool {
 		synchronized (poolLock) {
 			if (close)
 				throw new IllegalStateException("The pool has already been shut down.");
-			if (verbose)
-				logger.info("Initiating shutdown...");
+			logger.info("Initiating shutdown...");
 			close = true;
 			while (prestartLatch.getCount() != 0)
 				prestartLatch.countDown();
-			if (verbose)
-				logger.info("Shutting down process executors...");
+			logger.debug("Shutting down process executors...");
 			for (StandardProcessExecutor executor : activeProcExecutors) {
 				if (!executor.stop(true)) {
 					// This should never happen.
-					logger.log(Level.SEVERE, "Process executor " + executor + " could not be stopped.");
+					logger.error("Process executor {} could not be stopped.", executor);
 				}
 			}
-			if (verbose)
-				logger.info("Shutting down thread pools...");
+			logger.debug("Shutting down thread pools...");
 			auxThreadPool.shutdown();
 			procExecutorThreadPool.shutdown();
 			procExecutorPool.close();
@@ -324,8 +308,7 @@ public class StandardProcessPool implements ProcessPool {
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		}
-		if (verbose)
-			logger.info("Process pool shut down.");
+		logger.info("Process pool shut down.");
 	}
 	
 	/**
@@ -600,11 +583,10 @@ public class StandardProcessPool implements ProcessPool {
 						 * the process is already terminated, and thus the execute method fails. In this case, the submission is put back into 
 						 * the queue. */
 						if (execute(submission)) {
-							if (verbose)
-								logger.info(String.format("Submission %s processed; delay: %.3f; " +
-										"execution time: %.3f.", submission, (float) ((double) (submission.submittedTime -
-										submission.receivedTime)/1000000000), (float) ((double) (submission.processedTime -
-										submission.submittedTime)/1000000000)));
+							logger.info(String.format("Submission %s processed; delay: %.3f; " +
+									"execution time: %.3f.", submission, (float) ((double) (submission.submittedTime -
+									submission.receivedTime)/1000000000), (float) ((double) (submission.processedTime -
+									submission.submittedTime)/1000000000)));
 							submission = null;
 						}
 					} catch (InterruptedException e) {
@@ -613,8 +595,7 @@ public class StandardProcessPool implements ProcessPool {
 					} catch (Exception e) {
 						// Signal the exception to the future and do not put the submission back into the queue.
 						if (submission != null) {
-							if (verbose)
-								logger.info(String.format("Exception while executing submission %s: %s", submission, e));
+							logger.warn(String.format("Exception while executing submission %s: %s", submission, e), e);
 							submission.setException(e);
 							submission = null;
 						}
@@ -815,8 +796,7 @@ public class StandardProcessPool implements ProcessPool {
 						}
 					}
 					lifeTime = lifeTime == 0 ? 0 : System.currentTimeMillis() - lifeTime;
-					if (verbose)
-						logger.info(String.format("Process runtime in executor %s: %.3f", this, ((float) lifeTime)/1000));
+					logger.debug(String.format("Process runtime in executor %s: %.3f", this, ((float) lifeTime)/1000));
 					// Make sure that there are no submission currently being executed...
 					subLock.lock();
 					try {
@@ -988,7 +968,6 @@ public class StandardProcessPool implements ProcessPool {
 				public void destroyObject(PooledObject<StandardProcessExecutor> p) {
 					// No-operation.
 				}
-				
 			});
 			setBlockWhenExhausted(false);
 			setMaxTotal(maxPoolSize);
@@ -1033,10 +1012,9 @@ public class StandardProcessPool implements ProcessPool {
 				@Override
 				public void uncaughtException(Thread t, Throwable e) {
 					// Log the exception whether verbose or not.
-					logger.log(Level.SEVERE, e.getMessage(), e);
+					logger.error(e.getMessage(), e);
 					StandardProcessPool.this.shutdown();
 				}
-				
 			});
 			return t;
 		}
@@ -1073,7 +1051,6 @@ public class StandardProcessPool implements ProcessPool {
 							 * the pool to create a new thread for running the task. */
 							return tryTransfer(r);
 						}
-						
 					}, new CustomizedThreadFactory(StandardProcessPool.this + "-procExecThreadPool"),
 					new RejectedExecutionHandler() {
 						
@@ -1089,7 +1066,6 @@ public class StandardProcessPool implements ProcessPool {
 								Thread.currentThread().interrupt();
 							}
 						}
-						
 					});
 		}
 		@Override
@@ -1097,9 +1073,7 @@ public class StandardProcessPool implements ProcessPool {
 			super.afterExecute(r, t);
 			StandardProcessExecutor executor = (StandardProcessExecutor) r;
 			activeProcExecutors.remove(executor);
-			if (verbose)
-				logger.info("Process executor " + executor + " stopped." + System.lineSeparator() +
-						getPoolStats());
+			logger.debug("Process executor {} stopped.{}", executor, System.lineSeparator() + getPoolStats());
 			/* A process has terminated. Extend the pool if necessary by directly reusing the ProcessExecutor instance. If not, return it to 
 			 * the pool. */
 			synchronized (poolLock) {
