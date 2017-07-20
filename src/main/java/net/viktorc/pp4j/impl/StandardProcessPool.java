@@ -1,4 +1,4 @@
-package net.viktorc.pp4j;
+package net.viktorc.pp4j.impl;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
@@ -35,11 +36,18 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.helpers.NOPLogger;
 
+import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.ProcessExecutor;
+import net.viktorc.pp4j.api.ProcessManager;
+import net.viktorc.pp4j.api.ProcessManagerFactory;
+import net.viktorc.pp4j.api.ProcessPool;
+import net.viktorc.pp4j.api.Submission;
+
 /**
- * An implementation of the {@link net.viktorc.pp4j.ProcessPool} interface for maintaining and managing a pool of pre-started 
- * processes. The processes are executed in instances of an own {@link net.viktorc.pp4j.ProcessExecutor} implementation. Each executor is 
- * assigned an instance of an implementation of the {@link net.viktorc.pp4j.ProcessManager} interface using an implementation of the 
- * {@link net.viktorc.pp4j.ProcessManagerFactory} interface. The pool accepts submissions in the form of {@link net.viktorc.pp4j.Submission} 
+ * An implementation of the {@link net.viktorc.pp4j.api.ProcessPool} interface for maintaining and managing a pool of pre-started 
+ * processes. The processes are executed in instances of an own {@link net.viktorc.pp4j.api.ProcessExecutor} implementation. Each executor is 
+ * assigned an instance of an implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface using an implementation of the 
+ * {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface. The pool accepts submissions in the form of {@link net.viktorc.pp4j.api.Submission} 
  * implementations which are executed on any one of the available active process executors maintained by the pool. While executing a submission, 
  * the executor cannot accept further submissions. The submissions are queued and executed as soon as there is an available executor. The size 
  * of the pool is always kept between the minimum pool size and the maximum pool size (both inclusive). The reserve size specifies the minimum 
@@ -84,12 +92,12 @@ public class StandardProcessPool implements ProcessPool {
 	 * one is greater. This constructor blocks until the initial number of processes start up. The size of the pool is dynamically 
 	 * adjusted based on the pool parameters and the rate of incoming submissions.
 	 * 
-	 * @param procManagerFactory A {@link net.viktorc.pp4j.ProcessManagerFactory} instance that is used to build 
-	 * {@link net.viktorc.pp4j.ProcessManager} instances that manage the processes' life cycle in the pool.
+	 * @param procManagerFactory A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to build 
+	 * {@link net.viktorc.pp4j.api.ProcessManager} instances that manage the processes' life cycle in the pool.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
-	 * @param keepAliveTime The number of milliseconds after which idle processes are cancelled. If it is 0 or less, the 
+	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 0 or less, the 
 	 * life-cycle of the processes will not be limited.
 	 * @param logger The logger used for logging events related to the management of the pool. If it is null, no logging is 
 	 * performed.
@@ -182,7 +190,7 @@ public class StandardProcessPool implements ProcessPool {
 	 * Returns the logger associated with the process pool instance.
 	 * 
 	 * @return The logger associated with the process pool or {@link org.slf4j.helpers.NOPLogger#NOP_LOGGER} if no 
-	 * has been specified.
+	 * logger has been specified.
 	 */
 	public Logger getLogger() {
 		return logger;
@@ -310,11 +318,15 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		logger.info("Process pool shut down.");
 	}
+	@Override
+	public String toString() {
+		return "standardProcessPoolP@" + super.toString().split("@")[1];
+	}
 	
 	/**
 	 * An implementation of the {@link net.viktorc.pp4j.InternalSubmission} interface to keep track of the number of commands 
 	 * being executed at a time and to establish a mechanism for cancelling submitted commands via the {@link java.util.concurrent.Future} 
-	 * returned by the {@link net.viktorc.pp4j.StandardProcessPool#submit(Submission)} method.
+	 * returned by the {@link net.viktorc.pp4j.impl.StandardProcessPool#submit(Submission)} method.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -398,7 +410,9 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public String toString() {
-			return origSubmission.toString();
+			return String.format("[commands:{%s};reuse:%s]@%s",String.join(", ", origSubmission.getCommands().stream()
+					.map(c -> c.getInstruction()).collect(Collectors.toList())), Boolean.toString(origSubmission
+					.doTerminateProcessAfterwards()), super.toString().split("@")[1]);
 		}
 		
 	}
@@ -480,7 +494,7 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	
 	/**
-	 * An implementation of the {@link net.viktorc.pp4j.ProcessExecutor} interface for starting, managing, and interacting with a process. The 
+	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessExecutor} interface for starting, managing, and interacting with a process. The 
 	 * life cycle of the associated process is the same as that of the {@link #run()} method of the instance. The process is not started until 
 	 * this method is called and the method does not terminate until the process does.
 	 * 
@@ -621,8 +635,8 @@ public class StandardProcessPool implements ProcessPool {
 		 * It prompts the currently running process, if there is one, to terminate. Once the process has been successfully terminated, 
 		 * subsequent calls are ignored and return true unless the process is started again.
 		 * 
-		 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pp4j.ProcessManager#terminate(ProcessExecutor)} 
-		 * method of the {@link net.viktorc.pp4j.ProcessManager} instance assigned to the executor. The latter might be ineffective if the 
+		 * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pp4j.api.ProcessManager#terminate(ProcessExecutor)} 
+		 * method of the {@link net.viktorc.pp4j.api.ProcessManager} instance assigned to the executor. The latter might be ineffective if the 
 		 * process is currently executing a command or has not started up.
 		 * @return Whether the process was successfully terminated.
 		 */
@@ -856,6 +870,10 @@ public class StandardProcessPool implements ProcessPool {
 				}
 			}
 		}
+		@Override
+		public String toString() {
+			return StandardProcessPool.this.toString() + "-standardProcessExecutor@" + super.toString().split("@")[1];
+		}
 		
 		/**
 		 * A simple timer that stops the process after <code>keepAliveTime</code> milliseconds unless the process is inactive 
@@ -983,8 +1001,8 @@ public class StandardProcessPool implements ProcessPool {
 	/**
 	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that provides more descriptive thread names and 
 	 * extends the {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by logging the uncaught exceptions if 
-	 * the enclosing {@link net.viktorc.pp4j.StandardProcessPool} instance is verbose. It also attempts to shut down the 
-	 * enclosing pool if a {@link net.viktorc.pp4j.ProcessException} is thrown in one of the threads it created.
+	 * the enclosing {@link net.viktorc.pp4j.impl.StandardProcessPool} instance is verbose. It also attempts to shut down the 
+	 * enclosing pool if a {@link net.viktorc.pp4j.impl.ProcessException} is thrown in one of the threads it created.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -1022,7 +1040,7 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	
 	/**
-	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of {@link net.viktorc.pp4j.StandardProcessPool.StandardProcessExecutor} 
+	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of {@link net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor} 
 	 * instances. It utilizes an extension of the {@link java.util.concurrent.LinkedTransferQueue} and an implementation of the 
 	 * {@link java.util.concurrent.RejectedExecutionHandler} as per Robert Tupelo-Schneck's answer to a StackOverflow 
 	 * <a href="https://stackoverflow.com/questions/19528304/how-to-get-the-threadpoolexecutor-to-increase-threads-to-max-before-queueing/19528305#19528305">

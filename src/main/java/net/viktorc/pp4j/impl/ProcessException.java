@@ -1,4 +1,4 @@
-package net.viktorc.pp4j;
+package net.viktorc.pp4j.impl;
 
 /**
  * An exception thrown if an unexpected error occurs while running or interacting with a process that solicits the 

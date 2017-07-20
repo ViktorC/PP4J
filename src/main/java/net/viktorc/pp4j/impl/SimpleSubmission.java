@@ -1,13 +1,15 @@
-package net.viktorc.pp4j;
+package net.viktorc.pp4j.impl;
 
 import java.util.Arrays;
 import java.util.List;
 
+import net.viktorc.pp4j.api.Command;
+
 /**
- * A simple sub-class of the {@link net.viktorc.pp4j.AbstractSubmission} abstract class. It does not provide a mechanism 
+ * A simple sub-class of the {@link net.viktorc.pp4j.impl.AbstractSubmission} abstract class. It does not provide a mechanism 
  * for directly canceling submissions; however, they can still be cancelled by canceling the {@link java.util.concurrent.Future} 
- * instance returned by the {@link net.viktorc.pp4j.ProcessPool#submit(Submission) submit} method of the implementations 
- * of the {@link net.viktorc.pp4j.ProcessPool} interface.
+ * instance returned by the {@link net.viktorc.pp4j.api.ProcessPool#submit(Submission) submit} method of the implementations 
+ * of the {@link net.viktorc.pp4j.api.ProcessPool} interface.
  * 
  * @author Viktor Csomor
  *

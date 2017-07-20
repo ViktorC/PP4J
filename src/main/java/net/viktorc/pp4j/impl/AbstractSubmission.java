@@ -1,11 +1,14 @@
-package net.viktorc.pp4j;
+package net.viktorc.pp4j.impl;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.Submission;
+
 /**
- * An abstract implementation of the {@link net.viktorc.pp4j.Submission} interface.
+ * An abstract implementation of the {@link net.viktorc.pp4j.api.Submission} interface.
  * 
  * @author Viktor Csomor
  *
@@ -39,10 +42,6 @@ public abstract class AbstractSubmission implements Submission {
 	@Override
 	public boolean doTerminateProcessAfterwards() {
 		return terminateProcessAfterwards;
-	}
-	@Override
-	public String toString() {
-		return String.join("; ", commands.stream().map(c -> c.getInstruction()).collect(Collectors.toList()));
 	}
 
 }

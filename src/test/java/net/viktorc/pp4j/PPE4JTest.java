@@ -8,17 +8,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
 
-import net.viktorc.pp4j.Command;
-import net.viktorc.pp4j.ProcessException;
-import net.viktorc.pp4j.ProcessManager;
-import net.viktorc.pp4j.ProcessManagerFactory;
-import net.viktorc.pp4j.ProcessPools;
-import net.viktorc.pp4j.ProcessExecutor;
-import net.viktorc.pp4j.SimpleCommand;
-import net.viktorc.pp4j.SimpleProcessManager;
-import net.viktorc.pp4j.SimpleSubmission;
-import net.viktorc.pp4j.StandardProcessPool;
-import net.viktorc.pp4j.Submission;
+import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.ProcessExecutor;
+import net.viktorc.pp4j.api.ProcessManager;
+import net.viktorc.pp4j.api.ProcessManagerFactory;
+import net.viktorc.pp4j.api.Submission;
+import net.viktorc.pp4j.impl.ProcessException;
+import net.viktorc.pp4j.impl.ProcessPools;
+import net.viktorc.pp4j.impl.SimpleCommand;
+import net.viktorc.pp4j.impl.SimpleProcessManager;
+import net.viktorc.pp4j.impl.SimpleSubmission;
+import net.viktorc.pp4j.impl.StandardProcessPool;
 
 import java.io.File;
 import java.net.URISyntaxException;
@@ -630,7 +630,7 @@ public class PPE4JTest {
 	
 	
 	/**
-	 * An implementation of the {@link net.viktorc.pp4j.ProcessManagerFactory} interface for testing purposes.
+	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface for testing purposes.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -681,7 +681,8 @@ public class PPE4JTest {
 					if (manuallyTerminate) {
 						try {
 							AtomicBoolean success = new AtomicBoolean(true);
-							if (executor.execute(new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o),
+							if (executor.execute(new SimpleSubmission(new SimpleCommand("stop",
+									(c, o) -> "bye".equals(o),
 									(c, o) -> {
 										success.set(false);
 										return true;

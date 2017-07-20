@@ -1,4 +1,4 @@
-package net.viktorc.pp4j;
+package net.viktorc.pp4j.api;
 
 import java.io.IOException;
 
@@ -44,10 +44,10 @@ public interface ProcessManager {
 	/**
 	 * A method called right after the process is started. Its main purpose is to allow for startup 
 	 * activities such as the execution of commands. The <code>executor</code> should be available and ready 
-	 * for processing submissions within this call back, thus its {@link net.viktorc.pp4j.ProcessExecutor#execute(Submission)} 
+	 * for processing submissions within this call back, thus its {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} 
 	 * method should always return <code>true</code>.
 	 * 
-	 * @param executor The {@link net.viktorc.pp4j.ProcessExecutor} instance in which the process is executed. 
+	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process after the startup if needed.
 	 */
 	void onStartup(ProcessExecutor executor);
@@ -56,11 +56,11 @@ public interface ProcessManager {
 	 * close resources or to exit the process in an orderly way. The return value of the method denotes 
 	 * whether the process was successfully terminated. If orderly termination fails, the process is 
 	 * killed forcibly. The <code>executor</code> might not be available or ready for processing submissions 
-	 * within this call back, thus its {@link net.viktorc.pp4j.ProcessExecutor#execute(Submission)} method 
+	 * within this call back, thus its {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} method 
 	 * might return <code>false</code>. In this case, it is recommended to have this method return <code>
 	 * false</code> as well to have the process killed.
 	 * 
-	 * @param executor The {@link net.viktorc.pp4j.ProcessExecutor} instance in which the process is executed. 
+	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process to terminate it in an orderly 
 	 * way.
 	 * @return Whether the process has been successfully terminated. If it is <code>false</code> the process 

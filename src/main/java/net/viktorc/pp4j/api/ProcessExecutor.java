@@ -1,4 +1,4 @@
-package net.viktorc.pp4j;
+package net.viktorc.pp4j.api;
 
 /**
  * An interface that defines an executor that encapsulates a process and serves as a handle for having the process execute submissions.
