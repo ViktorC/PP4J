@@ -34,6 +34,7 @@ import org.apache.commons.pool2.PooledObjectFactory;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
 
 import net.viktorc.pp4j.api.Command;
@@ -47,12 +48,12 @@ import net.viktorc.pp4j.api.Submission;
  * An implementation of the {@link net.viktorc.pp4j.api.ProcessPool} interface for maintaining and managing a pool of pre-started 
  * processes. The processes are executed in instances of an own {@link net.viktorc.pp4j.api.ProcessExecutor} implementation. Each executor is 
  * assigned an instance of an implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface using an implementation of the 
- * {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface. The pool accepts submissions in the form of {@link net.viktorc.pp4j.api.Submission} 
+ * {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface. The pool accepts submissionQueue in the form of {@link net.viktorc.pp4j.api.Submission} 
  * implementations which are executed on any one of the available active process executors maintained by the pool. While executing a submission, 
- * the executor cannot accept further submissions. The submissions are queued and executed as soon as there is an available executor. The size 
+ * the executor cannot accept further submissionQueue. The submissionQueue are queued and executed as soon as there is an available executor. The size 
  * of the pool is always kept between the minimum pool size and the maximum pool size (both inclusive). The reserve size specifies the minimum 
  * number of processes that should always be available (there are no guarantees that there actually will be this many available executors at 
- * any given time).
+ * any given time). It uses <a href="https://www.slf4j.org/">SLF4J</a> for logging.
  * 
  * @author Viktor Csomor
  *
@@ -75,14 +76,15 @@ public class StandardProcessPool implements ProcessPool {
 	private final int maxPoolSize;
 	private final int reserveSize;
 	private final long keepAliveTime;
-	private final Logger logger;
+	private final boolean verbose;
 	private final boolean doTime;
+	private final Logger logger;
 	private final ExecutorService procExecutorThreadPool;
 	private final ExecutorService auxThreadPool;
 	private final Queue<StandardProcessExecutor> activeProcExecutors;
 	private final StandardProcessExecutorPool procExecutorPool;
-	private final LinkedBlockingDeque<InternalSubmission> submissions;
-	private final AtomicInteger numOfExecutingSubmissions;
+	private final LinkedBlockingDeque<InternalSubmission> submissionQueue;
+	private final AtomicInteger numOfActiveSubmissions;
 	private final CountDownLatch prestartLatch;
 	private final Object poolLock;
 	private volatile boolean close;
@@ -90,7 +92,7 @@ public class StandardProcessPool implements ProcessPool {
 	/**
 	 * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size depending on which 
 	 * one is greater. This constructor blocks until the initial number of processes start up. The size of the pool is dynamically 
-	 * adjusted based on the pool parameters and the rate of incoming submissions.
+	 * adjusted based on the pool parameters and the rate of incoming submissionQueue.
 	 * 
 	 * @param procManagerFactory A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to build 
 	 * {@link net.viktorc.pp4j.api.ProcessManager} instances that manage the processes' life cycle in the pool.
@@ -99,15 +101,17 @@ public class StandardProcessPool implements ProcessPool {
 	 * @param reserveSize The number of available processes to keep in the pool.
 	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 0 or less, the 
 	 * life-cycle of the processes will not be limited.
-	 * @param logger The logger used for logging events related to the management of the pool. If it is null, no logging is 
-	 * performed.
+	 * @param verbose Whether the events related to the management of the process pool should be logged. Setting this 
+	 * parameter to <code>true</code> does not guarantee that logging will be performed as logging depends on the SLF4J binding 
+	 * and the logging configurations, but setting it to <code>false</code> guarantees that no logging will be performed by the 
+	 * constructed instance.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
 	 * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the 
 	 * maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum 
 	 * pool size.
 	 */
 	public StandardProcessPool(ProcessManagerFactory procManagerFactory, int minPoolSize, int maxPoolSize, int reserveSize,
-			long keepAliveTime, Logger logger) throws InterruptedException {
+			long keepAliveTime, boolean verbose) throws InterruptedException {
 		if (procManagerFactory == null)
 			throw new IllegalArgumentException("The process manager factory cannot be null.");
 		if (minPoolSize < 0)
@@ -122,8 +126,9 @@ public class StandardProcessPool implements ProcessPool {
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
 		this.keepAliveTime = Math.max(0, keepAliveTime);
-		this.logger = logger == null ? NOPLogger.NOP_LOGGER : logger;
+		this.verbose = verbose;
 		doTime = keepAliveTime > 0;
+		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 		procExecutorThreadPool = new ProcessExecutorThreadPool();
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		/* If keepAliveTime is positive, one process requires 4 auxiliary threads (std_out listener, err_out listener,
@@ -133,8 +138,8 @@ public class StandardProcessPool implements ProcessPool {
 				new CustomizedThreadFactory(this + "-auxThreadPool"));
 		activeProcExecutors = new LinkedBlockingQueue<>();
 		procExecutorPool = new StandardProcessExecutorPool();
-		submissions = new LinkedBlockingDeque<>();
-		numOfExecutingSubmissions = new AtomicInteger(0);
+		submissionQueue = new LinkedBlockingDeque<>();
+		numOfActiveSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
 		poolLock = new Object();
 		for (int i = 0; i < actualMinSize && !close; i++) {
@@ -144,6 +149,7 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		// Wait for the processes in the initial pool to start up.
 		prestartLatch.await();
+		logger.info("Pool started up.");
 	}
 	/**
 	 * Returns the <code>ProcessManagerFactory</code> assigned to the pool.
@@ -187,13 +193,13 @@ public class StandardProcessPool implements ProcessPool {
 		return keepAliveTime;
 	}
 	/**
-	 * Returns the logger associated with the process pool instance.
+	 * Returns whether events relating to the management of the processes held by the pool are logged to the 
+	 * console.
 	 * 
-	 * @return The logger associated with the process pool or {@link org.slf4j.helpers.NOPLogger#NOP_LOGGER} if no 
-	 * logger has been specified.
+	 * @return Whether the pool is verbose.
 	 */
-	public Logger getLogger() {
-		return logger;
+	public boolean isVerbose() {
+		return verbose;
 	}
 	/**
 	 * Returns the number of running processes currently held in the pool.
@@ -204,20 +210,20 @@ public class StandardProcessPool implements ProcessPool {
 		return activeProcExecutors.size();
 	}
 	/**
-	 * Returns the number of submissions currently being executed in the pool.
+	 * Returns the number of submissionQueue currently being executed in the pool.
 	 * 
-	 * @return The number of submissions currently being executed in the pool.
+	 * @return The number of submissionQueue currently being executed in the pool.
 	 */
 	public int getNumOfExecutingSubmissions() {
-		return numOfExecutingSubmissions.get();
+		return numOfActiveSubmissions.get();
 	}
 	/**
-	 * Returns the number of submissions queued and waiting for execution.
+	 * Returns the number of submissionQueue queued and waiting for execution.
 	 * 
-	 * @return The number of queued submissions.
+	 * @return The number of queued submissionQueue.
 	 */
 	public int getNumOfQueuedSubmissions() {
-		return submissions.size();
+		return submissionQueue.size();
 	}
 	/**
 	 * Returns the number of active, queued, and currently executing processes as string.
@@ -225,8 +231,8 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return this + " - Active processes: " + activeProcExecutors.size() + "; submitted commands: " +
-				(numOfExecutingSubmissions.get() + submissions.size());
+		return "Processes: " + activeProcExecutors.size() + "; active submissionQueue: " +
+				numOfActiveSubmissions.get() + "; queued submissionQueue: " + submissionQueue.size();
 	}
 	/**
 	 * Returns whether a new process {@link net.viktorc.pp4j.StandardProcessExecutor} instance should be started.
@@ -234,8 +240,8 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return Whether the process pool should be extended.
 	 */
 	private boolean doExtendPool() {
-		return !close && (activeProcExecutors.size() < minPoolSize || (activeProcExecutors.size() < Math.min(maxPoolSize,
-				numOfExecutingSubmissions.get() + submissions.size() + reserveSize)));
+		return !close && (activeProcExecutors.size() < minPoolSize || (activeProcExecutors.size() <
+				Math.min(maxPoolSize, numOfActiveSubmissions.get() + submissionQueue.size() + reserveSize)));
 	}
 	/**
 	 * Starts a new process by executing the provided {@link net.viktorc.pp4j.StandardProcessExecutor}. If it is null, it borrows an 
@@ -273,13 +279,14 @@ public class StandardProcessPool implements ProcessPool {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
 		InternalSubmission internalSubmission = new InternalSubmission(submission);
-		submissions.addLast(internalSubmission);
+		submissionQueue.addLast(internalSubmission);
 		// If necessary, adjust the pool size given the new submission.
 		synchronized (poolLock) {
 			if (doExtendPool())
 				startNewProcess(null);
 		}
-		logger.debug("Submission {} received.{}", submission, System.lineSeparator() + getPoolStats());
+		logger.info("Submission {} received.{}", internalSubmission, System.lineSeparator() +
+				getPoolStats());
 		// Return a Future holding the total execution time including the submission delay.
 		return new InternalSubmissionFuture(internalSubmission);
 	}
@@ -320,7 +327,7 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	@Override
 	public String toString() {
-		return "standardProcessPoolP@" + super.toString().split("@")[1];
+		return String.format("stdProcPool@%s", Integer.toHexString(hashCode()));
 	}
 	
 	/**
@@ -409,10 +416,19 @@ public class StandardProcessPool implements ProcessPool {
 			}
 		}
 		@Override
+		public int hashCode() {
+			return origSubmission.hashCode();
+		}
+		@Override
+		public boolean equals(Object o) {
+			return o instanceof InternalSubmission && ((InternalSubmission) o).origSubmission == origSubmission;
+		}
+		@Override
 		public String toString() {
-			return String.format("[commands:{%s};reuse:%s]@%s",String.join(", ", origSubmission.getCommands().stream()
-					.map(c -> c.getInstruction()).collect(Collectors.toList())), Boolean.toString(origSubmission
-					.doTerminateProcessAfterwards()), super.toString().split("@")[1]);
+			return String.format("{commands:[%s],terminate:%s}@%s", String.join(",", origSubmission.getCommands()
+					.stream().map(c -> "\"" + c.getInstruction() + "\"").collect(Collectors.toList())),
+					Boolean.toString(origSubmission.doTerminateProcessAfterwards()),
+					Integer.toHexString(hashCode()));
 		}
 		
 	}
@@ -572,7 +588,7 @@ public class StandardProcessPool implements ProcessPool {
 			}
 		}
 		/**
-		 * Starts waiting on the blocking queue of submissions executing available ones one at a time.
+		 * Starts waiting on the blocking queue of submissionQueue executing available ones one at a time.
 		 */
 		void startHandlingSubmissions() {
 			synchronized (threadLock) {
@@ -588,9 +604,9 @@ public class StandardProcessPool implements ProcessPool {
 						subLock.lock();
 						subLock.unlock();
 						// Wait for an available submission.
-						submission = submissions.takeFirst();
-						// Increment the counter for executing submissions to keep track of the number of busy processes.
-						numOfExecutingSubmissions.incrementAndGet();
+						submission = submissionQueue.takeFirst();
+						// Increment the counter for executing submissionQueue to keep track of the number of busy processes.
+						numOfActiveSubmissions.incrementAndGet();
 						submissionRetrieved = true;
 						submission.setThread(subThread);
 						/* It can happen of course that in the mean time, the mainLock has been stolen (for terminating the process) or that 
@@ -598,9 +614,9 @@ public class StandardProcessPool implements ProcessPool {
 						 * the queue. */
 						if (execute(submission)) {
 							logger.info(String.format("Submission %s processed; delay: %.3f; " +
-									"execution time: %.3f.", submission, (float) ((double) (submission.submittedTime -
+									"execution time: %.3f.%n%s", submission, (float) ((double) (submission.submittedTime -
 									submission.receivedTime)/1000000000), (float) ((double) (submission.processedTime -
-									submission.submittedTime)/1000000000)));
+									submission.submittedTime)/1000000000), getPoolStats()));
 							submission = null;
 						}
 					} catch (InterruptedException e) {
@@ -609,7 +625,7 @@ public class StandardProcessPool implements ProcessPool {
 					} catch (Exception e) {
 						// Signal the exception to the future and do not put the submission back into the queue.
 						if (submission != null) {
-							logger.warn(String.format("Exception while executing submission %s: %s", submission, e), e);
+							logger.warn(String.format("Exception while executing submission %s: %s.%n%s", submission, getPoolStats()), e);
 							submission.setException(e);
 							submission = null;
 						}
@@ -617,11 +633,11 @@ public class StandardProcessPool implements ProcessPool {
 						// If the execute method failed and there was no exception thrown, put the submission back into the queue at the front.
 						if (submission != null) {
 							submission.setThread(null);
-							submissions.addFirst(submission);
+							submissionQueue.addFirst(submission);
 						}
-						// Decrement the executing submissions counter if it was incremented in this cycle.
+						// Decrement the executing submissionQueue counter if it was incremented in this cycle.
 						if (submissionRetrieved)
-							numOfExecutingSubmissions.decrementAndGet();
+							numOfActiveSubmissions.decrementAndGet();
 					}
 				}
 			} finally {
@@ -766,7 +782,7 @@ public class StandardProcessPool implements ProcessPool {
 							manager.onStartup(this);
 							if (stop)
 								return;
-							// Start accepting handling submissions.
+							// Start accepting handling submissionQueue.
 							auxThreadPool.submit(this::startHandlingSubmissions);
 							if (doTime) {
 								// Start the timer.
@@ -819,7 +835,7 @@ public class StandardProcessPool implements ProcessPool {
 							running = false;
 							execLock.notifyAll();
 						}
-						/* And interrupt the submission handler thread to avoid having it stuck waiting for submissions forever in case 
+						/* And interrupt the submission handler thread to avoid having it stuck waiting for submissionQueue forever in case 
 						 * the queue is empty. */
 						synchronized (threadLock) {
 							if (subThread != null)
@@ -872,7 +888,8 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public String toString() {
-			return StandardProcessPool.this.toString() + "-standardProcessExecutor@" + super.toString().split("@")[1];
+			return String.format("%s-stdProcExecutor@%s", StandardProcessPool.this,
+					Integer.toHexString(hashCode()));
 		}
 		
 		/**
