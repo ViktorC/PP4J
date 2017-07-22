@@ -238,8 +238,8 @@ public class PPE4JTest {
 											" instead of " + procTime + " and " + c.getErrorOutLines().size() + 
 											" instead of " + 0 + ".";
 									if (processPool.isVerbose())
-										logger.debug("Std: {}; Err: {}", c.getJointStandardOutLines()
-												.replaceAll("\n", " "), c.getJointErrorOutLines().replaceAll("\n", " "));
+										logger.debug("Std: {}; Err: {}", c.getJointStandardOutLines().replaceAll("\n", " "),
+												c.getJointErrorOutLines().replaceAll("\n", " "));
 									c.reset();
 									return true;
 								}
@@ -323,8 +323,8 @@ public class PPE4JTest {
 				processPool.getProcessManagerFactory()).verifyStartup), Boolean.toString(((TestProcessManagerFactory) processPool
 				.getProcessManagerFactory()).manuallyTerminate), Boolean.toString(reuse), Arrays.toString(procTimes), requests,
 				timeSpan, Boolean.toString(throwExecutionException), cancelTime, Boolean.toString(forcedCancel),
-				Boolean.toString(earlyClose), (float) (((double) waitTimeout)/1000), (float) (((double) lowerBound)/1000), (float)
-				(((double) upperBound)/1000));
+				Boolean.toString(earlyClose), (float) (((double) waitTimeout)/1000), (float) (((double) lowerBound)/1000),
+				(float) (((double) upperBound)/1000));
 		System.out.println("-------------------------------------------------------------------------------------" +
 				"---------------");
 		if (times.size() == requests) {

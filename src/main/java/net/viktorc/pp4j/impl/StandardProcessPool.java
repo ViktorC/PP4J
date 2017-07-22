@@ -48,9 +48,9 @@ import net.viktorc.pp4j.api.Submission;
  * An implementation of the {@link net.viktorc.pp4j.api.ProcessPool} interface for maintaining and managing a pool of pre-started 
  * processes. The processes are executed in instances of an own {@link net.viktorc.pp4j.api.ProcessExecutor} implementation. Each executor is 
  * assigned an instance of an implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface using an implementation of the 
- * {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface. The pool accepts submissionQueue in the form of {@link net.viktorc.pp4j.api.Submission} 
+ * {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface. The pool accepts submissions in the form of {@link net.viktorc.pp4j.api.Submission} 
  * implementations which are executed on any one of the available active process executors maintained by the pool. While executing a submission, 
- * the executor cannot accept further submissionQueue. The submissionQueue are queued and executed as soon as there is an available executor. The size 
+ * the executor cannot accept further submissions. The submissions are queued and executed as soon as there is an available executor. The size 
  * of the pool is always kept between the minimum pool size and the maximum pool size (both inclusive). The reserve size specifies the minimum 
  * number of processes that should always be available (there are no guarantees that there actually will be this many available executors at 
  * any given time). It uses <a href="https://www.slf4j.org/">SLF4J</a> for logging.
@@ -92,7 +92,7 @@ public class StandardProcessPool implements ProcessPool {
 	/**
 	 * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size depending on which 
 	 * one is greater. This constructor blocks until the initial number of processes start up. The size of the pool is dynamically 
-	 * adjusted based on the pool parameters and the rate of incoming submissionQueue.
+	 * adjusted based on the pool parameters and the rate of incoming submissions.
 	 * 
 	 * @param procManagerFactory A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to build 
 	 * {@link net.viktorc.pp4j.api.ProcessManager} instances that manage the processes' life cycle in the pool.
@@ -210,17 +210,17 @@ public class StandardProcessPool implements ProcessPool {
 		return activeProcExecutors.size();
 	}
 	/**
-	 * Returns the number of submissionQueue currently being executed in the pool.
+	 * Returns the number of submissions currently being executed in the pool.
 	 * 
-	 * @return The number of submissionQueue currently being executed in the pool.
+	 * @return The number of submissions currently being executed in the pool.
 	 */
 	public int getNumOfExecutingSubmissions() {
 		return numOfActiveSubmissions.get();
 	}
 	/**
-	 * Returns the number of submissionQueue queued and waiting for execution.
+	 * Returns the number of submissions queued and waiting for execution.
 	 * 
-	 * @return The number of queued submissionQueue.
+	 * @return The number of queued submissions.
 	 */
 	public int getNumOfQueuedSubmissions() {
 		return submissionQueue.size();
@@ -231,8 +231,8 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return A string of statistics concerning the size of the process pool.
 	 */
 	private String getPoolStats() {
-		return "Processes: " + activeProcExecutors.size() + "; active submissionQueue: " +
-				numOfActiveSubmissions.get() + "; queued submissionQueue: " + submissionQueue.size();
+		return "Processes: " + activeProcExecutors.size() + "; active submission: " +
+				numOfActiveSubmissions.get() + "; queued submission: " + submissionQueue.size();
 	}
 	/**
 	 * Returns whether a new process {@link net.viktorc.pp4j.StandardProcessExecutor} instance should be started.
@@ -470,7 +470,7 @@ public class StandardProcessPool implements ProcessPool {
 				while (!submission.processed && !submission.isCancelled() && submission.exception == null)
 					submission.lock.wait();
 				if (submission.isCancelled())
-					throw new CancellationException();
+					throw new CancellationException(String.format("Submission %s cancelled.", submission));
 				if (submission.exception != null)
 					throw new ExecutionException(submission.exception);
 				return (long) Math.round(((double) (submission.processedTime - submission.receivedTime))/1000000);
@@ -489,11 +489,11 @@ public class StandardProcessPool implements ProcessPool {
 					timeoutNs -= (System.nanoTime() - start);
 				}
 				if (submission.isCancelled())
-					throw new CancellationException();
+					throw new CancellationException(String.format("Submission %s cancelled.", submission));
 				if (submission.exception != null)
 					throw new ExecutionException(submission.exception);
 				if (timeoutNs <= 0)
-					throw new TimeoutException();
+					throw new TimeoutException(String.format("Submission %s timed out.", submission));
 				return timeoutNs <= 0 ? null : (long) Math.round(((double) (submission.processedTime -
 						submission.receivedTime))/1000000);
 			}
@@ -588,7 +588,7 @@ public class StandardProcessPool implements ProcessPool {
 			}
 		}
 		/**
-		 * Starts waiting on the blocking queue of submissionQueue executing available ones one at a time.
+		 * Starts waiting on the blocking queue of submissions executing available ones one at a time.
 		 */
 		void startHandlingSubmissions() {
 			synchronized (threadLock) {
@@ -605,7 +605,7 @@ public class StandardProcessPool implements ProcessPool {
 						subLock.unlock();
 						// Wait for an available submission.
 						submission = submissionQueue.takeFirst();
-						// Increment the counter for executing submissionQueue to keep track of the number of busy processes.
+						// Increment the counter for active submissions to keep track of the number of busy processes.
 						numOfActiveSubmissions.incrementAndGet();
 						submissionRetrieved = true;
 						submission.setThread(subThread);
@@ -625,7 +625,7 @@ public class StandardProcessPool implements ProcessPool {
 					} catch (Exception e) {
 						// Signal the exception to the future and do not put the submission back into the queue.
 						if (submission != null) {
-							logger.warn(String.format("Exception while executing submission %s: %s.%n%s", submission, getPoolStats()), e);
+							logger.warn(String.format("Exception while executing submission %s.%n%s", submission, getPoolStats()), e);
 							submission.setException(e);
 							submission = null;
 						}
@@ -635,7 +635,7 @@ public class StandardProcessPool implements ProcessPool {
 							submission.setThread(null);
 							submissionQueue.addFirst(submission);
 						}
-						// Decrement the executing submissionQueue counter if it was incremented in this cycle.
+						// Decrement the active submissions counter if it was incremented in this cycle.
 						if (submissionRetrieved)
 							numOfActiveSubmissions.decrementAndGet();
 					}
@@ -728,7 +728,7 @@ public class StandardProcessPool implements ProcessPool {
 						}
 						// If the submission is cancelled, throw an exception.
 						if (submission.isCancelled())
-							throw new CancellationException();
+							throw new CancellationException(String.format("Submission %s cancelled.", submission));
 						success = true;
 						return success;
 					} finally {
@@ -782,7 +782,7 @@ public class StandardProcessPool implements ProcessPool {
 							manager.onStartup(this);
 							if (stop)
 								return;
-							// Start accepting handling submissionQueue.
+							// Start accepting submissions.
 							auxThreadPool.submit(this::startHandlingSubmissions);
 							if (doTime) {
 								// Start the timer.
@@ -835,7 +835,7 @@ public class StandardProcessPool implements ProcessPool {
 							running = false;
 							execLock.notifyAll();
 						}
-						/* And interrupt the submission handler thread to avoid having it stuck waiting for submissionQueue forever in case 
+						/* And interrupt the submission handler thread to avoid having it stuck waiting for submissions forever in case 
 						 * the queue is empty. */
 						synchronized (threadLock) {
 							if (subThread != null)
