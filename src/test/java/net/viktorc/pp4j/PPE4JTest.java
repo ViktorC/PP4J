@@ -55,7 +55,8 @@ public class PPE4JTest {
 	public PPE4JTest() throws URISyntaxException {
 		// Support testing on Linux and Windows.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-		programLocation = new File(getClass().getResource(windows ? "win/test.exe" : "linux/test")
+		programLocation = new File(ClassLoader.getSystemClassLoader()
+				.getResource(windows ? "win/test.exe" : "linux/test")
 				.toURI().getPath()).getAbsolutePath();
 		File file = new File(programLocation);
 		file.setExecutable(true);
