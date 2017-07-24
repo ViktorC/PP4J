@@ -1,7 +1,8 @@
-package net.viktorc.pp4j.impl;
+package net.viktorc.pp4j;
 
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.ProcessPool;
+import net.viktorc.pp4j.impl.StandardProcessPool;
 
 /**
  * A class for convenience and factory methods for creating instances of implementations of the 

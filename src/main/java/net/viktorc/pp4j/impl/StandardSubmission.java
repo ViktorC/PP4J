@@ -1,6 +1,7 @@
 package net.viktorc.pp4j.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -8,12 +9,12 @@ import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
 
 /**
- * An abstract implementation of the {@link net.viktorc.pp4j.api.Submission} interface.
+ * A basic implementation of the {@link net.viktorc.pp4j.api.Submission} interface.
  * 
  * @author Viktor Csomor
  *
  */
-public abstract class AbstractSubmission implements Submission {
+public class StandardSubmission implements Submission {
 
 	private final List<Command> commands;
 	private final boolean terminateProcessAfterwards;
@@ -25,7 +26,7 @@ public abstract class AbstractSubmission implements Submission {
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
 	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public AbstractSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
+	public StandardSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
 		if (commands == null)
 			throw new IllegalArgumentException("The commands cannot be null.");
 		if (commands.isEmpty())
@@ -34,6 +35,16 @@ public abstract class AbstractSubmission implements Submission {
 			throw new IllegalArgumentException("The commands cannot include null references.");
 		this.commands = new ArrayList<>(commands);
 		this.terminateProcessAfterwards = terminateProcessAfterwards;
+	}
+	/**
+	 * Constructs an instance according to the specified parameters.
+	 * 
+	 * @param command A command to execute.
+	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
+	 * @throws IllegalArgumentException If the command is null.
+	 */
+	public StandardSubmission(Command command, boolean terminateProcessAfterwards) {
+		this(Arrays.asList(command), terminateProcessAfterwards);
 	}
 	@Override
 	public List<Command> getCommands() {

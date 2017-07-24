@@ -25,12 +25,6 @@ public interface Submission {
 	 */
 	boolean doTerminateProcessAfterwards();
 	/**
-	 * Returns whether the submission has been cancelled.
-	 * 
-	 * @return Whether the submission has been cancelled.
-	 */
-	boolean isCancelled();
-	/**
 	 * A method that is executed once the processing of the submitted commands has begun.
 	 */
 	default void onStartedProcessing() { }

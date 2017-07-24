@@ -152,12 +152,12 @@ public class StandardProcessPool implements ProcessPool {
 		logger.info("Pool started up.");
 	}
 	/**
-	 * Returns the <code>ProcessManagerFactory</code> assigned to the pool.
+	 * Returns the minimum number of processes to hold in the pool.
 	 * 
-	 * @return The process manager factory of the process pool.
+	 * @return The minimum size of the process pool.
 	 */
-	public ProcessManagerFactory getProcessManagerFactory() {
-		return procManagerFactory;
+	public int getMinSize() {
+		return minPoolSize;
 	}
 	/**
 	 * Returns the maximum allowed number of processes to hold in the pool.
@@ -166,14 +166,6 @@ public class StandardProcessPool implements ProcessPool {
 	 */
 	public int getMaxSize() {
 		return maxPoolSize;
-	}
-	/**
-	 * Returns the minimum number of processes to hold in the pool.
-	 * 
-	 * @return The minimum size of the process pool.
-	 */
-	public int getMinSize() {
-		return minPoolSize;
 	}
 	/**
 	 * Returns the minimum number of available processes to keep in the pool.
@@ -263,15 +255,10 @@ public class StandardProcessPool implements ProcessPool {
 		logger.debug("Process executor {} started.{}", executor, System.lineSeparator() + getPoolStats());
 		return true;
 	}
-	/**
-	 * Executes the submission on any of the available processes in the pool.
-	 * 
-	 * @param submission The submission including all information necessary for executing and processing the command(s).
-	 * @return A {@link java.util.concurrent.Future} instance of the time it took to execute the command including the submission 
-	 * delay in milliseconds.
-	 * @throws IllegalStateException If the pool has already been shut down.
-	 * @throws IllegalArgumentException If the submission is null.
-	 */
+	@Override
+	public ProcessManagerFactory getProcessManagerFactory() {
+		return procManagerFactory;
+	}
 	@Override
 	public Future<Long> submit(Submission submission) {
 		if (close)
@@ -290,12 +277,6 @@ public class StandardProcessPool implements ProcessPool {
 		// Return a Future holding the total execution time including the submission delay.
 		return new InternalSubmissionFuture(internalSubmission);
 	}
-	/**
-	 * Attempts to shut the process pool including all its processes down. The method blocks until all process executor instances maintained 
-	 * by the pool are closed.
-	 * 
-	 * @throws IllegalStateException If the pool has already been shut down.
-	 */
 	@Override
 	public synchronized void shutdown() {
 		synchronized (poolLock) {
@@ -320,6 +301,8 @@ public class StandardProcessPool implements ProcessPool {
 		try {
 			auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 			procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+			for (InternalSubmission submission : submissionQueue)
+				submission.setException(new Exception("The process pool has been shut down."));
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		}
@@ -348,7 +331,6 @@ public class StandardProcessPool implements ProcessPool {
 		volatile long submittedTime;
 		volatile long processedTime;
 		volatile boolean processed;
-		volatile boolean cancel;
 		
 		/**
 		 * Constructs an instance according to the specified parameters.
@@ -394,10 +376,6 @@ public class StandardProcessPool implements ProcessPool {
 			return origSubmission.doTerminateProcessAfterwards();
 		}
 		@Override
-		public boolean isCancelled() {
-			return origSubmission.isCancelled() || cancel || close;
-		}
-		@Override
 		public void onStartedProcessing() {
 			// If it is the first time the submission is submitted to a process...
 			if (submittedTime == 0) {
@@ -416,14 +394,6 @@ public class StandardProcessPool implements ProcessPool {
 			}
 		}
 		@Override
-		public int hashCode() {
-			return origSubmission.hashCode();
-		}
-		@Override
-		public boolean equals(Object o) {
-			return o instanceof InternalSubmission && ((InternalSubmission) o).origSubmission == origSubmission;
-		}
-		@Override
 		public String toString() {
 			return String.format("{commands:[%s],terminate:%s}@%s", String.join(",", origSubmission.getCommands()
 					.stream().map(c -> "\"" + c.getInstruction() + "\"").collect(Collectors.toList())),
@@ -435,7 +405,7 @@ public class StandardProcessPool implements ProcessPool {
 	
 	/**
 	 * An implementation of {@link java.util.concurrent.Future} that returns the time it took to process the 
-	 * submission.
+	 * submission in nanoseconds.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -443,6 +413,7 @@ public class StandardProcessPool implements ProcessPool {
 	private class InternalSubmissionFuture implements Future<Long> {
 		
 		final InternalSubmission submission;
+		volatile boolean cancel;
 		
 		/**
 		 * Constructs a {@link java.util.concurrent.Future} for the specified submission.
@@ -455,25 +426,32 @@ public class StandardProcessPool implements ProcessPool {
 		@Override
 		public boolean cancel(boolean mayInterruptIfRunning) {
 			synchronized (submission.lock) {
-				// If mayInterruptIfRunning, interrupt the executor thread if it is not null.
-				if (mayInterruptIfRunning && submission.thread != null)
-					submission.thread.interrupt();
-				submission.cancel = true;
-				submission.lock.notifyAll();
-				return true;
+				if (cancel)
+					return true;
+				// If mayInterruptIfRunning is true, and the executor thread is not null, interrupt it.
+				if (mayInterruptIfRunning) {
+					if (submission.thread != null) {
+						submission.thread.interrupt();
+						cancel = true;
+					}
+				} else // Try to remove the submission from the queue if it is not being processed yet.
+					cancel = submissionQueue.remove(this);
+				if (cancel)
+					submission.lock.notifyAll();
+				return cancel;
 			}
 		}
 		@Override
 		public Long get() throws InterruptedException, ExecutionException, CancellationException {
 			// Wait until the submission is processed, or cancelled, or fails.
 			synchronized (submission.lock) {
-				while (!submission.processed && !submission.isCancelled() && submission.exception == null)
+				while (!submission.processed && !cancel && submission.exception == null)
 					submission.lock.wait();
-				if (submission.isCancelled())
+				if (cancel)
 					throw new CancellationException(String.format("Submission %s cancelled.", submission));
 				if (submission.exception != null)
 					throw new ExecutionException(submission.exception);
-				return (long) Math.round(((double) (submission.processedTime - submission.receivedTime))/1000000);
+				return submission.processedTime - submission.receivedTime;
 			}
 		}
 		@Override
@@ -483,24 +461,23 @@ public class StandardProcessPool implements ProcessPool {
 			synchronized (submission.lock) {
 				long timeoutNs = unit.toNanos(timeout);
 				long start = System.nanoTime();
-				while (!submission.processed && !submission.isCancelled() && submission.exception == null &&
+				while (!submission.processed && !cancel && submission.exception == null &&
 						timeoutNs > 0) {
 					submission.lock.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
 					timeoutNs -= (System.nanoTime() - start);
 				}
-				if (submission.isCancelled())
+				if (cancel)
 					throw new CancellationException(String.format("Submission %s cancelled.", submission));
 				if (submission.exception != null)
 					throw new ExecutionException(submission.exception);
 				if (timeoutNs <= 0)
 					throw new TimeoutException(String.format("Submission %s timed out.", submission));
-				return timeoutNs <= 0 ? null : (long) Math.round(((double) (submission.processedTime -
-						submission.receivedTime))/1000000);
+				return timeoutNs <= 0 ? null : (submission.processedTime - submission.receivedTime);
 			}
 		}
 		@Override
 		public boolean isCancelled() {
-			return submission.isCancelled();
+			return cancel;
 		}
 		@Override
 		public boolean isDone() {
@@ -701,7 +678,7 @@ public class StandardProcessPool implements ProcessPool {
 						submission.onStartedProcessing();
 						List<Command> commands = submission.getCommands();
 						List<Command> processedCommands = commands.size() > 1 ? new ArrayList<>(commands.size() - 1) : null;
-						for (int i = 0; i < commands.size() && !submission.isCancelled(); i++) {
+						for (int i = 0; i < commands.size(); i++) {
 							command = commands.get(i);
 							if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
 								continue;
@@ -726,9 +703,6 @@ public class StandardProcessPool implements ProcessPool {
 								stopLock.unlock();
 							}
 						}
-						// If the submission is cancelled, throw an exception.
-						if (submission.isCancelled())
-							throw new CancellationException(String.format("Submission %s cancelled.", submission));
 						success = true;
 						return success;
 					} finally {
