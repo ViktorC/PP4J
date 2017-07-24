@@ -9,12 +9,15 @@ import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
 
 /**
- * A basic implementation of the {@link net.viktorc.pp4j.api.Submission} interface.
+ * A simple implementation of the {@link net.viktorc.pp4j.api.Submission} interface that allows for the specification 
+ * of the commands to execute and whether the process is to be terminated after the execution of the commands. It 
+ * assumes that whether the process is to be terminated after the execution of the commands can be defined statically 
+ * and does not depend on the state of the process.
  * 
  * @author Viktor Csomor
  *
  */
-public class StandardSubmission implements Submission {
+public class SimpleSubmission implements Submission {
 
 	private final List<Command> commands;
 	private final boolean terminateProcessAfterwards;
@@ -26,7 +29,7 @@ public class StandardSubmission implements Submission {
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the commands.
 	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
 	 */
-	public StandardSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
+	public SimpleSubmission(List<Command> commands, boolean terminateProcessAfterwards) {
 		if (commands == null)
 			throw new IllegalArgumentException("The commands cannot be null.");
 		if (commands.isEmpty())
@@ -43,7 +46,7 @@ public class StandardSubmission implements Submission {
 	 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the command.
 	 * @throws IllegalArgumentException If the command is null.
 	 */
-	public StandardSubmission(Command command, boolean terminateProcessAfterwards) {
+	public SimpleSubmission(Command command, boolean terminateProcessAfterwards) {
 		this(Arrays.asList(command), terminateProcessAfterwards);
 	}
 	@Override

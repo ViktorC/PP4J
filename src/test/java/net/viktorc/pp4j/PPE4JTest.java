@@ -11,11 +11,11 @@ import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.ProcessPool;
 import net.viktorc.pp4j.api.Submission;
+import net.viktorc.pp4j.impl.AbstractProcessManager;
 import net.viktorc.pp4j.impl.ProcessException;
 import net.viktorc.pp4j.impl.SimpleCommand;
-import net.viktorc.pp4j.impl.SimpleProcessManager;
 import net.viktorc.pp4j.impl.StandardProcessPool;
-import net.viktorc.pp4j.impl.StandardSubmission;
+import net.viktorc.pp4j.impl.SimpleSubmission;
 
 import java.io.File;
 import java.net.URISyntaxException;
@@ -85,10 +85,10 @@ public class PPE4JTest {
 					stdProcPool.isVerbose() + ".";
 			assert stdProcPool.getNumOfQueuedSubmissions() == 0 : "Non-zero number of queued submissions on startup: " +
 					stdProcPool.getNumOfQueuedSubmissions() + ".";
-			assert stdProcPool.getNumOfExecutingSubmissions() == 0 : "Non-zero number of executing submissions on startup: " +
-					stdProcPool.getNumOfExecutingSubmissions() + ".";
-			assert stdProcPool.getNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of total " +
-					"processes: " + stdProcPool.getNumOfProcesses() + " instead of " +
+			assert stdProcPool.getNumOfExecutingSubmissions() == 0 : "Non-zero number of executing submissions on " +
+					"startup: " + stdProcPool.getNumOfExecutingSubmissions() + ".";
+			assert stdProcPool.getNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of " +
+					"total processes: " + stdProcPool.getNumOfProcesses() + " instead of " +
 					Math.max(minPoolSize, reserveSize) + ".";
 		} else {
 			// Other implementations of the ProcessPool interface.
@@ -113,12 +113,12 @@ public class PPE4JTest {
 					throws InterruptedException {
 		TestProcessManagerFactory managerFactory = new TestProcessManagerFactory(verifyStartup, manuallyTerminate,
 				throwStartupException);
-		ProcessPool pool = keepAliveTime > 0 && verbose ?
+		ProcessPool pool = keepAliveTime > 0 && verbose ? ProcessPools.newCustomProcessPool(managerFactory,
+				minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose) : keepAliveTime > 0 ?
 				ProcessPools.newCustomProcessPool(managerFactory, minPoolSize, maxPoolSize, reserveSize,
-				keepAliveTime, verbose) : keepAliveTime > 0 ? ProcessPools.newCustomProcessPool(managerFactory,
-				minPoolSize, maxPoolSize, reserveSize, keepAliveTime) : verbose ? ProcessPools
-				.newCustomProcessPool(managerFactory, minPoolSize, maxPoolSize, reserveSize, verbose) :
-				ProcessPools.newCustomProcessPool(managerFactory, minPoolSize, maxPoolSize, reserveSize);
+				keepAliveTime) : verbose ? ProcessPools.newCustomProcessPool(managerFactory, minPoolSize,
+				maxPoolSize, reserveSize, verbose) : ProcessPools.newCustomProcessPool(managerFactory,
+				minPoolSize, maxPoolSize, reserveSize);
 		checkPool(pool, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, verbose);
 		return pool;
 	}
@@ -239,27 +239,23 @@ public class PPE4JTest {
 					commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
 								if ("ready".equals(o)) {
 									// Output line caching check.
-//									assert c.getStandardOutLines().size() == procTime &&
-//											c.getErrorOutLines().size() == 0 :
-//											"Unexpected numbers of output lines: " +
-//											c.getStandardOutLines().size() + " instead of " +
-//											procTime + " and " + c.getErrorOutLines().size() + 
-//											" instead of " + 0 + ".";
-//									String expectedStdOutput = Arrays.stream(new String[procTime - 1])
-//											.map(s -> "in progress").reduce("", (s1, s2) -> s1 +
-//											System.lineSeparator() + s2) + System.lineSeparator() +
-//											"ready";
-//									System.out.println("Wrongly captured standard output. Expected: \"" +
-//											expectedStdOutput + "\"" + System.lineSeparator() +
-//											"Actual: \"" + c.getJointStandardOutLines() + "\"");
-//									assert expectedStdOutput.equals(c.getJointStandardOutLines()) :
-//											"Wrongly captured standard output. Expected: \"" +
-//											expectedStdOutput + "\"" + System.lineSeparator() +
-//											"Actual: \"" + c.getJointStandardOutLines() + "\"";
-//									assert "".equals(c.getJointErrorOutLines()) : "Wrongly " +
-//											"captured error output. Expected: \"\"" + System
-//											.lineSeparator() + "Actual: \"" + c
-//											.getJointErrorOutLines() + "\"";
+									assert c.getStandardOutLines().size() == procTime &&
+											c.getErrorOutLines().size() == 0 :
+											"Unexpected numbers of output lines: " +
+											c.getStandardOutLines().size() + " instead of " +
+											procTime + " and " + c.getErrorOutLines().size() + 
+											" instead of " + 0 + ".";
+									String expectedStdOutput = Arrays.stream(new String[procTime - 1])
+											.map(s -> "in progress").reduce("", (s1, s2) -> (s1 +
+											"\n" + s2).trim()) + "\nready";
+									assert expectedStdOutput.equals(c.getJointStandardOutLines()) :
+											"Wrongly captured standard output. Expected: \"" +
+											expectedStdOutput + "\"" + System.lineSeparator() +
+											"Actual: \"" + c.getJointStandardOutLines() + "\"";
+									assert "".equals(c.getJointErrorOutLines()) : "Wrongly " +
+											"captured error output. Expected: \"\"" + System
+											.lineSeparator() + "Actual: \"" + c
+											.getJointErrorOutLines() + "\"";
 									c.reset();
 									return true;
 								}
@@ -275,15 +271,15 @@ public class PPE4JTest {
 							});
 			}
 			int index = i;
-			Submission submission = new StandardSubmission(commands, !reuse) {
+			Submission submission = new SimpleSubmission(commands, !reuse) {
 				
 				@Override
 				public void onFinishedProcessing() {
 					times.set(index, System.nanoTime() - times.get(index));
 				}
 			};
-			futures.add(processPool.submit(submission));
 			times.add(System.nanoTime());
+			futures.add(processPool.submit(submission));
 		}
 		if (cancelTime > 0) {
 			Thread.sleep(cancelTime);
@@ -293,14 +289,10 @@ public class PPE4JTest {
 			processPool.shutdown();
 		for (int i = 0; i < futures.size(); i++) {
 			Future<?> future = futures.get(i);
-			try {
-				if (waitTimeout > 0)
-					future.get(waitTimeout, TimeUnit.MILLISECONDS);
-				else
-					future.get();
-			} catch (ExecutionException e) {
-				times.set(i, (long) 0);
-			}
+			if (waitTimeout > 0)
+				future.get(waitTimeout, TimeUnit.MILLISECONDS);
+			else
+				future.get();
 		}
 		if (!earlyClose)
 			processPool.shutdown();
@@ -527,6 +519,7 @@ public class PPE4JTest {
 	public void test25() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 25");
 		ProcessPool pool = getFixedPool(100, 5000, true, false, false, false);
+		exceptionRule.expect(ExecutionException.class);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 0, false, 0, false, true, 0, 0, 0));
 	}
 	// Interrupted construction testing.
@@ -611,7 +604,6 @@ public class PPE4JTest {
 	public void test34() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 34");
 		ProcessPool pool = getFixedPool(20, 0, false, false, false, false);
-		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 0, false, 2500, false, false, 3000, 4995,
 				5120));
 	}
@@ -669,33 +661,33 @@ public class PPE4JTest {
 		}
 		@Override
 		public ProcessManager newProcessManager() {
-			return new SimpleProcessManager(new ProcessBuilder(programLocation),
-					s -> {
-						try {
-							s.execute(new StandardSubmission(new SimpleCommand("start",
-									(c, o) -> "ok".equals(o), (c, o) -> true), false));
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-					}) {
+			return new AbstractProcessManager(new ProcessBuilder(programLocation)) {
 				
 				@Override
 				public boolean startsUpInstantly() {
 					if (throwStartupException)
 						throw new ProcessException("Test startup exception.");
-					return !verifyStartup && super.startsUpInstantly();
+					return !verifyStartup;
 				}
 				@Override
 				public boolean isStartedUp(String output, boolean standard) {
-					return (!verifyStartup && super.isStartedUp(output, standard)) ||
-							(standard && "hi".equals(output));
+					return !verifyStartup || (standard && "hi".equals(output));
+				}
+				@Override
+				public void onStartup(ProcessExecutor executor) {
+					try {
+						executor.execute(new SimpleSubmission(new SimpleCommand("start",
+								(c, o) -> "ok".equals(o), (c, o) -> true), false));
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
 				}
 				@Override
 				public boolean terminate(ProcessExecutor executor) {
 					if (manuallyTerminate) {
 						try {
 							AtomicBoolean success = new AtomicBoolean(true);
-							if (executor.execute(new StandardSubmission(new SimpleCommand("stop",
+							if (executor.execute(new SimpleSubmission(new SimpleCommand("stop",
 									(c, o) -> "bye".equals(o),
 									(c, o) -> {
 										success.set(false);
@@ -706,8 +698,10 @@ public class PPE4JTest {
 							e.printStackTrace();
 						}
 					}
-					return super.terminate(executor);
+					return false;
 				}
+				@Override
+				public void onTermination(int resultCode, long lifeTime) { }
 			};
 		}
 		
