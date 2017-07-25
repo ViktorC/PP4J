@@ -32,7 +32,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A test class for the process pool executor.
+ * A test class for the PP4J project.
  * 
  * @author Viktor Csomor
  *

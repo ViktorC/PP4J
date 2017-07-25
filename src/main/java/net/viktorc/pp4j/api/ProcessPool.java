@@ -20,7 +20,8 @@ public interface ProcessPool {
 	 */
 	ProcessManagerFactory getProcessManagerFactory();
 	/**
-	 * Submits the specified submission for execution.
+	 * Submits the specified submission for execution and returns a {@link java.util.concurrent.Future} instance which allows for the 
+	 * cancellation of the submission.
 	 * 
 	 * @param submission The submission to execute.
 	 * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of the execution or the 
