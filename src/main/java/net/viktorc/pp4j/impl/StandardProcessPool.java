@@ -46,16 +46,17 @@ import net.viktorc.pp4j.api.Submission;
 
 /**
  * An implementation of the {@link net.viktorc.pp4j.api.ProcessPool} interface for maintaining and managing a pool 
- * of pre-started processes. The processes are executed in instances of an own {@link net.viktorc.pp4j.api.
- * ProcessExecutor} implementation. Each executor is assigned an instance of an implementation of the {@link net.
- * viktorc.pp4j.api.ProcessManager} interface using an implementation of the {@link net.viktorc.pp4j.api.
- * ProcessManagerFactory} interface. The pool accepts submissions in the form of {@link net.viktorc.pp4j.api.
- * Submission} implementations which are executed on any one of the available active process executors maintained 
- * by the pool. While executing a submission, the executor cannot accept further submissions. The submissions are 
- * queued and executed as soon as there is an available executor. The size of the pool is always kept between the 
- * minimum pool size and the maximum pool size (both inclusive). The reserve size specifies the minimum number of 
- * processes that should always be available (there are no guarantees that there actually will be this many available 
- * executors at any given time). It uses <a href="https://www.slf4j.org/">SLF4J</a> for logging.
+ * of pre-started processes. The processes are executed in instances of an own 
+ * {@link net.viktorc.pp4j.api.ProcessExecutor} implementation. Each executor is assigned an instance of an 
+ * implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface using an implementation of the 
+ * {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface. The pool accepts submissions in the form of 
+ * {@link net.viktorc.pp4j.api.Submission} implementations which are executed on any one of the available active 
+ * process executors maintained by the pool. While executing a submission, the executor cannot accept further 
+ * submissions. The submissions are queued and executed as soon as there is an available executor. The size of the 
+ * pool is always kept between the minimum pool size and the maximum pool size (both inclusive). The reserve size 
+ * specifies the minimum number of processes that should always be available (there are no guarantees that there 
+ * actually will be this many available executors at any given time). It uses <a href="https://www.slf4j.org/">
+ * SLF4J</a> for logging.
  * 
  * @author Viktor Csomor
  *
@@ -1082,13 +1083,13 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	
 	/**
-	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of {@link net.viktorc.pp4j.impl.
-	 * StandardProcessPool.StandardProcessExecutor} instances. It utilizes an extension of the {@link java.util.
-	 * concurrent.LinkedTransferQueue} and an implementation of the {@link java.util.concurrent.RejectedExecutionHandler} 
-	 * as per Robert Tupelo-Schneck's answer to a StackOverflow <a href="https://stackoverflow.com/questions/19528304/how
-	 * -to-get-the-threadpoolexecutor-to-increase-threads-to-max-before-queueing/19528305#19528305">question</a> to 
-	 * facilitate a queueing logic that has the pool first increase the number of its threads and only really queue tasks 
-	 * once the maximum pool size has been reached.
+	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of 
+	 * {@link net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor} instances. It utilizes an extension of 
+	 * the {@link java.util.concurrent.LinkedTransferQueue} and an implementation of the 
+	 * {@link java.util.concurrent.RejectedExecutionHandler} as per Robert Tupelo-Schneck's answer to a StackOverflow 
+	 * <a href="https://stackoverflow.com/questions/19528304/how-to-get-the-threadpoolexecutor-to-increase-threads-to-
+	 * max-before-queueing/19528305#19528305">question</a> to facilitate a queueing logic that has the pool first increase 
+	 * the number of its threads and only really queue tasks once the maximum pool size has been reached.
 	 * 
 	 * @author Viktor Csomor
 	 *
