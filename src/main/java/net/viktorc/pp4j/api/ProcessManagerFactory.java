@@ -10,10 +10,11 @@ package net.viktorc.pp4j.api;
 public interface ProcessManagerFactory {
 
 	/**
-	 * Constructs and returns a new instance of an implementation of the {@link net.viktorc.pp4j.api.ProcessManager} 
-	 * interface.
+	 * Constructs and returns a new instance of an implementation of the 
+	 * {@link net.viktorc.pp4j.api.ProcessManager} interface.
 	 * 
-	 * @return A new instance of an implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface.
+	 * @return A new instance of an implementation of the {@link net.viktorc.pp4j.api.ProcessManager} 
+	 * interface.
 	 */
 	ProcessManager newProcessManager();
 	

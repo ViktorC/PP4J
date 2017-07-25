@@ -5,10 +5,11 @@ import java.util.function.Consumer;
 import net.viktorc.pp4j.api.ProcessExecutor;
 
 /**
- * A simplified sub-class of the {@link net.viktorc.pp4j.impl.AbstractProcessManager} abstract class. It assumes that the 
- * process is immediately started up as soon as it is running (without having to wait for a certain output denoting that 
- * the process is ready), it has the process forcibly killed every time it needs to be terminated due to exceeding the 
- * keep-alive-time of the pool or not being reusable, and it implements no callback for when the process terminates.
+ * A simplified sub-class of the {@link net.viktorc.pp4j.impl.AbstractProcessManager} abstract class. It assumes 
+ * that the process is immediately started up as soon as it is running (without having to wait for a certain output 
+ * denoting that the process is ready), it has the process forcibly killed every time it needs to be terminated due 
+ * to exceeding the keep-alive-time of the pool or not being reusable, and it implements no callback for when the 
+ * process terminates.
  * 
  * @author Viktor Csomor
  *

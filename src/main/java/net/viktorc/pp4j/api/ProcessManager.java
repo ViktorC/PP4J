@@ -24,8 +24,8 @@ public interface ProcessManager {
 	 * A method that denotes whether the process should be considered started up instantly or if it is only 
 	 * started up once a certain output has been printed to one of its out streams. If it returns true, the 
 	 * process is instantly considered started up and ready as soon as it is running, and the method 
-	 * {@link #onStartup(ProcessExecutor)} is executed. If it returns false, the method {@link #isStartedUp(String, boolean)} 
-	 * determines when the process is considered started up.
+	 * {@link #onStartup(ProcessExecutor)} is executed. If it returns false, the method 
+	 * {@link #isStartedUp(String, boolean)} determines when the process is considered started up.
 	 * 
 	 * @return Whether the process instantly start up as soon as it is run or if it is started up and ready 
 	 * only when a certain output has been written to one of its output streams.
@@ -44,8 +44,9 @@ public interface ProcessManager {
 	/**
 	 * A method called right after the process is started. Its main purpose is to allow for startup 
 	 * activities such as the execution of commands. The <code>executor</code> should be available and ready 
-	 * for processing submissions within this call back, thus its {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} 
-	 * method should always return <code>true</code>.
+	 * for processing submissions within this call back, thus its 
+	 * {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} method should always return <code>true
+	 * </code>.
 	 * 
 	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process after the startup if needed.

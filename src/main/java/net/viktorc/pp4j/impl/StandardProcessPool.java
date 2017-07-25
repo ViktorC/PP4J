@@ -95,15 +95,17 @@ public class StandardProcessPool implements ProcessPool {
 	/**
 	 * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size 
 	 * depending on which one is greater. This constructor blocks until the initial number of processes start up. 
-	 * The size of the pool is dynamically adjusted based on the pool parameters and the rate of incoming submissions.
+	 * The size of the pool is dynamically adjusted based on the pool parameters and the rate of incoming 
+	 * submissions.
 	 * 
-	 * @param procManagerFactory A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to build 
-	 * {@link net.viktorc.pp4j.api.ProcessManager} instances that manage the processes' life cycle in the pool.
+	 * @param procManagerFactory A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to 
+	 * build {@link net.viktorc.pp4j.api.ProcessManager} instances that manage the processes' life cycle in the 
+	 * pool.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
-	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 0 or less, 
-	 * the life-cycle of the processes will not be limited.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 0 or 
+	 * less, the life-cycle of the processes will not be limited.
 	 * @param verbose Whether the events related to the management of the process pool should be logged. Setting 
 	 * this parameter to <code>true</code> does not guarantee that logging will be performed as logging depends on 
 	 * the SLF4J binding and the logging configurations, but setting it to <code>false</code> guarantees that no 
@@ -136,8 +138,8 @@ public class StandardProcessPool implements ProcessPool {
 		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 		procExecutorThreadPool = new StandardProcessPoolExecutor();
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
-		/* If keepAliveTime is positive, one process requires 4 auxiliary threads (std_out listener, err_out listener,
-		 * submission handler, timer); if it is not, only 3 are required. */
+		/* If keepAliveTime is positive, one process requires 4 auxiliary threads (std_out listener, err_out 
+		 * listener, submission handler, timer); if it is not, only 3 are required. */
 		auxThreadPool = new ThreadPoolExecutor(doTime ? 4*actualMinSize : 3*actualMinSize, Integer.MAX_VALUE,
 				doTime ? keepAliveTime : DEFAULT_EVICT_TIME, TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
 				new CustomizedThreadFactory(this + "-auxThreadPool"));
@@ -241,11 +243,11 @@ public class StandardProcessPool implements ProcessPool {
 				Math.min(maxPoolSize, numOfActiveSubmissions.get() + submissionQueue.size() + reserveSize)));
 	}
 	/**
-	 * Starts a new process by executing the provided {@link net.viktorc.pp4j.StandardProcessExecutor}. If it is null, 
-	 * it borrows an instance from the pool.
+	 * Starts a new process by executing the provided {@link net.viktorc.pp4j.StandardProcessExecutor}. If it is 
+	 * null, it borrows an instance from the pool.
 	 * 
-	 * @param executor An optional {@link net.viktorc.pp4j.StandardProcessExecutor} instance to re-start in case one 
-	 * is available.
+	 * @param executor An optional {@link net.viktorc.pp4j.StandardProcessExecutor} instance to re-start in case 
+	 * one is available.
 	 * @return Whether the process was successfully started.
 	 */
 	private boolean startNewProcess(StandardProcessExecutor executor) {
@@ -320,8 +322,8 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	
 	/**
-	 * An implementation of the {@link net.viktorc.pp4j.InternalSubmission} interface to keep track of the number of 
-	 * commands being executed at a time and to establish a mechanism for cancelling submitted commands via the 
+	 * An implementation of the {@link net.viktorc.pp4j.InternalSubmission} interface to keep track of the number 
+	 * of commands being executed at a time and to establish a mechanism for cancelling submitted commands via the 
 	 * {@link java.util.concurrent.Future} returned by the 
 	 * {@link net.viktorc.pp4j.impl.StandardProcessPool#submit(Submission)} method.
 	 * 
@@ -456,7 +458,8 @@ public class StandardProcessPool implements ProcessPool {
 				 * anything and return false. */
 				if (submission.cancelled || submission.processed)
 					return false;
-				// If it is already being processed and mayInterruptIfRunning is true, interrupt the executor thread.
+				/* If it is already being processed and mayInterruptIfRunning is true, interrupt the executor 
+				 * thread. */
 				if (submission.thread != null) {
 					if (mayInterruptIfRunning) {
 						submission.cancel();
@@ -515,10 +518,10 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	
 	/**
-	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessExecutor} interface for starting, managing, and 
-	 * interacting with a process. The life cycle of the associated process is the same as that of the {@link #run()} 
-	 * method of the instance. The process is not started until this method is called and the method does not terminate 
-	 * until the process does.
+	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessExecutor} interface for starting, managing, 
+	 * and interacting with a process. The life cycle of the associated process is the same as that of the 
+	 * {@link #run()} method of the instance. The process is not started until this method is called and the 
+	 * method does not terminate until the process does.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -546,9 +549,9 @@ public class StandardProcessPool implements ProcessPool {
 		volatile boolean stop;
 		
 		/**
-		 * Constructs an executor for the specified process using two threads to listen to the out streams of the 
-		 * process, one for listening to the submission queue, and one thread for ensuring that the process is 
-		 * terminated once it times out if <code>keepAliveTime</code> is greater than 0.
+		 * Constructs an executor for the specified process using two threads to listen to the out streams of 
+		 * the process, one for listening to the submission queue, and one thread for ensuring that the process 
+		 * is terminated once it times out if <code>keepAliveTime</code> is greater than 0.
 		 */
 		StandardProcessExecutor() {
 			timer = doTime ? new KeepAliveTimer() : null;
@@ -612,7 +615,8 @@ public class StandardProcessPool implements ProcessPool {
 						subLock.unlock();
 						// Wait for an available submission.
 						submission = submissionQueue.takeFirst();
-						// Increment the counter for active submissions to keep track of the number of busy processes.
+						/* Increment the counter for active submissions to keep track of the number of busy 
+						 * processes. */
 						numOfActiveSubmissions.incrementAndGet();
 						submissionRetrieved = true;
 						submission.setThread(subThread);
@@ -620,14 +624,15 @@ public class StandardProcessPool implements ProcessPool {
 							submission = null;
 							continue;
 						}
-						/* It can happen of course that in the mean time, the mainLock has been stolen (for terminating 
-						 * the process) or that the process is already terminated, and thus the execute method fails. 
-						 * In this case, the submission is put back into the queue. */
+						/* It can happen of course that in the mean time, the mainLock has been stolen (for 
+						 * terminating the process) or that the process is already terminated, and thus the 
+						 * execute method fails. In this case, the submission is put back into the queue. */
 						if (execute(submission)) {
-							logger.info(String.format("Submission %s processed; delay: %.3f; execution time: %.3f.%n%s",
-									submission, (float) ((double) (submission.submittedTime - submission.receivedTime)/
-									1000000000), (float) ((double) (submission.processedTime - submission.submittedTime)/
-									1000000000), getPoolStats()));
+							logger.info(String.format("Submission %s processed; delay: %.3f;" +
+									"execution time: %.3f.%n%s", submission, (float) ((double)
+									(submission.submittedTime - submission.receivedTime)/1000000000),
+									(float) ((double) (submission.processedTime -
+									submission.submittedTime)/1000000000), getPoolStats()));
 							submission = null;
 						}
 					} catch (InterruptedException e) {
@@ -642,8 +647,8 @@ public class StandardProcessPool implements ProcessPool {
 							submission = null;
 						}
 					} finally {
-						/* If the execute method failed and there was no exception thrown, put the submission back 
-						 * into the queue at the front. */
+						/* If the execute method failed and there was no exception thrown, put the submission 
+						 * back into the queue at the front. */
 						if (submission != null) {
 							if (!submission.isCancelled()) {
 								submission.setThread(null);
@@ -708,8 +713,8 @@ public class StandardProcessPool implements ProcessPool {
 				synchronized (execLock) {
 					boolean success = false;
 					try {
-						/* If the process has terminated or the ProcessExecutor has been stopped while acquiring the 
-						 * execLock, return. */
+						/* If the process has terminated or the ProcessExecutor has been stopped while acquiring 
+						 * the execLock, return. */
 						if (!running || stop)
 							return success;
 						// Stop the timer as the process is not idle anymore.
@@ -813,9 +818,9 @@ public class StandardProcessPool implements ProcessPool {
 						}
 					} finally {
 						/* If the startup was not orderly, e.g. the process was stopped prematurely or an exception 
-						 * was thrown, release as many permits as there are slave threads to ensure that the semaphore 
-						 * does not block in the finally clause; also count down on the pre-start latch to avoid 
-						 * having the pool wait on the failed startup. */
+						 * was thrown, release as many permits as there are slave threads to ensure that the 
+						 * semaphore does not block in the finally clause; also count down on the pre-start latch 
+						 * to avoid having the pool wait on the failed startup. */
 						if (!orderly) {
 							termSemaphore.release(doTime ? 4 : 3);
 							prestartLatch.countDown();
@@ -863,7 +868,8 @@ public class StandardProcessPool implements ProcessPool {
 							if (subThread != null)
 								subThread.interrupt();
 						}
-						// Make sure that the timer sees the new value of running and the timer thread can terminate.
+						/* Make sure that the timer sees the new value of running and the timer thread can 
+						 * terminate. */
 						if (doTime)
 							timer.stop();
 					} finally {
@@ -915,8 +921,8 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		
 		/**
-		 * A simple timer that stops the process after <code>keepAliveTime</code> milliseconds unless the process is 
-		 * inactive or the timer is cancelled. It also enables the timer to be restarted using the same thread.
+		 * A simple timer that stops the process after <code>keepAliveTime</code> milliseconds unless the process 
+		 * is inactive or the timer is cancelled. It also enables the timer to be restarted using the same thread.
 		 * 
 		 * @author Viktor Csomor
 		 *
@@ -956,15 +962,15 @@ public class StandardProcessPool implements ProcessPool {
 								return;
 							waitTime -= (System.currentTimeMillis() - start);
 						}
-						/* Normally, the timer should not be running while a submission is being processed, i.e. if 
-						 * the timer gets to this point with go set to true, subLock should be available to the 
-						 * timer thread. However, if the execute method acquires the subLock right after the 
-						 * timer's wait time elapses, it will not be able to disable the timer until it enters the 
-						 * wait method in the next cycle and gives up its intrinsic lock. Therefore, the first call 
-						 * of the stop method of the StandardProcessExecutor would fail due to the lock held by the 
-						 * thread running the execute method, triggering the forcible shutdown of the process even 
-						 * though it is not idle. To avoid this behavior, first the subLock is attempted to be 
-						 * acquired to ensure that the process is indeed idle. */
+						/* Normally, the timer should not be running while a submission is being processed, i.e. 
+						 * if the timer gets to this point with go set to true, subLock should be available to 
+						 * the timer thread. However, if the execute method acquires the subLock right after the 
+						 * timer's wait time elapses, it will not be able to disable the timer until it enters 
+						 * the wait method in the next cycle and gives up its intrinsic lock. Therefore, the 
+						 * first call of the stop method of the StandardProcessExecutor would fail due to the 
+						 * lock held by the thread running the execute method, triggering the forcible shutdown 
+						 * of the process even though it is not idle. To avoid this behavior, first the subLock 
+						 * is attempted to be acquired to ensure that the process is indeed idle. */
 						if (go && subLock.tryLock()) {
 							try {
 								if (!StandardProcessExecutor.this.stop(false))
@@ -998,12 +1004,13 @@ public class StandardProcessPool implements ProcessPool {
 	private class StandardProcessExecutorObjectPool extends GenericObjectPool<StandardProcessExecutor> {
 
 		/**
-		 * Constructs an object pool instance to facilitate the reuse of {@link net.viktorc.pp4j.StandardProcessExecutor} 
-		 * instances. The pool does not block if there are no available objects, it accommodates <code>maxPoolSize</code> 
-		 * objects, and if there are more than <code>Math.max(minPoolSize, reserveSize)</code> idle objects in the pool, 
-		 * excess idle objects are eligible for eviction after <code>keepAliveTime</code> milliseconds, or if it is 
-		 * non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds. The eviction thread runs at the above 
-		 * specified intervals and performs at most <code>maxPoolSize - minPoolSize</code> evictions per run.
+		 * Constructs an object pool instance to facilitate the reuse of 
+		 * {@link net.viktorc.pp4j.StandardProcessExecutor} instances. The pool does not block if there are no 
+		 * available objects, it accommodates <code>maxPoolSize</code> objects, and if there are more than 
+		 * <code>Math.max(minPoolSize, reserveSize)</code> idle objects in the pool, excess idle objects are 
+		 * eligible for eviction after <code>keepAliveTime</code> milliseconds, or if it is non-positive, after 
+		 * <code>DEFAULT_EVICT_TIME</code> milliseconds. The eviction thread runs at the above specified 
+		 * intervals and performs at most <code>maxPoolSize - minPoolSize</code> evictions per run.
 		 */
 		StandardProcessExecutorObjectPool() {
 			super(new PooledObjectFactory<StandardProcessExecutor>() {
@@ -1041,11 +1048,11 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	
 	/**
-	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that provides more descriptive thread 
-	 * names and extends the {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by logging the 
-	 * uncaught exceptions if the enclosing {@link net.viktorc.pp4j.impl.StandardProcessPool} instance is verbose. It 
-	 * also attempts to shut down the enclosing pool if a {@link net.viktorc.pp4j.impl.ProcessException} is thrown in 
-	 * one of the threads it created.
+	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that provides more descriptive 
+	 * thread  names and extends the {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by 
+	 * logging the uncaught exceptions if the enclosing {@link net.viktorc.pp4j.impl.StandardProcessPool} 
+	 * instance is verbose. It also attempts to shut down the enclosing pool if a 
+	 * {@link net.viktorc.pp4j.impl.ProcessException} is thrown in one of the threads it created.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -1084,12 +1091,13 @@ public class StandardProcessPool implements ProcessPool {
 	
 	/**
 	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of 
-	 * {@link net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor} instances. It utilizes an extension of 
-	 * the {@link java.util.concurrent.LinkedTransferQueue} and an implementation of the 
-	 * {@link java.util.concurrent.RejectedExecutionHandler} as per Robert Tupelo-Schneck's answer to a StackOverflow 
-	 * <a href="https://stackoverflow.com/questions/19528304/how-to-get-the-threadpoolexecutor-to-increase-threads-to-
-	 * max-before-queueing/19528305#19528305">question</a> to facilitate a queueing logic that has the pool first increase 
-	 * the number of its threads and only really queue tasks once the maximum pool size has been reached.
+	 * {@link net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor} instances. It utilizes an 
+	 * extension of the {@link java.util.concurrent.LinkedTransferQueue} and an implementation of the 
+	 * {@link java.util.concurrent.RejectedExecutionHandler} as per Robert Tupelo-Schneck's answer to a 
+	 * StackOverflow <a href="https://stackoverflow.com/questions/19528304/how-to-get-the-threadpoolexecutor-
+	 * to-increase-threads-to-max-before-queueing/19528305#19528305">question</a> to facilitate a queueing 
+	 * logic that has the pool first increase the number of its threads and only really queue tasks once the 
+	 * maximum pool size has been reached.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -1097,10 +1105,10 @@ public class StandardProcessPool implements ProcessPool {
 	private class StandardProcessPoolExecutor extends ThreadPoolExecutor {
 		
 		/**
-		 * Constructs thread pool for the execution of {@link net.viktorc.pp4j.StandardProcessExecutor} instances. If 
-		 * there are more than <code>Math.max(minPoolSize, reserveSize)</code> idle threads in the pool, excess threads 
-		 * are evicted after <code>keepAliveTime</code> milliseconds, or if it is non-positive, after <code>
-		 * DEFAULT_EVICT_TIME</code> milliseconds.
+		 * Constructs thread pool for the execution of {@link net.viktorc.pp4j.StandardProcessExecutor} 
+		 * instances. If there are more than <code>Math.max(minPoolSize, reserveSize)</code> idle threads in 
+		 * the pool, excess threads are evicted after <code>keepAliveTime</code> milliseconds, or if it is 
+		 * non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds.
 		 */
 		StandardProcessPoolExecutor() {
 			super(Math.max(minPoolSize, reserveSize), maxPoolSize, doTime ? keepAliveTime : DEFAULT_EVICT_TIME,
@@ -1120,10 +1128,11 @@ public class StandardProcessPool implements ProcessPool {
 						@Override
 						public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
 							try {
-								/* If there are no threads waiting on the queue (all of them are busy executing) and 
-								 * the maximum pool size has been reached, when the queue declines the offer, the pool 
-								 * will not create any more threads but call this handler instead. This handler 
-								 * 'forces' the declined task on the queue, ensuring that it is not rejected. */
+								/* If there are no threads waiting on the queue (all of them are busy executing) 
+								 * and the maximum pool size has been reached, when the queue declines the offer, 
+								 * the pool will not create any more threads but call this handler instead. This 
+								 * handler 'forces' the declined task on the queue, ensuring that it is not 
+								 * rejected. */
 								executor.getQueue().put(r);
 							} catch (InterruptedException e) {
 								// Should not happen.
@@ -1138,8 +1147,8 @@ public class StandardProcessPool implements ProcessPool {
 			StandardProcessExecutor executor = (StandardProcessExecutor) r;
 			activeProcExecutors.remove(executor);
 			logger.debug("Process executor {} stopped.{}", executor, System.lineSeparator() + getPoolStats());
-			/* A process has terminated. Extend the pool if necessary by directly reusing the ProcessExecutor instance. 
-			 * If not, return it to the pool. */
+			/* A process has terminated. Extend the pool if necessary by directly reusing the ProcessExecutor 
+			 * instance. If not, return it to the pool. */
 			synchronized (poolLock) {
 				if (doExtendPool())
 					startNewProcess(executor);

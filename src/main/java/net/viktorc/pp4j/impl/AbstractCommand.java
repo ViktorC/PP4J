@@ -6,8 +6,8 @@ import java.util.List;
 import net.viktorc.pp4j.api.Command;
 
 /**
- * An abstract implementation of the {@link net.viktorc.pp4j.api.Command} interface that stores all lines output to the process' standard 
- * out and error out in response to the command.
+ * An abstract implementation of the {@link net.viktorc.pp4j.api.Command} interface that stores all lines output to 
+ * the process' standard out and error out in response to the command.
  * 
  * @author Viktor Csomor
  *
@@ -29,8 +29,8 @@ public abstract class AbstractCommand implements Command {
 		errOutLines = new ArrayList<>();
 	}
 	/**
-	 * Returns a list of lines output to the standard out of the underlying process after the instruction has been written to the 
-	 * standard in of the process.
+	 * Returns a list of lines output to the standard out of the underlying process after the instruction has been 
+	 * written to the standard in of the process.
 	 * 
 	 * @return A list of lines output to the standard out of the underlying process.
 	 */
@@ -38,8 +38,8 @@ public abstract class AbstractCommand implements Command {
 		return new ArrayList<>(stdOutLines);
 	}
 	/**
-	 * Returns a list of lines output to the error out of the underlying process after the instruction has been written to the 
-	 * standard in of the process.
+	 * Returns a list of lines output to the error out of the underlying process after the instruction has been 
+	 * written to the standard in of the process.
 	 * 
 	 * @return A list of lines output to the standard out of the underlying process.
 	 */
@@ -47,8 +47,8 @@ public abstract class AbstractCommand implements Command {
 		return new ArrayList<>(errOutLines);
 	}
 	/**
-	 * Returns a string of the lines output to the standard out of the underlying process after the instruction has been written to 
-	 * the standard in of the process.
+	 * Returns a string of the lines output to the standard out of the underlying process after the instruction 
+	 * has been written to the standard in of the process.
 	 * 
 	 * @return A string of the lines output to the standard out of the underlying process.
 	 */
@@ -56,8 +56,8 @@ public abstract class AbstractCommand implements Command {
 		return String.join("\n", stdOutLines);
 	}
 	/**
-	 * Returns a string of the lines output to the error out of the underlying process after the instruction has been written to 
-	 * the standard in of the process.
+	 * Returns a string of the lines output to the error out of the underlying process after the instruction has 
+	 * been written to the standard in of the process.
 	 * 
 	 * @return A string of the lines output to the error out of the underlying process.
 	 */
@@ -65,8 +65,8 @@ public abstract class AbstractCommand implements Command {
 		return String.join("\n", errOutLines);
 	}
 	/**
-	 * Clears the lists holding the lines output to the out streams of the underlying process. Recommended in case the 
-	 * {@link net.viktorc.pp4j.api.Command} instance is reused.
+	 * Clears the lists holding the lines output to the out streams of the underlying process. Recommended in case 
+	 * the {@link net.viktorc.pp4j.api.Command} instance is reused.
 	 */
 	public void reset() {
 		stdOutLines.clear();
