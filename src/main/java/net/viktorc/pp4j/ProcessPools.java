@@ -81,8 +81,7 @@ public class ProcessPools {
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
 	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>
-	 * 0</code> 
-	 * or less, the life-cycle of the processes will not be limited.
+	 * 0</code> or less, the life-cycle of the processes will not be limited.
 	 * @return A pool of process executors each hosting a process.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the processes to start up.
 	 */
