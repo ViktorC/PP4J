@@ -26,6 +26,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
@@ -530,20 +531,21 @@ public class StandardProcessPool implements ProcessPool {
 		
 		final ProcessManager manager;
 		final KeepAliveTimer timer;
-		final Semaphore termSemaphore;
-		final ReentrantLock subLock;
-		final ReentrantLock stopLock;
+		final Lock submissionLock;
+		final Lock stopLock;
 		final Object runLock;
 		final Object execLock;
-		final Object threadLock;
 		final Object processLock;
+		final Object subHandlerLock;
+		final Semaphore termSemaphore;
 		Process process;
 		BufferedReader stdOutReader;
 		BufferedReader errOutReader;
 		BufferedWriter stdInWriter;
 		Thread subThread;
 		Command command;
-		boolean commandProcessed;
+		boolean onWait;
+		boolean commandCompleted;
 		boolean startedUp;
 		volatile boolean running;
 		volatile boolean stop;
@@ -556,13 +558,13 @@ public class StandardProcessPool implements ProcessPool {
 		StandardProcessExecutor() {
 			timer = doTime ? new KeepAliveTimer() : null;
 			this.manager = procManagerFactory.newProcessManager();
-			termSemaphore = new Semaphore(0);
-			subLock = new ReentrantLock();
+			submissionLock = new ReentrantLock();
 			stopLock = new ReentrantLock();
 			runLock = new Object();
 			execLock = new Object();
-			threadLock = new Object();
 			processLock = new Object();
+			subHandlerLock = new Object();
+			termSemaphore = new Semaphore(0);
 		}
 		/**
 		 * Starts listening to an out stream of the process using the specified reader.
@@ -580,9 +582,17 @@ public class StandardProcessPool implements ProcessPool {
 					// Make sure that the submission executor thread is waiting.
 					synchronized (execLock) {
 						if (startedUp) {
-							commandProcessed = command == null || command.onNewOutput(line, standard);
-							if (commandProcessed)
-								execLock.notifyAll();
+							/* Before processing a new line, make sure that the submission executor 
+							 * thread is notified that the line signaling the completion of the command 
+							 * has been processed. */
+							while (commandCompleted && onWait)
+								execLock.wait();
+							if (command != null) {
+								// Process the next line.
+								commandCompleted = command.onNewOutput(line, standard);
+								if (commandCompleted)
+									execLock.notifyAll();
+							}
 						} else {
 							startedUp = manager.isStartedUp(line, standard);
 							if (startedUp)
@@ -590,7 +600,7 @@ public class StandardProcessPool implements ProcessPool {
 						}
 					}
 				}
-			} catch (IOException e) {
+			} catch (IOException | InterruptedException e) {
 				throw new ProcessException(e);
 			} finally {
 				termSemaphore.release();
@@ -600,7 +610,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * Starts waiting on the blocking queue of submissions executing available ones one at a time.
 		 */
 		void startHandlingSubmissions() {
-			synchronized (threadLock) {
+			synchronized (subHandlerLock) {
 				subThread = Thread.currentThread();
 			}
 			try {
@@ -611,8 +621,8 @@ public class StandardProcessPool implements ProcessPool {
 						/* Wait until the startup phase is over and the mainLock is available to avoid retrieving 
 						 * a submission only to find that it cannot be executed and thus has to be put back into 
 						 * the queue. */
-						subLock.lock();
-						subLock.unlock();
+						submissionLock.lock();
+						submissionLock.unlock();
 						// Wait for an available submission.
 						submission = submissionQueue.takeFirst();
 						/* Increment the counter for active submissions to keep track of the number of busy 
@@ -661,7 +671,7 @@ public class StandardProcessPool implements ProcessPool {
 					}
 				}
 			} finally {
-				synchronized (threadLock) {
+				synchronized (subHandlerLock) {
 					subThread = null;
 				}
 				termSemaphore.release();
@@ -708,7 +718,7 @@ public class StandardProcessPool implements ProcessPool {
 		@Override
 		public boolean execute(Submission submission)
 				throws IOException, InterruptedException, CancellationException {
-			if (subLock.tryLock()) {
+			if (submissionLock.tryLock()) {
 				// Make sure that the reader thread can only process output lines if this one is ready and waiting.
 				synchronized (execLock) {
 					boolean success = false;
@@ -730,20 +740,25 @@ public class StandardProcessPool implements ProcessPool {
 							command = commands.get(i);
 							if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands)))
 								continue;
-							commandProcessed = !command.generatesOutput();
+							commandCompleted = !command.generatesOutput();
 							stdInWriter.write(command.getInstruction());
 							stdInWriter.newLine();
 							stdInWriter.flush();
-							while (running && !stop && !commandProcessed)
+							while (running && !stop && !commandCompleted) {
+								onWait = true;
 								execLock.wait();
+							}
+							// Let the readers know that the command may be considered effectively processed.
+							onWait = false;
+							execLock.notifyAll();
 							/* If the process has terminated or the ProcessExecutor has been stopped, return false 
 							 * to signal failure. */
-							if (!commandProcessed)
+							if (!commandCompleted)
 								return success;
 							if (i < commands.size() - 1)
 								processedCommands.add(command);
-							command = null;
 						}
+						command = null;
 						if (running && !stop && submission.doTerminateProcessAfterwards() &&
 								stopLock.tryLock()) {
 							try {
@@ -761,9 +776,11 @@ public class StandardProcessPool implements ProcessPool {
 								submission.onFinishedProcessing();
 						} finally {
 							command = null;
+							onWait = false;
+							execLock.notifyAll();
 							if (running && !stop && doTime)
 								timer.start();
-							subLock.unlock();
+							submissionLock.unlock();
 						}
 					}
 				}
@@ -777,7 +794,7 @@ public class StandardProcessPool implements ProcessPool {
 				int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 				long lifeTime = 0;
 				try {
-					subLock.lock();
+					submissionLock.lock();
 					boolean orderly = false;
 					try {
 						// Start the process
@@ -825,7 +842,7 @@ public class StandardProcessPool implements ProcessPool {
 							termSemaphore.release(doTime ? 4 : 3);
 							prestartLatch.countDown();
 						}
-						subLock.unlock();
+						submissionLock.unlock();
 					}
 					/* If the startup failed, the process might not be initialized. Otherwise, wait for the process 
 					 * to terminate. */
@@ -855,7 +872,7 @@ public class StandardProcessPool implements ProcessPool {
 					logger.debug(String.format("Process runtime in executor %s: %.3f", this,
 							((float) lifeTime)/1000));
 					// Make sure that there are no submission currently being executed...
-					subLock.lock();
+					submissionLock.lock();
 					try {
 						// Set running to false...
 						synchronized (execLock) {
@@ -864,7 +881,7 @@ public class StandardProcessPool implements ProcessPool {
 						}
 						/* And interrupt the submission handler thread to avoid having it stuck waiting for 
 						 * submissions forever in case the queue is empty. */
-						synchronized (threadLock) {
+						synchronized (subHandlerLock) {
 							if (subThread != null)
 								subThread.interrupt();
 						}
@@ -873,7 +890,7 @@ public class StandardProcessPool implements ProcessPool {
 						if (doTime)
 							timer.stop();
 					} finally {
-						subLock.unlock();
+						submissionLock.unlock();
 					}
 					// Wait for all the slave threads to finish.
 					try {
@@ -963,20 +980,20 @@ public class StandardProcessPool implements ProcessPool {
 							waitTime -= (System.currentTimeMillis() - start);
 						}
 						/* Normally, the timer should not be running while a submission is being processed, i.e. 
-						 * if the timer gets to this point with go set to true, subLock should be available to 
-						 * the timer thread. However, if the execute method acquires the subLock right after the 
+						 * if the timer gets to this point with go set to true, submissionLock should be available to 
+						 * the timer thread. However, if the execute method acquires the submissionLock right after the 
 						 * timer's wait time elapses, it will not be able to disable the timer until it enters 
 						 * the wait method in the next cycle and gives up its intrinsic lock. Therefore, the 
 						 * first call of the stop method of the StandardProcessExecutor would fail due to the 
 						 * lock held by the thread running the execute method, triggering the forcible shutdown 
-						 * of the process even though it is not idle. To avoid this behavior, first the subLock 
+						 * of the process even though it is not idle. To avoid this behavior, first the submissionLock 
 						 * is attempted to be acquired to ensure that the process is indeed idle. */
-						if (go && subLock.tryLock()) {
+						if (go && submissionLock.tryLock()) {
 							try {
 								if (!StandardProcessExecutor.this.stop(false))
 									StandardProcessExecutor.this.stop(true);
 							} finally {
-								subLock.unlock();
+								submissionLock.unlock();
 							}
 						}
 					}
@@ -1020,21 +1037,15 @@ public class StandardProcessPool implements ProcessPool {
 					return new DefaultPooledObject<StandardProcessExecutor>(new StandardProcessExecutor());
 				}
 				@Override
-				public void activateObject(PooledObject<StandardProcessExecutor> p) {
-					// No-operation.
-				}
+				public void activateObject(PooledObject<StandardProcessExecutor> p) { /* No-operation. */ }
 				@Override
 				public boolean validateObject(PooledObject<StandardProcessExecutor> p) {
 					return true;
 				}
 				@Override
-				public void passivateObject(PooledObject<StandardProcessExecutor> p) {
-					// No-operation
-				}
+				public void passivateObject(PooledObject<StandardProcessExecutor> p) { /* No-operation. */ }
 				@Override
-				public void destroyObject(PooledObject<StandardProcessExecutor> p) {
-					// No-operation.
-				}
+				public void destroyObject(PooledObject<StandardProcessExecutor> p) { /* No-operation. */ }
 			});
 			setBlockWhenExhausted(false);
 			setMaxTotal(maxPoolSize);
@@ -1093,11 +1104,10 @@ public class StandardProcessPool implements ProcessPool {
 	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of 
 	 * {@link net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor} instances. It utilizes an 
 	 * extension of the {@link java.util.concurrent.LinkedTransferQueue} and an implementation of the 
-	 * {@link java.util.concurrent.RejectedExecutionHandler} as per Robert Tupelo-Schneck's answer to a 
-	 * StackOverflow <a href="https://stackoverflow.com/questions/19528304/how-to-get-the-threadpoolexecutor-
-	 * to-increase-threads-to-max-before-queueing/19528305#19528305">question</a> to facilitate a queueing 
-	 * logic that has the pool first increase the number of its threads and only really queue tasks once the 
-	 * maximum pool size has been reached.
+	 * {@link java.util.concurrent.RejectedExecutionHandler} as per Robert Tupelo-Schneck's 
+	 * <a href="https://stackoverflow.com/a/24493856">answer</a> to a StackOverflow question to facilitate a 
+	 * queueing logic that has the pool first increase the number of its threads and only really queue tasks 
+	 * once the maximum pool size has been reached.
 	 * 
 	 * @author Viktor Csomor
 	 *

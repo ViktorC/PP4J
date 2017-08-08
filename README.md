@@ -56,7 +56,6 @@ __PP4J__ (Process Pool for Java) is a library that provides a pool for maintaini
 		public void onTermination(int resultCode, long lifeTime) {
 			// Don't do anything after a process has terminated.
 		}
-		
 	}, 10, 50, 5, 60000, true);
 
 In the example above, a *StandardProcessPoolExecutor* for a program called "test.exe" is created. Every time the pool starts a new process, it waits until the message "hi" is output to the process' standard out, signaling that it has started up, then the pool sends the instruction "start" to the process' standard in. The instruction "start" has the process sleep for 1 second before it outputs "ok". Once this message is output to the process' standard out, the pool considers the process ready for submissions. Whenever the process needs to be terminated (either due to timing out or having it cancelled after the execution of a submission), the pool tries to terminate the process in an orderly way by sending it the "stop" instruction. If the response to this is "bye", the process is considered terminated. However, if something is printed to the process' error out in response to the "stop" instruction, the process is killed forcibly. The pool's minimum size is 10, its maximum size is 50, its reserve size is 5, its idle processes are terminated after 1 minute, and it is verbose (meaning that all events related to the management of the pool are logged using [SLF4J](https://www.slf4j.org/)).
