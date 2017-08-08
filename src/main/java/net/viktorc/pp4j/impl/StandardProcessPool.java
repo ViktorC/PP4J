@@ -628,7 +628,7 @@ public class StandardProcessPool implements ProcessPool {
 						 * terminating the process) or that the process is already terminated, and thus the 
 						 * execute method fails. In this case, the submission is put back into the queue. */
 						if (execute(submission)) {
-							logger.info(String.format("Submission %s processed; delay: %.3f;" +
+							logger.info(String.format("Submission %s processed; delay: %.3f; " +
 									"execution time: %.3f.%n%s", submission, (float) ((double)
 									(submission.submittedTime - submission.receivedTime)/1000000000),
 									(float) ((double) (submission.processedTime -
