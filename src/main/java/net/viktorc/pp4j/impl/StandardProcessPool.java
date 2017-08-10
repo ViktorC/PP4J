@@ -75,15 +75,15 @@ public class StandardProcessPool implements ProcessPool {
 	private final int maxPoolSize;
 	private final int reserveSize;
 	private final boolean verbose;
-	private final Logger logger;
-	private final ExecutorService procExecutorThreadPool;
+	private final StandardProcessPoolExecutor procExecutorThreadPool;
 	private final ExecutorService auxThreadPool;
-	private final Queue<StandardProcessExecutor> activeProcExecutors;
 	private final StandardProcessExecutorObjectPool procExecutorPool;
+	private final Queue<StandardProcessExecutor> activeProcExecutors;
 	private final LinkedBlockingDeque<InternalSubmission> submissionQueue;
 	private final AtomicInteger numOfActiveSubmissions;
 	private final CountDownLatch prestartLatch;
 	private final Object poolLock;
+	private final Logger logger;
 	private volatile boolean close;
 
 	/**
@@ -125,7 +125,6 @@ public class StandardProcessPool implements ProcessPool {
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
 		this.verbose = verbose;
-		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 		procExecutorThreadPool = new StandardProcessPoolExecutor();
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		/* One process requires minimum 3 auxiliary threads (std_out listener, err_out listener, 
@@ -133,12 +132,13 @@ public class StandardProcessPool implements ProcessPool {
 		auxThreadPool = new ThreadPoolExecutor(3*actualMinSize, Integer.MAX_VALUE, EVICT_TIME,
 				TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
 				new CustomizedThreadFactory(this + "-auxThreadPool"));
-		activeProcExecutors = new LinkedBlockingQueue<>();
 		procExecutorPool = new StandardProcessExecutorObjectPool();
 		submissionQueue = new LinkedBlockingDeque<>();
+		activeProcExecutors = new LinkedBlockingQueue<>();
 		numOfActiveSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
 		poolLock = new Object();
+		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 		for (int i = 0; i < actualMinSize && !close; i++) {
 			synchronized (poolLock) {
 				startNewProcess(null);
