@@ -21,22 +21,22 @@ public interface ProcessManager {
 	 */
 	Process start() throws IOException;
 	/**
-	 * A method that denotes whether the process should be considered started up instantly or if it is only 
-	 * started up once a certain output has been printed to one of its out streams. If it returns true, the 
-	 * process is instantly considered started up and ready as soon as it is running, and the method 
-	 * {@link #onStartup(ProcessExecutor)} is executed. If it returns false, the method 
-	 * {@link #isStartedUp(String, boolean)} determines when the process is considered started up.
+	 * Determines the duration of continuous idleness after which the process is to be terminated. The process 
+	 * is considered idle if it is started up and not processing any submission. If it returns <code>0</code> 
+	 * or less, the life span of the process is not limited.
 	 * 
-	 * @return Whether the process instantly start up as soon as it is run or if it is started up and ready 
-	 * only when a certain output has been written to one of its output streams.
+	 * @return The number of milliseconds of idleness after which the process is to be terminated.
 	 */
-	boolean startsUpInstantly();
+	long getKeepAliveTime();
 	/**
 	 * Handles the output of the underlying process after it has been started. The return value of the method 
 	 * determines whether the process is to be considered started up and ready for the execution of the method 
-	 * {@link #onStartup(ProcessExecutor)}. It is only ever called if {@link #startsUpInstantly()} returns false.
+	 * {@link #onStartup(ProcessExecutor)}. This method is first called with a <code>null</code> parameter as the 
+	 * <code>outputLine</code> before the process is actually started; if it returns <code>true</code> in 
+	 * response, the process is assumed to be instantly ready for the {@link #onStartup(ProcessExecutor)} 
+	 * method after it is started. In no other circumstance is the <code>outputLine</code> <code>null</code>.  
 	 * 
-	 * @param outputLine A line of output produced by the process.
+	 * @param outputLine At first <code>null</code> then a line of output produced by the process.
 	 * @param standard Whether this line has been output to the standard out or to the error out.
 	 * @return Whether the process is to be considered started up.
 	 */
@@ -55,19 +55,16 @@ public interface ProcessManager {
 	/**
 	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
 	 * close resources or to exit the process in an orderly way. The return value of the method denotes 
-	 * whether the process was successfully terminated. If orderly termination fails, the process is 
-	 * killed forcibly. The <code>executor</code> might not be available or ready for processing submissions 
-	 * within this call back, thus its {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} method 
-	 * might return <code>false</code>. In this case, it is recommended to have this method return <code>
-	 * false</code> as well to have the process killed.
+	 * whether the process was successfully terminated. If orderly termination fails or for any other reason 
+	 * this method returns <code>false</code>, the process is killed forcibly. If the return value is <code>
+	 * true</code>, the process is considered successfully terminated.
 	 * 
 	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process to terminate it in an orderly 
 	 * way.
-	 * @return Whether the process has been successfully terminated. If it is <code>false</code> the process 
-	 * is killed forcibly.
+	 * @return Whether the process has been successfully terminated.
 	 */
-	boolean terminate(ProcessExecutor executor);
+	boolean terminateGracefully(ProcessExecutor executor);
 	/**
 	 * A method called right after the process terminates. Its main purpose is to allow for wrap-up 
 	 * activities.

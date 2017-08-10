@@ -19,6 +19,21 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	private final Consumer<ProcessExecutor> onStartup;
 	
 	/**
+	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with the 
+	 * specified maximum life span.
+	 * 
+	 * @param builder The instance to build the processes with.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 
+	 * <code>0</code> or less, the life span of the process will not be limited.
+	 * @param onStartup A consumer that is called after the process started up to allow for the execution 
+	 * of commands to 'prepare' the process for the pool.
+	 */
+	public SimpleProcessManager(ProcessBuilder builder, long keepAliveTime,
+			Consumer<ProcessExecutor> onStartup) {
+		super(builder, keepAliveTime);
+		this.onStartup = onStartup;
+	}
+	/**
 	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder}.
 	 * 
 	 * @param builder The instance to build the processes with.
@@ -26,12 +41,8 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	 * of commands to 'prepare' the process for the pool.
 	 */
 	public SimpleProcessManager(ProcessBuilder builder, Consumer<ProcessExecutor> onStartup) {
-		super(builder);
+		super(builder, 0);
 		this.onStartup = onStartup;
-	}
-	@Override
-	public boolean startsUpInstantly() {
-		return true;
 	}
 	@Override
 	public boolean isStartedUp(String outputLine, boolean standard) {
@@ -42,12 +53,10 @@ public class SimpleProcessManager extends AbstractProcessManager {
 		onStartup.accept(executor);
 	}
 	@Override
-	public boolean terminate(ProcessExecutor executor) {
+	public boolean terminateGracefully(ProcessExecutor executor) {
 		return false;
 	}
 	@Override
-	public void onTermination(int resultCode, long lifeTime) {
-		// Don't do anything.
-	}
+	public void onTermination(int resultCode, long lifeTime) { /* Don't do anything. */ }
 
 }

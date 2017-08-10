@@ -65,23 +65,16 @@ import net.viktorc.pp4j.api.Submission;
 public class StandardProcessPool implements ProcessPool {
 	
 	/**
-	 * If a process cannot be started or an exception occurs which would make it impossible to retrieve the actual 
-	 * return code of the process.
+	 * The number of milliseconds after which idle process executor instances and process executor threads are 
+	 * evicted from the object pool and the thread pool respectively.
 	 */
-	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -1;
-	/**
-	 * The number of milliseconds after which idle process executor instances and the process executor threads are 
-	 * evicted if {@link #keepAliveTime} is non-positive.
-	 */
-	private static final long DEFAULT_EVICT_TIME = 60L*1000;
+	private static final long EVICT_TIME = 60L*1000;
 	
 	private final ProcessManagerFactory procManagerFactory;
 	private final int minPoolSize;
 	private final int maxPoolSize;
 	private final int reserveSize;
-	private final long keepAliveTime;
 	private final boolean verbose;
-	private final boolean doTime;
 	private final Logger logger;
 	private final ExecutorService procExecutorThreadPool;
 	private final ExecutorService auxThreadPool;
@@ -105,8 +98,6 @@ public class StandardProcessPool implements ProcessPool {
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
-	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 0 or 
-	 * less, the life-cycle of the processes will not be limited.
 	 * @param verbose Whether the events related to the management of the process pool should be logged. Setting 
 	 * this parameter to <code>true</code> does not guarantee that logging will be performed as logging depends on 
 	 * the SLF4J binding and the logging configurations, but setting it to <code>false</code> guarantees that no 
@@ -118,7 +109,7 @@ public class StandardProcessPool implements ProcessPool {
 	 * than the maximum pool size.
 	 */
 	public StandardProcessPool(ProcessManagerFactory procManagerFactory, int minPoolSize, int maxPoolSize,
-			int reserveSize, long keepAliveTime, boolean verbose) throws InterruptedException {
+			int reserveSize, boolean verbose) throws InterruptedException {
 		if (procManagerFactory == null)
 			throw new IllegalArgumentException("The process manager factory cannot be null.");
 		if (minPoolSize < 0)
@@ -133,16 +124,14 @@ public class StandardProcessPool implements ProcessPool {
 		this.minPoolSize = minPoolSize;
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
-		this.keepAliveTime = Math.max(0, keepAliveTime);
 		this.verbose = verbose;
-		doTime = keepAliveTime > 0;
 		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 		procExecutorThreadPool = new StandardProcessPoolExecutor();
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
-		/* If keepAliveTime is positive, one process requires 4 auxiliary threads (std_out listener, err_out 
-		 * listener, submission handler, timer); if it is not, only 3 are required. */
-		auxThreadPool = new ThreadPoolExecutor(doTime ? 4*actualMinSize : 3*actualMinSize, Integer.MAX_VALUE,
-				doTime ? keepAliveTime : DEFAULT_EVICT_TIME, TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
+		/* One process requires minimum 3 auxiliary threads (std_out listener, err_out listener, 
+		 * submission handler); 4 if keepAliveTime is positive (one more for timing). */
+		auxThreadPool = new ThreadPoolExecutor(3*actualMinSize, Integer.MAX_VALUE, EVICT_TIME,
+				TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
 				new CustomizedThreadFactory(this + "-auxThreadPool"));
 		activeProcExecutors = new LinkedBlockingQueue<>();
 		procExecutorPool = new StandardProcessExecutorObjectPool();
@@ -182,15 +171,6 @@ public class StandardProcessPool implements ProcessPool {
 	 */
 	public int getReserveSize() {
 		return reserveSize;
-	}
-	/**
-	 * Returns the number of milliseconds after which idle processes should be terminated. If it is 0 or less, 
-	 * the processes are never terminated due to a timeout.
-	 * 
-	 * @return The number of milliseconds after which idle processes should be terminated.
-	 */
-	public long getKeepAliveTime() {
-		return keepAliveTime;
 	}
 	/**
 	 * Returns whether events relating to the management of the processes held by the pool are logged to the 
@@ -529,8 +509,13 @@ public class StandardProcessPool implements ProcessPool {
 	 */
 	private class StandardProcessExecutor implements ProcessExecutor, Runnable {
 		
+		/**
+		 * If a process cannot be started or an exception occurs which would make it impossible to retrieve the 
+		 * actual return code of the process.
+		 */
+		public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -1;
+		
 		final ProcessManager manager;
-		final KeepAliveTimer timer;
 		final Lock submissionLock;
 		final Lock stopLock;
 		final Object runLock;
@@ -539,11 +524,14 @@ public class StandardProcessPool implements ProcessPool {
 		final Object subHandlerLock;
 		final Semaphore termSemaphore;
 		Process process;
+		KeepAliveTimer timer;
 		BufferedReader stdOutReader;
 		BufferedReader errOutReader;
 		BufferedWriter stdInWriter;
 		Thread subThread;
 		Command command;
+		long keepAliveTime;
+		boolean doTime;
 		boolean onWait;
 		boolean commandCompleted;
 		boolean startedUp;
@@ -556,8 +544,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * is terminated once it times out if <code>keepAliveTime</code> is greater than 0.
 		 */
 		StandardProcessExecutor() {
-			timer = doTime ? new KeepAliveTimer() : null;
-			this.manager = procManagerFactory.newProcessManager();
+			manager = procManagerFactory.newProcessManager();
 			submissionLock = new ReentrantLock();
 			stopLock = new ReentrantLock();
 			runLock = new Object();
@@ -683,7 +670,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * again.
 		 * 
 		 * @param forcibly Whether the process should be killed forcibly or using the 
-		 * {@link net.viktorc.pp4j.api.ProcessManager#terminate(ProcessExecutor)} method of the 
+		 * {@link net.viktorc.pp4j.api.ProcessManager#terminateGracefully(ProcessExecutor)} method of the 
 		 * {@link net.viktorc.pp4j.api.ProcessManager} instance assigned to the executor. The latter might be 
 		 * ineffective if the process is currently executing a command or has not started up.
 		 * @return Whether the process was successfully terminated.
@@ -697,7 +684,7 @@ public class StandardProcessPool implements ProcessPool {
 					boolean success = true;
 					if (running) {
 						if (!forcibly)
-							success = manager.terminate(this);
+							success = manager.terminateGracefully(this);
 						else {
 							synchronized (processLock) {
 								if (process != null)
@@ -803,6 +790,9 @@ public class StandardProcessPool implements ProcessPool {
 								return;
 							running = true;
 							command = null;
+							keepAliveTime = manager.getKeepAliveTime();
+							doTime = keepAliveTime > 0;
+							timer = doTime && timer == null ? new KeepAliveTimer() : timer;
 							// Start the process.
 							synchronized (processLock) {
 								process = manager.start();
@@ -811,8 +801,8 @@ public class StandardProcessPool implements ProcessPool {
 							stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 							errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 							stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
-							// Handle the startup.
-							startedUp = manager.startsUpInstantly();
+							// Handle the startup; check if the process is to be considered immediately started up.
+							startedUp = manager.isStartedUp(null, true);
 							auxThreadPool.submit(() -> startListeningToProcess(stdOutReader, true));
 							auxThreadPool.submit(() -> startListeningToProcess(errOutReader, false));
 							while (!startedUp) {
@@ -1026,7 +1016,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * available objects, it accommodates <code>maxPoolSize</code> objects, and if there are more than 
 		 * <code>Math.max(minPoolSize, reserveSize)</code> idle objects in the pool, excess idle objects are 
 		 * eligible for eviction after <code>keepAliveTime</code> milliseconds, or if it is non-positive, after 
-		 * <code>DEFAULT_EVICT_TIME</code> milliseconds. The eviction thread runs at the above specified 
+		 * <code>EVICT_TIME</code> milliseconds. The eviction thread runs at the above specified 
 		 * intervals and performs at most <code>maxPoolSize - minPoolSize</code> evictions per run.
 		 */
 		StandardProcessExecutorObjectPool() {
@@ -1050,7 +1040,7 @@ public class StandardProcessPool implements ProcessPool {
 			setBlockWhenExhausted(false);
 			setMaxTotal(maxPoolSize);
 			setMaxIdle(Math.max(minPoolSize, reserveSize));
-			long evictTime = doTime ? keepAliveTime : DEFAULT_EVICT_TIME;
+			long evictTime = EVICT_TIME;
 			setTimeBetweenEvictionRunsMillis(evictTime);
 			setSoftMinEvictableIdleTimeMillis(evictTime);
 			setNumTestsPerEvictionRun(maxPoolSize - minPoolSize);
@@ -1118,11 +1108,11 @@ public class StandardProcessPool implements ProcessPool {
 		 * Constructs thread pool for the execution of {@link net.viktorc.pp4j.StandardProcessExecutor} 
 		 * instances. If there are more than <code>Math.max(minPoolSize, reserveSize)</code> idle threads in 
 		 * the pool, excess threads are evicted after <code>keepAliveTime</code> milliseconds, or if it is 
-		 * non-positive, after <code>DEFAULT_EVICT_TIME</code> milliseconds.
+		 * non-positive, after <code>EVICT_TIME</code> milliseconds.
 		 */
 		StandardProcessPoolExecutor() {
-			super(Math.max(minPoolSize, reserveSize), maxPoolSize, doTime ? keepAliveTime : DEFAULT_EVICT_TIME,
-					TimeUnit.MILLISECONDS, new LinkedTransferQueue<Runnable>() {
+			super(Math.max(minPoolSize, reserveSize), maxPoolSize, EVICT_TIME, TimeUnit.MILLISECONDS,
+					new LinkedTransferQueue<Runnable>() {
 				
 						private static final long serialVersionUID = 1L;
 
