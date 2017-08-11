@@ -526,7 +526,7 @@ public class StandardProcessPool implements ProcessPool {
 		Process process;
 		KeepAliveTimer timer;
 		BufferedReader stdOutReader;
-		BufferedReader errOutReader;
+		BufferedReader stdErrReader;
 		BufferedWriter stdInWriter;
 		Thread subThread;
 		Command command;
@@ -557,7 +557,7 @@ public class StandardProcessPool implements ProcessPool {
 		 * Starts listening to an out stream of the process using the specified reader.
 		 * 
 		 * @param reader The buffered reader to use to listen to the steam.
-		 * @param standard Whether it is the standard out or the error out stream of the process.
+		 * @param standard Whether it is the standard out or the standard error stream of the process.
 		 */
 		void startListeningToProcess(BufferedReader reader, boolean standard) {
 			try {
@@ -799,12 +799,12 @@ public class StandardProcessPool implements ProcessPool {
 							}
 							lifeTime = System.currentTimeMillis();
 							stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-							errOutReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+							stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 							stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 							// Handle the startup; check if the process is to be considered immediately started up.
 							startedUp = manager.isStartedUp(null, true);
 							auxThreadPool.submit(() -> startListeningToProcess(stdOutReader, true));
-							auxThreadPool.submit(() -> startListeningToProcess(errOutReader, false));
+							auxThreadPool.submit(() -> startListeningToProcess(stdErrReader, false));
 							while (!startedUp) {
 								execLock.wait();
 								if (stop)
@@ -896,9 +896,9 @@ public class StandardProcessPool implements ProcessPool {
 							// Ignore it.
 						}
 					}
-					if (errOutReader != null) {
+					if (stdErrReader != null) {
 						try {
-							errOutReader.close();
+							stdErrReader.close();
 						} catch (IOException e) {
 							// Ignore it.
 						}

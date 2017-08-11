@@ -227,10 +227,10 @@ public class PPE4JTest {
 								if ("ready".equals(o)) {
 									// Output line caching check.
 									assert c.getStandardOutLines().size() == procTime &&
-											c.getErrorOutLines().size() == 0 :
+											c.getStandardErrLines().size() == 0 :
 											"Unexpected numbers of output lines: " +
 											c.getStandardOutLines().size() + " instead of " +
-											procTime + " and " + c.getErrorOutLines().size() + 
+											procTime + " and " + c.getStandardErrLines().size() + 
 											" instead of " + 0 + ".";
 									String expectedStdOutput = Arrays.stream(new String[procTime - 1])
 											.map(s -> "in progress").reduce("", (s1, s2) -> (s1 +
@@ -239,10 +239,10 @@ public class PPE4JTest {
 											"Wrongly captured standard output. Expected: \"" +
 											expectedStdOutput + "\"" + System.lineSeparator() +
 											"Actual: \"" + c.getJointStandardOutLines() + "\"";
-									assert "".equals(c.getJointErrorOutLines()) : "Wrongly " +
+									assert "".equals(c.getJointStandardErrLines()) : "Wrongly " +
 											"captured error output. Expected: \"\"" + System
 											.lineSeparator() + "Actual: \"" + c
-											.getJointErrorOutLines() + "\"";
+											.getJointStandardErrLines() + "\"";
 									c.reset();
 									return true;
 								}

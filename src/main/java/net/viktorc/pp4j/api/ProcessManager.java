@@ -37,7 +37,7 @@ public interface ProcessManager {
 	 * method after it is started. In no other circumstance is the <code>outputLine</code> <code>null</code>.  
 	 * 
 	 * @param outputLine At first <code>null</code> then a line of output produced by the process.
-	 * @param standard Whether this line has been output to the standard out or to the error out.
+	 * @param standard Whether this line has been output to the standard out or the standard error stream.
 	 * @return Whether the process is to be considered started up.
 	 */
 	boolean isStartedUp(String outputLine, boolean standard);

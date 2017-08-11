@@ -25,8 +25,8 @@ public class SimpleCommand extends AbstractCommand {
 	 * @param instruction The instruction to write to the process' standard in.
 	 * @param onStandardOutput The predicate that allows for the processing of the process' standard output in 
 	 * response to the command and determines when the command is to be considered processed by returning true.
-	 * @param onErrorOutput The predicate that allows for the processing of the process' error output in response 
-	 * to the command and determines when the command is to be considered processed by returning true.
+	 * @param onErrorOutput The predicate that allows for the processing of the process' standard error output 
+	 * in response to the command and determines when the command is to be considered processed by returning true.
 	 */
 	public SimpleCommand(String instruction, BiPredicate<SimpleCommand,String> onStandardOutput,
 			BiPredicate<SimpleCommand,String> onErrorOutput) {
