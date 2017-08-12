@@ -657,6 +657,12 @@ public class PPE4JTest {
 			return new AbstractProcessManager(new ProcessBuilder(programLocation), keepAliveTime) {
 				
 				@Override
+				public boolean startsUpInstantly() {
+					if (throwStartupException)
+						throw new ProcessException("Test startup exception.");
+					return !verifyStartup;
+				}
+				@Override
 				public boolean isStartedUp(String output, boolean standard) {
 					if (throwStartupException)
 						throw new ProcessException("Test startup exception.");

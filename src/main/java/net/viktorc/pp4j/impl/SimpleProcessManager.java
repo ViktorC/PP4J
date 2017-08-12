@@ -45,6 +45,10 @@ public class SimpleProcessManager extends AbstractProcessManager {
 		this.onStartup = onStartup;
 	}
 	@Override
+	public boolean startsUpInstantly() {
+		return true;
+	}
+	@Override
 	public boolean isStartedUp(String outputLine, boolean standard) {
 		return true;
 	}

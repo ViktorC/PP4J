@@ -802,7 +802,7 @@ public class StandardProcessPool implements ProcessPool {
 							stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 							stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 							// Handle the startup; check if the process is to be considered immediately started up.
-							startedUp = manager.isStartedUp(null, true);
+							startedUp = manager.startsUpInstantly();
 							auxThreadPool.submit(() -> startListeningToProcess(stdOutReader, true));
 							auxThreadPool.submit(() -> startListeningToProcess(stdErrReader, false));
 							while (!startedUp) {
