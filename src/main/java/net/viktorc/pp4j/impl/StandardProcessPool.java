@@ -215,7 +215,7 @@ public class StandardProcessPool implements ProcessPool {
 				numOfActiveSubmissions.get() + "; queued submission: " + submissionQueue.size();
 	}
 	/**
-	 * Returns whether a new process {@link net.viktorc.pp4j.StandardProcessExecutor} instance should be started.
+	 * Returns whether a new {@link StandardProcessExecutor} instance should be started.
 	 * 
 	 * @return Whether the process pool should be extended.
 	 */
@@ -224,11 +224,10 @@ public class StandardProcessPool implements ProcessPool {
 				Math.min(maxPoolSize, numOfActiveSubmissions.get() + submissionQueue.size() + reserveSize)));
 	}
 	/**
-	 * Starts a new process by executing the provided {@link net.viktorc.pp4j.StandardProcessExecutor}. If it is 
-	 * null, it borrows an instance from the pool.
+	 * Starts a new process by executing the provided {@link StandardProcessExecutor}. If it is null, it borrows 
+	 * an instance from the pool.
 	 * 
-	 * @param executor An optional {@link net.viktorc.pp4j.StandardProcessExecutor} instance to re-start in case 
-	 * one is available.
+	 * @param executor An optional {@link StandardProcessExecutor} instance to re-start in case one is available.
 	 * @return Whether the process was successfully started.
 	 */
 	private boolean startNewProcess(StandardProcessExecutor executor) {
@@ -303,7 +302,7 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	
 	/**
-	 * An implementation of the {@link net.viktorc.pp4j.InternalSubmission} interface to keep track of the number 
+	 * An implementation of the {@link net.viktorc.pp4j.api.Submission} interface to keep track of the number 
 	 * of commands being executed at a time and to establish a mechanism for cancelling submitted commands via the 
 	 * {@link java.util.concurrent.Future} returned by the 
 	 * {@link net.viktorc.pp4j.impl.StandardProcessPool#submit(Submission)} method.
@@ -1003,7 +1002,7 @@ public class StandardProcessPool implements ProcessPool {
 	
 	/**
 	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of 
-	 * {@link net.viktorc.pp4j.StandardProcessExecutor} instances.
+	 * {@link net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor} instances.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -1012,12 +1011,12 @@ public class StandardProcessPool implements ProcessPool {
 
 		/**
 		 * Constructs an object pool instance to facilitate the reuse of 
-		 * {@link net.viktorc.pp4j.StandardProcessExecutor} instances. The pool does not block if there are no 
-		 * available objects, it accommodates <code>maxPoolSize</code> objects, and if there are more than 
-		 * <code>Math.max(minPoolSize, reserveSize)</code> idle objects in the pool, excess idle objects are 
-		 * eligible for eviction after <code>keepAliveTime</code> milliseconds, or if it is non-positive, after 
-		 * <code>EVICT_TIME</code> milliseconds. The eviction thread runs at the above specified 
-		 * intervals and performs at most <code>maxPoolSize - minPoolSize</code> evictions per run.
+		 * {@link net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor} instances. The pool 
+		 * does not block if there are no available objects, it accommodates <code>maxPoolSize</code> 
+		 * objects, and if there are more than <code>Math.max(minPoolSize, reserveSize)</code> idle objects 
+		 * in the pool, excess idle objects are eligible for eviction after <code>EVICT_TIME</code> 
+		 * milliseconds. The eviction thread runs at the above specified intervals and performs at most 
+		 * <code>maxPoolSize - Math.max(minPoolSize, reserveSize)</code> evictions per run.
 		 */
 		StandardProcessExecutorObjectPool() {
 			super(new PooledObjectFactory<StandardProcessExecutor>() {
@@ -1043,7 +1042,7 @@ public class StandardProcessPool implements ProcessPool {
 			long evictTime = EVICT_TIME;
 			setTimeBetweenEvictionRunsMillis(evictTime);
 			setSoftMinEvictableIdleTimeMillis(evictTime);
-			setNumTestsPerEvictionRun(maxPoolSize - minPoolSize);
+			setNumTestsPerEvictionRun(maxPoolSize - Math.max(maxPoolSize, reserveSize));
 		}
 		
 	}
@@ -1105,10 +1104,10 @@ public class StandardProcessPool implements ProcessPool {
 	private class StandardProcessPoolExecutor extends ThreadPoolExecutor {
 		
 		/**
-		 * Constructs thread pool for the execution of {@link net.viktorc.pp4j.StandardProcessExecutor} 
-		 * instances. If there are more than <code>Math.max(minPoolSize, reserveSize)</code> idle threads in 
-		 * the pool, excess threads are evicted after <code>keepAliveTime</code> milliseconds, or if it is 
-		 * non-positive, after <code>EVICT_TIME</code> milliseconds.
+		 * Constructs thread pool for the execution of 
+		 * {@link net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor} instances. If there are 
+		 * more than <code>Math.max(minPoolSize, reserveSize)</code> idle threads in the pool, excess threads 
+		 * are evicted after <code>EVICT_TIME</code> milliseconds.
 		 */
 		StandardProcessPoolExecutor() {
 			super(Math.max(minPoolSize, reserveSize), maxPoolSize, EVICT_TIME, TimeUnit.MILLISECONDS,
