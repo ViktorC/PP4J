@@ -9,6 +9,7 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -79,7 +80,7 @@ public class StandardProcessPool implements ProcessPool {
 	private final ExecutorService auxThreadPool;
 	private final StandardProcessExecutorObjectPool procExecutorPool;
 	private final Queue<StandardProcessExecutor> activeProcExecutors;
-	private final LinkedBlockingDeque<InternalSubmission> submissionQueue;
+	private final BlockingDeque<InternalSubmission> submissionQueue;
 	private final AtomicInteger numOfActiveSubmissions;
 	private final CountDownLatch prestartLatch;
 	private final Object poolLock;
@@ -1051,8 +1052,8 @@ public class StandardProcessPool implements ProcessPool {
 	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that provides more descriptive 
 	 * thread  names and extends the {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by 
 	 * logging the uncaught exceptions if the enclosing {@link net.viktorc.pp4j.impl.StandardProcessPool} 
-	 * instance is verbose. It also attempts to shut down the enclosing pool if a 
-	 * {@link net.viktorc.pp4j.impl.ProcessException} is thrown in one of the threads it created.
+	 * instance is verbose. It also attempts to shut down the enclosing pool if an exception is thrown in one of 
+	 * the threads it created.
 	 * 
 	 * @author Viktor Csomor
 	 *
