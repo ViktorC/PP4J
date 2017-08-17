@@ -1,6 +1,7 @@
 package net.viktorc.pp4j.impl.jp;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -48,6 +49,25 @@ class RunnableJavaSubmission implements Submission {
 		if (error != null)
 			throw new ExecutionException(error);
 		return null;
+	}
+	
+	class SerializableRunnableJavaTask implements Serializable, Runnable {
+
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -1059186698337790761L;
+
+		private Runnable runnable;
+		
+		SerializableRunnableJavaTask(Runnable runnable) {
+			this.runnable = runnable;
+		}
+		@Override
+		public void run() {
+			runnable.run();
+		}
+
 	}
 	
 }

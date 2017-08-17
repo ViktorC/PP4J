@@ -52,9 +52,9 @@ public class JavaProcessManager extends SimpleProcessManager {
 		if (options != null) {
 			JVMArch arch = options.getArch();
 			JVMType type = options.getType();
-			Integer initHeap = options.getInitHeapSize();
-			Integer maxHeap = options.getMaxHeapSize();
-			Integer stack = options.getStackSize();
+			Integer initHeap = options.getInitHeapSizeMb();
+			Integer maxHeap = options.getMaxHeapSizeMb();
+			Integer stack = options.getStackSizeKb();
 			if (arch != null)
 				javaOptions.add(arch.equals(JVMArch.BIT_32) ? "-d32" : "-d64");
 			if (type != null)
@@ -64,7 +64,7 @@ public class JavaProcessManager extends SimpleProcessManager {
 			if (maxHeap != null)
 				javaOptions.add(String.format("-Xmx%dm", maxHeap));
 			if (stack != null)
-				javaOptions.add(String.format("-Xss%dm", stack));
+				javaOptions.add(String.format("-Xss%dk", stack));
 		}
 		List<String> args = new ArrayList<>();
 		args.add(javaPath);
