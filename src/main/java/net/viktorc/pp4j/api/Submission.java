@@ -1,6 +1,7 @@
 package net.viktorc.pp4j.api;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 /**
  * An interface that defines methods necessary for the submission and execution commands in 
@@ -24,6 +25,14 @@ public interface Submission {
 	 * @return Whether the process should be terminated after the execution of the commands.
 	 */
 	boolean doTerminateProcessAfterwards();
+	/**
+	 * Returns the result of the submission. By default, it returns null.
+	 * 
+	 * @return The object representing the result of the submission or null if no result is associated with 
+	 * the submission.
+	 * @throws ExecutionException if an error occurred while executing the submission.
+	 */
+	default Object getResult() throws ExecutionException { return null; }
 	/**
 	 * A method that is executed once the processing of the submitted commands has begun.
 	 */

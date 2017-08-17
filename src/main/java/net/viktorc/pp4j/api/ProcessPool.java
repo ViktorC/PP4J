@@ -27,7 +27,7 @@ public interface ProcessPool {
 	 * 
 	 * @param submission The submission to execute.
 	 * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of 
-	 * the execution or the cancellation thereof.
+	 * the execution, the cancellation thereof, or the retrieval of its optional result.
 	 */
 	Future<?> submit(Submission submission);
 	/**
