@@ -17,7 +17,7 @@ import net.viktorc.pp4j.api.Submission;
  * @author Viktor Csomor
  *
  */
-public class SimpleSubmission implements Submission {
+public class SimpleSubmission implements Submission<Object> {
 
 	private final List<Command> commands;
 	private final boolean terminateProcessAfterwards;

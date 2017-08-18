@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * An interface that defines methods that provide a textual command instruction and allow for the processing of the 
  * outputs of the process in response to the instruction. Besides possible processing activities, the 
- * {@link #onNewOutput(String, boolean)} method is also responsible for determining when the process finished 
+ * {@link #isProcessed(String, boolean)} method is also responsible for determining when the process finished 
  * processing the command. E.g. if a process takes the command "go" which triggers the execution of a long-running 
  * task, and it prints "ready" to its standard out stream once the task is completed, the method should only return 
  * true if the output "ready" has been written to the standard out, in any other case, it should return false 
@@ -39,7 +39,7 @@ public interface Command {
 	 * A method called before the printing of the instruction of the process' standard in. It denotes whether the 
 	 * command is expected to generate output from the process. If it returns false, the command is considered 
 	 * processed as soon as it is written to the process' standard in and therefore the process is considered 
-	 * ready for new commands right away. If it returns true, the {@link #onNewOutput(String, boolean)} method 
+	 * ready for new commands right away. If it returns true, the {@link #isProcessed(String, boolean)} method 
 	 * determines when the command is deemed processed.
 	 * 
 	 * @return Whether the command is expected to generate output from the process to which it is sent.
@@ -55,6 +55,6 @@ public interface Command {
 	 * {@link net.viktorc.pp4j.api.ProcessExecutor} instance executing the command will not accept new commands 
 	 * until the processing of the command is completed.
 	 */
-	boolean onNewOutput(String outputLine, boolean standard);
+	boolean isProcessed(String outputLine, boolean standard);
 	
 }

@@ -12,8 +12,10 @@ import java.util.Queue;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.LinkedTransferQueue;
@@ -23,9 +25,11 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
@@ -67,21 +71,21 @@ public class StandardProcessPool implements ProcessPool {
 	 */
 	protected static final long EVICT_TIME = 60L*1000;
 	
-	protected final ProcessManagerFactory procManagerFactory;
-	protected final int minPoolSize;
-	protected final int maxPoolSize;
-	protected final int reserveSize;
-	protected final boolean verbose;
-	protected final StandardProcessPoolExecutor procExecutorThreadPool;
-	protected final ExecutorService auxThreadPool;
-	protected final StandardProcessExecutorObjectPool procExecutorPool;
-	protected final Queue<StandardProcessExecutor> activeProcExecutors;
-	protected final BlockingDeque<InternalSubmission> submissionQueue;
-	protected final AtomicInteger numOfActiveSubmissions;
-	protected final CountDownLatch prestartLatch;
-	protected final Object poolLock;
-	protected final Logger logger;
-	protected volatile boolean close;
+	private final ProcessManagerFactory procManagerFactory;
+	private final int minPoolSize;
+	private final int maxPoolSize;
+	private final int reserveSize;
+	private final boolean verbose;
+	private final StandardProcessPoolExecutor procExecutorThreadPool;
+	private final ExecutorService auxThreadPool;
+	private final StandardProcessExecutorObjectPool procExecutorPool;
+	private final Queue<StandardProcessExecutor> activeProcExecutors;
+	private final BlockingDeque<InternalSubmission<?>> submissionQueue;
+	private final AtomicInteger numOfActiveSubmissions;
+	private final CountDownLatch prestartLatch;
+	private final Object poolLock;
+	private final Logger logger;
+	private volatile boolean close;
 
 	/**
 	 * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size 
@@ -203,6 +207,22 @@ public class StandardProcessPool implements ProcessPool {
 		return submissionQueue.size();
 	}
 	/**
+	 * Returns whether the shutdown of the pool has been initiated.
+	 * 
+	 * @return Whether the shutdowns of the pool has been initiated.
+	 */
+	public boolean isClosed() {
+		return close;
+	}
+	/**
+	 * Returns a list of the submissions currently in the queue.
+	 * 
+	 * @return A list of the queued submissions.
+	 */
+	protected List<Submission<?>> getQueuedSubmissions() {
+		return submissionQueue.stream().map(s -> s.origSubmission).collect(Collectors.toList());
+	}
+	/**
 	 * Returns the number of active, queued, and currently executing processes as string.
 	 * 
 	 * @return A string of statistics concerning the size of the process pool.
@@ -245,12 +265,12 @@ public class StandardProcessPool implements ProcessPool {
 		return procManagerFactory;
 	}
 	@Override
-	public InternalSubmissionFuture submit(Submission submission) {
+	public <T> Future<T> submit(Submission<T> submission) {
 		if (close)
 			throw new IllegalStateException("The pool has already been shut down.");
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
-		InternalSubmission internalSubmission = new InternalSubmission(submission);
+		InternalSubmission<T> internalSubmission = new InternalSubmission<>(submission);
 		submissionQueue.addLast(internalSubmission);
 		// If necessary, adjust the pool size given the new submission.
 		synchronized (poolLock) {
@@ -260,7 +280,7 @@ public class StandardProcessPool implements ProcessPool {
 		logger.info("Submission {} received.{}", internalSubmission, System.lineSeparator() +
 				getPoolStats());
 		// Return a Future holding the total execution time including the submission delay.
-		return new InternalSubmissionFuture(internalSubmission);
+		return new InternalSubmissionFuture<T>(internalSubmission);
 	}
 	@Override
 	public synchronized void shutdown() {
@@ -286,7 +306,7 @@ public class StandardProcessPool implements ProcessPool {
 		try {
 			auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 			procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-			for (InternalSubmission submission : submissionQueue)
+			for (InternalSubmission<?> submission : submissionQueue)
 				submission.setException(new Exception("The process pool has been shut down."));
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -296,6 +316,205 @@ public class StandardProcessPool implements ProcessPool {
 	@Override
 	public String toString() {
 		return String.format("stdProcPool@%s", Integer.toHexString(hashCode()));
+	}
+	
+	/**
+	 * An implementation of the {@link net.viktorc.pp4j.api.Submission} interface for wrapping other instances 
+	 * of the interface into a class that allows for waiting for the completion of the submission, the 
+	 * cancellation thereof, and the tracking of the time its processing took.
+	 * 
+	 * @author Viktor Csomor
+	 *
+	 */
+	private class InternalSubmission<T> implements Submission<T> {
+		
+		final Submission<T> origSubmission;
+		final long receivedTime;
+		final Object lock;
+		Thread thread;
+		Exception exception;
+		volatile long submittedTime;
+		volatile long processedTime;
+		volatile boolean processed;
+		volatile boolean cancelled;
+		
+		/**
+		 * Constructs an instance according to the specified parameters.
+		 * 
+		 * @param origSubmission The submission to wrap into an internal submission with extended features.
+		 * @throws IllegalArgumentException If the submission is null.
+		 */
+		InternalSubmission(Submission<T> originalSubmission) {
+			if (originalSubmission == null)
+				throw new IllegalArgumentException("The submission cannot be null.");
+			this.origSubmission = originalSubmission;
+			receivedTime = System.nanoTime();
+			lock = new Object();
+		}
+		/**
+		 * Sets the thread that is executing the submission.
+		 * 
+		 * @param t The thread that executes the submission.
+		 */
+		void setThread(Thread t) {
+			synchronized (lock) {
+				thread = t;
+			}
+		}
+		/**
+		 * Sets the exception thrown during the execution of the submission if there was any.
+		 * 
+		 * @param e The exception thrown during the execution of the submission.
+		 */
+		void setException(Exception e) {
+			// Notify the InternalSubmissionFuture that an exception was thrown while processing the submission.
+			synchronized (lock) {
+				exception = e;
+				lock.notifyAll();
+			}
+		}
+		/**
+		 * Returns whether the <code>cancelled</code> flag of the submission has been set to true.
+		 * 
+		 * @return Whether the submission has been cancelled.
+		 */
+		boolean isCancelled() {
+			synchronized (lock) {
+				return cancelled;
+			}
+		}
+		/**
+		 * Sets the <code>cancelled</code> flag of the submission to true.
+		 */
+		void cancel() {
+			synchronized (lock) {
+				cancelled = true;
+				lock.notifyAll();
+			}
+		}
+		@Override
+		public List<Command> getCommands() {
+			return origSubmission.getCommands();
+		}
+		@Override
+		public boolean doTerminateProcessAfterwards() {
+			return origSubmission.doTerminateProcessAfterwards();
+		}
+		@Override
+		public T getResult() throws ExecutionException {
+			return origSubmission.getResult();
+		}
+		@Override
+		public void onStartedProcessing() {
+			// If it is the first time the submission is submitted to a process...
+			if (submittedTime == 0) {
+				submittedTime = System.nanoTime();
+				origSubmission.onStartedProcessing();
+			}
+		}
+		@Override
+		public void onFinishedProcessing() {
+			origSubmission.onFinishedProcessing();
+			processedTime = System.nanoTime();
+			// Notify the InternalSubmissionFuture that the submission has been processed.
+			synchronized (lock) {
+				processed = true;
+				lock.notifyAll();
+			}
+		}
+		@Override
+		public String toString() {
+			return String.format("{commands:[%s],terminate:%s}@%s", String.join(",", origSubmission.getCommands()
+					.stream().map(c -> "\"" + c.getInstruction() + "\"").collect(Collectors.toList())),
+					Boolean.toString(origSubmission.doTerminateProcessAfterwards()),
+					Integer.toHexString(hashCode()));
+		}
+		
+	}
+	
+	/**
+	 * An implementation of {@link java.util.concurrent.Future} that can be used to cancel, wait on, and retrieve 
+	 * the return value of a {@link net.viktorc.pp4j.impl.InternalSubmission} instance.
+	 * 
+	 * @author Viktor Csomor
+	 *
+	 */
+	private class InternalSubmissionFuture<T> implements Future<T> {
+		
+		final InternalSubmission<T> submission;
+		
+		/**
+		 * Constructs a {@link java.util.concurrent.Future} for the specified submission.
+		 * 
+		 * @param submission The submission to get a {@link java.util.concurrent.Future} for.
+		 */
+		InternalSubmissionFuture(InternalSubmission<T> submission) {
+			this.submission = submission;
+		}
+		@Override
+		public boolean cancel(boolean mayInterruptIfRunning) {
+			synchronized (submission.lock) {
+				/* If the submission has already been cancelled or if it has already been processed, don't do 
+				 * anything and return false. */
+				if (submission.cancelled || submission.processed)
+					return false;
+				/* If it is already being processed and mayInterruptIfRunning is true, interrupt the executor 
+				 * thread. */
+				if (submission.thread != null) {
+					if (mayInterruptIfRunning) {
+						submission.cancel();
+						submission.thread.interrupt();
+					}
+					// If mayInterruptIfRunning is false, don't let the submission be cancelled.
+				} else
+					// If the processing of the submission has not commenced yet, cancel it.
+					submission.cancel();
+				return submission.cancelled;
+			}
+		}
+		@Override
+		public T get() throws InterruptedException, ExecutionException, CancellationException {
+			// Wait until the submission is processed, or cancelled, or fails.
+			synchronized (submission.lock) {
+				while (!submission.processed && !submission.cancelled && submission.exception == null)
+					submission.lock.wait();
+				if (submission.cancelled)
+					throw new CancellationException(String.format("Submission %s cancelled.", submission));
+				if (submission.exception != null)
+					throw new ExecutionException(submission.exception);
+				return submission.getResult();
+			}
+		}
+		@Override
+		public T get(long timeout, TimeUnit unit)
+				throws InterruptedException, ExecutionException, TimeoutException, CancellationException {
+			// Wait until the submission is processed, or cancelled, or fails, or the method times out.
+			synchronized (submission.lock) {
+				long timeoutNs = unit.toNanos(timeout);
+				long start = System.nanoTime();
+				while (!submission.processed && !submission.cancelled && submission.exception == null &&
+						timeoutNs > 0) {
+					submission.lock.wait(timeoutNs/1000000, (int) (timeoutNs%1000000));
+					timeoutNs -= (System.nanoTime() - start);
+				}
+				if (submission.cancelled)
+					throw new CancellationException(String.format("Submission %s cancelled.", submission));
+				if (submission.exception != null)
+					throw new ExecutionException(submission.exception);
+				if (timeoutNs <= 0)
+					throw new TimeoutException(String.format("Submission %s timed out.", submission));
+				return submission.getResult();
+			}
+		}
+		@Override
+		public boolean isCancelled() {
+			return submission.cancelled;
+		}
+		@Override
+		public boolean isDone() {
+			return submission.processed;
+		}
+		
 	}
 	
 	/**
@@ -376,7 +595,7 @@ public class StandardProcessPool implements ProcessPool {
 								execLock.wait();
 							if (command != null) {
 								// Process the next line.
-								commandCompleted = command.onNewOutput(line, standard);
+								commandCompleted = command.isProcessed(line, standard);
 								if (commandCompleted)
 									execLock.notifyAll();
 							}
@@ -402,7 +621,7 @@ public class StandardProcessPool implements ProcessPool {
 			}
 			try {
 				while (running && !stop) {
-					InternalSubmission submission = null;
+					InternalSubmission<?> submission = null;
 					boolean submissionRetrieved = false;
 					try {
 						/* Wait until the startup phase is over and the mainLock is available to avoid retrieving 
@@ -503,7 +722,7 @@ public class StandardProcessPool implements ProcessPool {
 			}
 		}
 		@Override
-		public boolean execute(Submission submission)
+		public boolean execute(Submission<?> submission)
 				throws IOException, InterruptedException, CancellationException {
 			if (submissionLock.tryLock()) {
 				// Make sure that the reader thread can only process output lines if this one is ready and waiting.

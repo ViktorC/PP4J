@@ -10,8 +10,9 @@ import java.util.concurrent.ExecutionException;
  * 
  * @author Viktor Csomor
  *
+ * @param <T> The return type associated with the submission.
  */
-public interface Submission {
+public interface Submission<T> {
 
 	/**
 	 * Returns the commands to execute.
@@ -32,7 +33,7 @@ public interface Submission {
 	 * the submission.
 	 * @throws ExecutionException if an error occurred while executing the submission.
 	 */
-	default Object getResult() throws ExecutionException { return null; }
+	default T getResult() throws ExecutionException { return null; }
 	/**
 	 * A method that is executed once the processing of the submitted commands has begun.
 	 */

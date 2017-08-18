@@ -29,7 +29,7 @@ public interface ProcessPool {
 	 * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of 
 	 * the execution, the cancellation thereof, or the retrieval of its optional result.
 	 */
-	Future<?> submit(Submission submission);
+	<T> Future<T> submit(Submission<T> submission);
 	/**
 	 * Shuts the executor service down freeing up the associated resources.
 	 */

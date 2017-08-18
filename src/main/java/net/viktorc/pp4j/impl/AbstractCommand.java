@@ -77,7 +77,7 @@ public abstract class AbstractCommand implements Command {
 		return instruction;
 	}
 	@Override
-	public final boolean onNewOutput(String outputLine, boolean standard) {
+	public final boolean isProcessed(String outputLine, boolean standard) {
 		if (standard)
 			stdOutLines.add(outputLine);
 		else
@@ -85,7 +85,7 @@ public abstract class AbstractCommand implements Command {
 		return onOutput(outputLine, standard);
 	}
 	/**
-	 * It stores the output line before calling and returning the result of {@link #onNewOutput(String, boolean)}.
+	 * It stores the output line before calling and returning the result of {@link #isProcessed(String, boolean)}.
 	 * 
 	 * @param outputLine The new line of output printed to the standard out of the process.
 	 * @param standard Whether this line has been output to the standard out or to the standard error stream.
