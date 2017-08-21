@@ -2,6 +2,7 @@ package net.viktorc.pp4j.impl.jpp;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,7 +41,7 @@ import net.viktorc.pp4j.impl.StandardProcessPool;
  */
 public class JavaProcessPoolExecutorService extends StandardProcessPool implements ProcessPoolExecutorService {
 
-	private Object termLock;
+	private final Object termLock;
 	private volatile boolean terminated;
 	
 	/**
@@ -68,6 +69,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		super(() -> new SimpleProcessManager(createJavaProcessBuilder(options),
 				keepAliveTime, e -> { }), minPoolSize, maxPoolSize, reserveSize,
 				verbose);
+		termLock = new Object();
 	}
 	/**
 	 * A utility method for creating the <code>ProcessBuilder</code> used to spawn the Java processes.
@@ -107,24 +109,37 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		return new ProcessBuilder(args);
 	}
 	/**
-	 * See {@link #submit(Callable)}. It additionally allows for the process to be terminated after the execution 
-	 * of the <code>Callable</code>.
+	 * It executes a serializable {@link java.util.concurrent.Callable} instance with a serializable 
+	 * return type in one of the processes of the pool and returns its return value. If the implementation 
+	 * contains non-serializable, non-transient fields, the method fails.
+	 * 
+	 * @param task The task to execute.
+	 * @param terminateProcessAfterwards Whether the process that executes the task should be terminated 
+	 * afterwards.
+	 * @return A {@link java.util.concurrent.Future} instance associated with the return value of the 
+	 * task.
+	 * @throws IOException If the serialization fails.
+	 * @throws NotSerializableException If some object to be serialized does not implement the 
+	 * {@link java.io.Serializable} interface.
 	 */
-	public <T> Future<T> submit(Callable<T> task, boolean terminateProcessAfterwards) {
+	public <T> Future<T> submit(Callable<T> task,
+			boolean terminateProcessAfterwards) throws IOException {
 		return submit(new CallableJavaSubmission<T>(task, terminateProcessAfterwards));
 	}
 	/**
-	 * See {@link #submit(Runnable, Object)}. It additionally allows for the process to be terminated after the execution 
-	 * of the <code>Runnable</code>.
+	 * It executes a serializable {@link #submit(Runnable)} instance in one of the processes of the pool. 
+	 * If the implementation contains non-serializable, non-transient fields, the method fails.
+	 * 
+	 * @param task The task to execute.
+	 * @param terminateProcessAfterwards Whether the process that executes the task should be terminated 
+	 * afterwards.
+	 * @return A {@link java.util.concurrent.Future} instance.
+	 * @throws IOException If the serialization fails.
+	 * @throws NotSerializableException If some object to be serialized does not implement the 
+	 * {@link java.io.Serializable} interface.
 	 */
-	public <T> Future<T> submit(Runnable task, T result, boolean terminateProcessAfterwards) {
-		return submit(new CallableJavaSubmission<T>(Executors.callable(task, result), terminateProcessAfterwards));
-	}
-	/**
-	 * See {@link #submit(Runnable)}. It additionally allows for the process to be terminated after the execution 
-	 * of the <code>Runnable</code>.
-	 */
-	public Future<?> submit(Runnable task, boolean terminateProcessAfterwards) {
+	public Future<?> submit(Runnable task, boolean terminateProcessAfterwards)
+			throws IOException {
 		return submit(new RunnableJavaSubmission(task, terminateProcessAfterwards));
 	}
 	/**
@@ -155,7 +170,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		super.shutdown();
 		return getQueuedSubmissions().stream()
 				.filter(s -> s instanceof RunnableJavaSubmission)
-				.map(s -> ((RunnableJavaSubmission) s).task)
+				.map(s -> (Runnable) ((RunnableJavaSubmission) s).task)
 				.collect(Collectors.toList());
 	}
 	@Override
@@ -180,15 +195,27 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	}
 	@Override
 	public <T> Future<T> submit(Callable<T> task) {
-		return submit(task, false);
+		try {
+			return submit(task, false);
+		} catch (IOException e) {
+			throw new IllegalArgumentException("The task is not serializable.", e);
+		}
 	}
 	@Override
 	public <T> Future<T> submit(Runnable task, T result) {
-		return submit(task, result, false);
+		try {
+			return submit(Executors.callable(task, result), false);
+		} catch (IOException e) {
+			throw new IllegalArgumentException("The task is not serializable.", e);
+		}
 	}
 	@Override
 	public Future<?> submit(Runnable task) {
-		return submit(task, false);
+		try {
+			return submit((Runnable & Serializable) task, false);
+		} catch (IOException e) {
+			throw new IllegalArgumentException("The task is not serializable.", e);
+		}
 	}
 	@Override
 	public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
@@ -279,6 +306,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	private class RunnableJavaSubmission implements Submission<Object> {
 
 		final Runnable task;
+		final String command;
 		final boolean terminateProcessAfterwards;
 		volatile Throwable error;
 		
@@ -288,29 +316,28 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		 * @param task The task to execute.
 		 * @param terminateProcessAfterwards Whether the process should be terminated after the execution 
 		 * of the task.
+		 * @throws IOException If the encoding of the serialized task fails.
+		 * @throws NotSerializableException If some object to be serialized does not implement the 
+		 * {@link java.io.Serializable} interface.
 		 */
-		RunnableJavaSubmission(Runnable task, boolean terminateProcessAfterwards) {
+		RunnableJavaSubmission(Runnable task, boolean terminateProcessAfterwards)
+				throws IOException {
 			this.task = task;
 			this.terminateProcessAfterwards = terminateProcessAfterwards;
+			command = ConversionUtil.encode(task);
 		}
 		@Override
 		public List<Command> getCommands() {
-			String command;
-			try {
-				command = ConversionUtil.encode(new SerializableRunnableJavaTask(task));
-				return Arrays.asList(new SimpleCommand(command,
-						(c, l) -> JavaProcess.COMPLETION_SIGNAL.equals(l),
-						(c, l) -> {
-							try {
-								error = (Throwable) ConversionUtil.decode(l);
-							} catch (ClassNotFoundException | IOException e) {
-								throw new ProcessException(e);
-							}
-							return true;
-						}));
-			} catch (IOException e) {
-				return null;
-			}
+			return Arrays.asList(new SimpleCommand(command,
+					(c, l) -> JavaProcess.COMPLETION_SIGNAL.equals(l),
+					(c, l) -> {
+						try {
+							error = (Throwable) ConversionUtil.decode(l);
+						} catch (ClassNotFoundException | IOException e) {
+							throw new ProcessException(e);
+						}
+						return true;
+					}));
 		}
 		@Override
 		public boolean doTerminateProcessAfterwards() {
@@ -321,33 +348,6 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 			if (error != null)
 				throw new ExecutionException(error);
 			return null;
-		}
-		
-		/**
-		 * A {@link java.io.Serializable} wrapper object for a {@link java.lang.Runnable} instance.
-		 * 
-		 * @author Viktor Csomor
-		 *
-		 */
-		private class SerializableRunnableJavaTask implements Serializable, Runnable {
-
-			static final long serialVersionUID = -1059186698337790761L;
-
-			Runnable runnable;
-			
-			/**
-			 * Constructs a serializable wrapper for the specified task.
-			 * 
-			 * @param runnable The task to transfer.
-			 */
-			SerializableRunnableJavaTask(Runnable runnable) {
-				this.runnable = runnable;
-			}
-			@Override
-			public void run() {
-				runnable.run();
-			}
-
 		}
 		
 	}
@@ -370,43 +370,44 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 */
 	private class CallableJavaSubmission<T> implements Submission<T> {
 
-		final Callable<T> task;
+		final String command;
 		final boolean terminateProcessAfterwards;
 		volatile T result;
 		volatile Throwable error;
 		
-		CallableJavaSubmission(Callable<T> task, boolean terminateProcessAfterwards) {
-			this.task = task;
+		/**
+		 * Creates a submission for the specified {@link java.util.concurrent.Callable}.
+		 * 
+		 * @param task The task to execute.
+		 * @param terminateProcessAfterwards Whether the process should be terminated after the execution 
+		 * of the task.
+		 * @throws IOException If the encoding of the serialized task fails.
+		 * @throws NotSerializableException If some object to be serialized does not implement the 
+		 * {@link java.io.Serializable} interface.
+		 */
+		CallableJavaSubmission(Callable<T> task, boolean terminateProcessAfterwards)
+				throws IOException {
 			this.terminateProcessAfterwards = terminateProcessAfterwards;
+			command = ConversionUtil.encode(task);
 		}
 		@SuppressWarnings("unchecked")
 		@Override
 		public List<Command> getCommands() {
-			String command;
-			try {
-				command = ConversionUtil.encode(new SerializableCallableJavaTask(task));
-				return Arrays.asList(new SimpleCommand(command, (c, l) -> {
-							System.out.println("STD: " + l);
-							try {
-								result = (T) ConversionUtil.decode(l);
-								System.out.println("STD - decoded: " + result);
-							} catch (ClassNotFoundException | IOException e) {
-								throw new ProcessException(e);
-							}
-							return true;
-						}, (c, l) -> {
-							System.out.println("ERR: " + l);
-							try {
-								error = (Throwable) ConversionUtil.decode(l);
-								System.out.println("ERR - decoded: " + result);
-							} catch (ClassNotFoundException | IOException e) {
-								throw new ProcessException(e);
-							}
-							return true;
-						}));
-			} catch (IOException e) {
-				return null;
-			}
+			return Arrays.asList(new SimpleCommand(command, (c, l) -> {
+						try {
+							result = (T) ConversionUtil.decode(l);
+						} catch (ClassNotFoundException | IOException e) {
+							throw new ProcessException(e);
+						}
+						return true;
+					}, (c, l) -> {
+						try {
+							error = (Throwable) ConversionUtil.decode(l);
+						} catch (ClassNotFoundException | IOException e) {
+							throw new ProcessException(e);
+						}
+						return true;
+					}));
 		}
 		@Override
 		public boolean doTerminateProcessAfterwards() {
@@ -417,33 +418,6 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 			if (error != null)
 				throw new ExecutionException(error);
 			return result;
-		}
-
-		/**
-		 * A {@link java.io.Serializable} wrapper object for a {@link java.util.concurrent.Callable} instance.
-		 * 
-		 * @author Viktor Csomor
-		 *
-		 */
-		private class SerializableCallableJavaTask implements Serializable, Callable<T> {
-
-			static final long serialVersionUID = -7416088294845052107L;
-
-			final Callable<T> callable;
-			
-			/**
-			 * Constructs a serializable wrapper for the task.
-			 * 
-			 * @param callable The task to transfer.
-			 */
-			SerializableCallableJavaTask(Callable<T> callable) {
-				this.callable = callable;
-			}
-			@Override
-			public T call() throws Exception {
-				return callable.call();
-			}
-
 		}
 		
 	}

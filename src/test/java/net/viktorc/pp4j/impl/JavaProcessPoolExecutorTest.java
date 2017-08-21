@@ -26,7 +26,7 @@ public class JavaProcessPoolExecutorTest {
 			try {
 				List<Future<String>> futures = new ArrayList<>();
 				long start = System.currentTimeMillis();
-				for (int i = 0; i < 10; i++) {
+				for (int i = 0; i < 1; i++) {
 					futures.add(exec.submit(() -> {
 						Random rand = new Random();
 						Thread.sleep(5000);

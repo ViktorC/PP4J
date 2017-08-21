@@ -3,6 +3,7 @@ package net.viktorc.pp4j.impl.jpp;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Base64;
@@ -26,6 +27,8 @@ class ConversionUtil {
 	 * @param o The object to serialize and encode.
 	 * @return The serialized and encoded object as a string.
 	 * @throws IOException If the serialization fails.
+	 * @throws NotSerializableException If some object to be serialized does not implement the 
+	 * {@link java.io.Serializable} interface.
 	 */
 	static String encode(Object o) throws IOException {
 		try (ByteArrayOutputStream byteArrayOut = new ByteArrayOutputStream();
