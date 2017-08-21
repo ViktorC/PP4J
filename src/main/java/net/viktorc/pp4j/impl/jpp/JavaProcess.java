@@ -3,6 +3,8 @@ package net.viktorc.pp4j.impl.jpp;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.concurrent.Callable;
 
 /**
@@ -13,39 +15,49 @@ import java.util.concurrent.Callable;
  *
  */
 class JavaProcess {
-
-	/**
-	 * Ensure that it contains characters that cannot be found in a Base64 encoded string.
-	 */
-	static final String COMPLETION_SIGNAL = "--ok--";
 	
 	/**
 	 * The method executed as a separate process. It listens to its standard in for 
-	 * encoded and serialized {@link java.lang.Runnable} and {@link java.util.concurrent.Callable} 
-	 * instances, which it decodes, deserializes, and executes on receipt. The return value 
-	 * is normally output to its stdout stream. In case of <code>Callable</code> instances, 
-	 * it is the serialized and encoded return values; while in case of <code>Runnable</code> 
-	 * instances, it is a simply string denoting the successful completion of execution. If 
-	 * an exception occurs, it is serialized, encoded, and output to the stderr stream.
+	 * encoded and serialized {@link java.util.concurrent.Callable} instances, which it 
+	 * decodes, deserializes, and executes on receipt. The return value is normally output 
+	 * to its stdout stream in the form of the serialized and encoded return values of the 
+	 * <code>Callable</code> instances. If an exception occurs, it is serialized, encoded, 
+	 * and output to the stderr stream.
 	 * 
 	 * @param args They are ignored for now.
 	 */
 	public static void main(String[] args) {
-		try (BufferedReader in = new BufferedReader(new InputStreamReader(System.in))) {
+		try (BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+				DummyPrintStream dummyOut = new DummyPrintStream();
+				DummyPrintStream dummyErr = new DummyPrintStream()) {
 			boolean stop = false;
+			PrintStream out = System.out;
+			PrintStream err = System.err;
 			while (!stop) {
 				try {
 					String line = in.readLine().trim();
 					if (line.isEmpty())
 						continue;
 					Object input = ConversionUtil.decode(line);
-					if (input instanceof Runnable) {
-						Runnable r = (Runnable) input;
-						r.run();
-						System.out.println(COMPLETION_SIGNAL);
-					} else if (input instanceof Callable<?>) {
+					if (input instanceof Callable<?>) {
 						Callable<?> c = (Callable<?>) input;
-						System.out.println(ConversionUtil.encode(c.call()));
+						/* Try to redirect the out streams to make sure that print 
+						 * statements and such do not cause the submission to be assumed 
+						 * done falsely. */
+						try {
+							System.setOut(dummyOut);
+							System.setErr(dummyErr);
+						} catch (SecurityException e) {
+							// Ignore it.
+						}
+						Object output = c.call();
+						try {
+							System.setOut(out);
+							System.setErr(err);
+						} catch (SecurityException e) {
+							// Ignore it.
+						}
+						System.out.println(ConversionUtil.encode(output));
 					} else
 						continue;
 				} catch (Throwable e) {
@@ -55,10 +67,34 @@ class JavaProcess {
 		} catch (Throwable e) {
 			try {
 				System.err.println(ConversionUtil.encode(e));
-			} catch (IOException e1) {
+			} catch (Exception e1) {
 				System.err.println(e.getMessage());
 			}
 		}
+	}
+	
+	/**
+	 * A dummy implementation of {@link java.io.PrintStream} that does nothing on <code>
+	 * write</code>.
+	 * 
+	 * @author Viktor Csomor
+	 *
+	 */
+	private static class DummyPrintStream extends PrintStream {
+
+		/**
+		 * Default constructor.
+		 */
+		DummyPrintStream() {
+			super(new OutputStream() {
+
+				@Override
+				public void write(int b) throws IOException {
+					// This is why it is called "DummyPrintStream".
+				}
+			});
+		}
+		
 	}
 
 }

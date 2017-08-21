@@ -34,5 +34,11 @@ public interface ProcessPool {
 	 * Shuts the executor service down freeing up the associated resources.
 	 */
 	void shutdown();
+	/**
+	 * Returns whether the shutdown of the pool has been initiated.
+	 * 
+	 * @return Whether the shutdown of the pool has been initiated.
+	 */
+	boolean isShutdown();
 	
 }

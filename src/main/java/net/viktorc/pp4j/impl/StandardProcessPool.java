@@ -85,7 +85,7 @@ public class StandardProcessPool implements ProcessPool {
 	private final CountDownLatch prestartLatch;
 	private final Object poolLock;
 	private final Logger logger;
-	private volatile boolean close;
+	private volatile boolean shutdown;
 
 	/**
 	 * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size 
@@ -140,7 +140,7 @@ public class StandardProcessPool implements ProcessPool {
 		prestartLatch = new CountDownLatch(actualMinSize);
 		poolLock = new Object();
 		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
-		for (int i = 0; i < actualMinSize && !close; i++) {
+		for (int i = 0; i < actualMinSize && !shutdown; i++) {
 			synchronized (poolLock) {
 				startNewProcess(null);
 			}
@@ -207,14 +207,6 @@ public class StandardProcessPool implements ProcessPool {
 		return submissionQueue.size();
 	}
 	/**
-	 * Returns whether the shutdown of the pool has been initiated.
-	 * 
-	 * @return Whether the shutdowns of the pool has been initiated.
-	 */
-	public boolean isClosed() {
-		return close;
-	}
-	/**
 	 * Returns a list of the submissions currently in the queue.
 	 * 
 	 * @return A list of the queued submissions.
@@ -237,7 +229,7 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return Whether the process pool should be extended.
 	 */
 	private boolean doExtendPool() {
-		return !close && (activeProcExecutors.size() < minPoolSize || (activeProcExecutors.size() <
+		return !shutdown && (activeProcExecutors.size() < minPoolSize || (activeProcExecutors.size() <
 				Math.min(maxPoolSize, numOfActiveSubmissions.get() + submissionQueue.size() + reserveSize)));
 	}
 	/**
@@ -266,7 +258,7 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	@Override
 	public <T> Future<T> submit(Submission<T> submission) {
-		if (close)
+		if (shutdown)
 			throw new IllegalStateException("The pool has already been shut down.");
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
@@ -285,10 +277,10 @@ public class StandardProcessPool implements ProcessPool {
 	@Override
 	public synchronized void shutdown() {
 		synchronized (poolLock) {
-			if (close)
+			if (shutdown)
 				throw new IllegalStateException("The pool has already been shut down.");
 			logger.info("Initiating shutdown...");
-			close = true;
+			shutdown = true;
 			while (prestartLatch.getCount() != 0)
 				prestartLatch.countDown();
 			logger.debug("Shutting down process executors...");
@@ -312,6 +304,10 @@ public class StandardProcessPool implements ProcessPool {
 			Thread.currentThread().interrupt();
 		}
 		logger.info("Process pool shut down.");
+	}
+	@Override
+	public boolean isShutdown() {
+		return shutdown;
 	}
 	@Override
 	public String toString() {
@@ -550,6 +546,7 @@ public class StandardProcessPool implements ProcessPool {
 		Thread subThread;
 		Command command;
 		long keepAliveTime;
+		boolean terminating;
 		boolean doTime;
 		boolean onWait;
 		boolean commandCompleted;
@@ -623,6 +620,7 @@ public class StandardProcessPool implements ProcessPool {
 				while (running && !stop) {
 					InternalSubmission<?> submission = null;
 					boolean submissionRetrieved = false;
+					boolean completed = false;
 					try {
 						/* Wait until the startup phase is over and the mainLock is available to avoid retrieving 
 						 * a submission only to find that it cannot be executed and thus has to be put back into 
@@ -651,6 +649,7 @@ public class StandardProcessPool implements ProcessPool {
 									submission.submittedTime)/1000000000), getPoolStats()));
 							submission = null;
 						}
+						completed = true;
 					} catch (InterruptedException e) {
 						// Next round (unless the process is stopped).
 						continue;
@@ -674,6 +673,15 @@ public class StandardProcessPool implements ProcessPool {
 						// Decrement the active submissions counter if it was incremented in this cycle.
 						if (submissionRetrieved)
 							numOfActiveSubmissions.decrementAndGet();
+						// If the submission did not complete due to an error or cancellation, kill the process.
+						if (!completed) {
+							submissionLock.lock();
+							try {
+								stop(false);
+							} finally {
+								submissionLock.unlock();
+							}
+						}
 					}
 				}
 			} finally {
@@ -765,12 +773,16 @@ public class StandardProcessPool implements ProcessPool {
 								processedCommands.add(command);
 						}
 						command = null;
-						if (running && !stop && submission.doTerminateProcessAfterwards() &&
+						if (running && !stop && !terminating && submission.doTerminateProcessAfterwards() &&
 								stopLock.tryLock()) {
+							/* Prevent infinite loops in case a terminal-submission is used for terminating the 
+							 * process */
+							terminating = true;
 							try {
 								if (!stop(false))
 									stop(true);
 							} finally {
+								terminating = false;
 								stopLock.unlock();
 							}
 						}
@@ -907,7 +919,7 @@ public class StandardProcessPool implements ProcessPool {
 					} catch (InterruptedException e) {
 						Thread.currentThread().interrupt();
 					}
-					// Try to close all the streams.
+					// Try to shutdown all the streams.
 					if (stdOutReader != null) {
 						try {
 							stdOutReader.close();
