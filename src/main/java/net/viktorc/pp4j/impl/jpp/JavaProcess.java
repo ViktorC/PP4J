@@ -8,8 +8,16 @@ import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The class whose main method is run as a separate process by the Java process based 
@@ -108,6 +116,22 @@ class JavaProcess {
 	private static void warmUp() {
 		try {
 			Callable<Integer> task = (Callable<Integer> & Serializable) () -> {
+				Set<Object> set = new HashSet<>();
+				set.add(true);
+				set.add('C');
+				set.add((byte) 16);
+				set.add((short) 1024);
+				set.add(100000);
+				set.add(0xe8fc763dL);
+				set.add((float) 0.5);
+				set.add(2.718281);
+				set.add("string");
+				set.add(Thread.currentThread());
+				set.add(Executors.callable(() -> { }, new AtomicInteger()));
+				List<?> linkedList = new LinkedList<>(set);
+				Map<Object,Boolean> map = new HashMap<>();
+				Random rand = new Random();
+				linkedList.stream().forEach(e -> map.put(e, rand.nextDouble() >= 0.5));
 				int[] nums = new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 				List<?> list = Arrays.asList(nums);
 				List<?> arrayList = new ArrayList<>(list);
@@ -119,6 +143,8 @@ class JavaProcess {
 			((Callable<?>) decodedTask).call();
 		} catch (Exception e) {
 			return;
+		} finally {
+			System.gc();
 		}
 	}
 	
