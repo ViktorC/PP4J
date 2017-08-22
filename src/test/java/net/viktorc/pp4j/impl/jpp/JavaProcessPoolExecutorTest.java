@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Assert;
 import org.junit.Test;
 
-import net.viktorc.pp4j.ProcessPools;
 import net.viktorc.pp4j.api.jpp.ProcessPoolExecutorService;
 
 /**
@@ -24,13 +23,13 @@ public class JavaProcessPoolExecutorTest {
 
 	@Test
 	public void test01() throws InterruptedException, ExecutionException {
-		ProcessPoolExecutorService exec = ProcessPools.newCustomProcessPoolExecutorService(
-				new SimpleJavaProcessOptions(1, 2, 128), 0, 15, 20, 2);
+		ProcessPoolExecutorService exec = new JavaProcessPoolExecutorService(
+				new SimpleJavaProcessOptions(1, 2, 128), 0, 10, 15, 2, false);
 		try {
 			List<Future<?>> futures = new ArrayList<>();
 			long start = System.currentTimeMillis();
 			AtomicInteger j = new AtomicInteger(2);
-			for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < 1; i++) {
 				futures.add(exec.submit((Runnable & Serializable) () -> {
 					j.incrementAndGet();
 					Thread t = new Thread(() -> {
@@ -51,10 +50,14 @@ public class JavaProcessPoolExecutorTest {
 			}
 			for (Future<?> f : futures)
 				Assert.assertTrue(((AtomicInteger) f.get()).get() == 4);
-			System.out.printf("It took: %.2f.%n", ((float) (System.currentTimeMillis() - start))/1000);
+			System.out.printf("It took: %.3f.%n", ((float) (System.currentTimeMillis() - start))/1000);
 		} finally {
 			exec.shutdown();
 		}
+	}
+	@Test
+	public void test02() {
+		
 	}
 	
 }

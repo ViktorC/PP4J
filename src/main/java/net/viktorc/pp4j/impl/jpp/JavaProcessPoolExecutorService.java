@@ -17,14 +17,17 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.ProcessExecutor;
+import net.viktorc.pp4j.api.ProcessManager;
+import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
 import net.viktorc.pp4j.api.jpp.JavaProcessOptions;
 import net.viktorc.pp4j.api.jpp.ProcessPoolExecutorService;
 import net.viktorc.pp4j.api.jpp.JavaProcessOptions.JVMArch;
 import net.viktorc.pp4j.api.jpp.JavaProcessOptions.JVMType;
+import net.viktorc.pp4j.impl.AbstractProcessManager;
 import net.viktorc.pp4j.impl.ProcessException;
 import net.viktorc.pp4j.impl.SimpleCommand;
-import net.viktorc.pp4j.impl.SimpleProcessManager;
 import net.viktorc.pp4j.impl.StandardProcessPool;
 
 /**
@@ -65,47 +68,9 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	public JavaProcessPoolExecutorService(JavaProcessOptions options, long keepAliveTime, int minPoolSize,
 			int maxPoolSize, int reserveSize, boolean verbose)
 					throws InterruptedException {
-		super(() -> new SimpleProcessManager(createJavaProcessBuilder(options),
-				keepAliveTime, e -> { }), minPoolSize, maxPoolSize, reserveSize,
+		super(new JavaProcessManagerFactory(options, keepAliveTime), minPoolSize, maxPoolSize, reserveSize,
 				verbose);
 		termLock = new Object();
-	}
-	/**
-	 * A utility method for creating the <code>ProcessBuilder</code> used to spawn the Java processes.
-	 * 
-	 * @param options The JVM options. If it is null, no options are used.
-	 * @return The <code>ProcessBuilder</code> instance.
-	 */
-	private static ProcessBuilder createJavaProcessBuilder(JavaProcessOptions options) {
-		String javaPath = System.getProperty("java.home") + File.separator + "bin" +
-				File.separator + "java";
-		String classPath = System.getProperty("java.class.path");
-		String className = JavaProcess.class.getCanonicalName();
-		List<String> javaOptions = new ArrayList<>();
-		if (options != null) {
-			JVMArch arch = options.getArch();
-			JVMType type = options.getType();
-			Integer initHeap = options.getInitHeapSizeMb();
-			Integer maxHeap = options.getMaxHeapSizeMb();
-			Integer stack = options.getStackSizeKb();
-			if (arch != null)
-				javaOptions.add(arch.equals(JVMArch.BIT_32) ? "-d32" : "-d64");
-			if (type != null)
-				javaOptions.add(type.equals(JVMType.CLIENT) ? "-client" : "-server");
-			if (initHeap != null)
-				javaOptions.add(String.format("-Xms%dm", initHeap));
-			if (maxHeap != null)
-				javaOptions.add(String.format("-Xmx%dm", maxHeap));
-			if (stack != null)
-				javaOptions.add(String.format("-Xss%dk", stack));
-		}
-		List<String> args = new ArrayList<>();
-		args.add(javaPath);
-		args.addAll(javaOptions);
-		args.add("-cp");
-		args.add(classPath);
-		args.add(className);
-		return new ProcessBuilder(args);
 	}
 	/**
 	 * It executes a serializable {@link java.util.concurrent.Callable} instance with a serializable 
@@ -297,72 +262,102 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	}
 	
 	/**
-	 * A wrapper class implementing the {@link java.util.concurrent.Callable} interface for turning a serializable 
-	 * <code>Callable</code> instance with a not explicitly serializable return type into a serializable <code>
-	 * Callable</code> instance with an explicitly serializable return type.
+	 * A sub-class of {@link net.viktorc.pp4j.impl.AbstractProcessManager} for the management of process instances 
+	 * of the {@link net.viktorc.pp4j.impl.jpp.JavaProcess} class.
 	 * 
 	 * @author Viktor Csomor
 	 *
-	 * @param <T> The serializable return type.
-	 * @param <S> The serializable <code>Callable</code> implementation with a not explicitly serializable return type.
 	 */
-	private static class SerializableCallable<T extends Serializable, S extends Callable<? super T> & Serializable>
-			implements Callable<T>, Serializable {
+	private static class JavaProcessManager extends AbstractProcessManager {
 
-		static final long serialVersionUID = -5418713087898561239L;
-		
-		Callable<T> task;
-		
 		/**
-		 * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the 
-		 * specified serializable <code>Callable</code> instance with a not explicitly serializable return type.
+		 * Constructs an instance using the specified <code>builder</code> and <code>keepAliveTime</code>.
 		 * 
-		 * @param callable The <code>Callable</code> to wrap.
+		 * @param builder The <code>ProcessBuilder</code> to use for starting the Java processes.
+		 * @param keepAliveTime The number of milliseconds of idleness after which the processes should be 
+		 * terminated. If it is non-positive, the life-cycle of processes will not be limited based on 
+		 * idleness.
 		 */
-		@SuppressWarnings("unchecked")
-		SerializableCallable(S callable) {
-			task = (Callable<T>) callable;
+		JavaProcessManager(ProcessBuilder builder, long keepAliveTime) {
+			super(builder, keepAliveTime);
 		}
 		@Override
-		public T call() throws Exception {
-			return task.call();
+		public boolean startsUpInstantly() {
+			return false;
 		}
-
+		@Override
+		public boolean isStartedUp(String outputLine, boolean standard) {
+			return standard && JavaProcess.STARTUP_SIGNAL.equals(outputLine);
+		}
+		@Override
+		public void onStartup(ProcessExecutor executor) { /* Don't do anything. */ }
+		@Override
+		public boolean terminateGracefully(ProcessExecutor executor) {
+			return false;
+		}
+		@Override
+		public void onTermination(int resultCode, long lifeTime) { /* Don't do anything. */ }
+		
 	}
 	
 	/**
-	 * A wrapper class implementing the {@link java.util.concurrent.Callable} interface for turning serializable 
-	 * {@link java.lang.Runnable} instances with serializable results into serializable {@link java.util.concurrent.Callable} 
-	 * instances with explicitly serialized return types.
+	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} for the creation 
+	 * of {@link net.viktorc.pp4j.impl.jpp.JavaProcessPoolExecutorService.JavaProcessManager} instances 
+	 * using a single {@link java.lang.ProcessBuilder} instance.
 	 * 
 	 * @author Viktor Csomor
 	 *
-	 * @param <T> The return type.
-	 * @param <S> The {@link java.lang.Runnable} and {@link java.io.Serializable} task type.
 	 */
-	private static class SerializableRunnableWithResult<T extends Serializable, S extends Runnable & Serializable> 
-			implements Callable<T>, Serializable {
+	private static class JavaProcessManagerFactory implements ProcessManagerFactory {
 		
-		static final long serialVersionUID = -1069566262473097740L;
-		
-		T result;
-		S runnable;
+		ProcessBuilder procBuilder;
+		long keepAliveTime;
 		
 		/**
-		 * Constructs a serializable <code>Callable</code> instance from the specified <code>Runnable</code> and 
-		 * return object.
+		 * Constructs an instance based on the specified JVM options and <code>keepAliveTime</code>. 
+		 * It creates a single <code>ProcessBuilder</code> which it uses for the creation of all 
+		 * processes of the pool.
 		 * 
-		 * @param runnable The task to execute.
-		 * @param result The object to return as a result of the operation.
+		 * @param options The JVM options for starting the Java process.
+		 * @param keepAliveTime The number of milliseconds of idleness after which the processes should be 
+		 * terminated. If it is non-positive, the life-cycle of processes will not be limited based on 
+		 * idleness.
 		 */
-		SerializableRunnableWithResult(S runnable, T result) {
-			this.runnable = runnable;
-			this.result = result;
+		JavaProcessManagerFactory(JavaProcessOptions options, long keepAliveTime) {
+			String javaPath = System.getProperty("java.home") + File.separator + "bin" +
+					File.separator + "java";
+			String classPath = System.getProperty("java.class.path");
+			String className = JavaProcess.class.getCanonicalName();
+			List<String> javaOptions = new ArrayList<>();
+			if (options != null) {
+				JVMArch arch = options.getArch();
+				JVMType type = options.getType();
+				Integer initHeap = options.getInitHeapSizeMb();
+				Integer maxHeap = options.getMaxHeapSizeMb();
+				Integer stack = options.getStackSizeKb();
+				if (arch != null)
+					javaOptions.add(arch.equals(JVMArch.BIT_32) ? "-d32" : "-d64");
+				if (type != null)
+					javaOptions.add(type.equals(JVMType.CLIENT) ? "-client" : "-server");
+				if (initHeap != null)
+					javaOptions.add(String.format("-Xms%dm", initHeap));
+				if (maxHeap != null)
+					javaOptions.add(String.format("-Xmx%dm", maxHeap));
+				if (stack != null)
+					javaOptions.add(String.format("-Xss%dk", stack));
+			}
+			List<String> args = new ArrayList<>();
+			args.add(javaPath);
+			args.addAll(javaOptions);
+			args.add("-cp");
+			args.add(classPath);
+			args.add(className);
+			procBuilder = new ProcessBuilder(args);
+			this.keepAliveTime = keepAliveTime;
 		}
 		@Override
-		public T call() throws Exception {
-			runnable.run();
-			return result;
+		public ProcessManager newProcessManager() {
+			return new JavaProcessManager(procBuilder, keepAliveTime);
 		}
 		
 	}
@@ -379,7 +374,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 * @param <S> An implementation of the {@link java.util.concurrent.Callable} and {@link java.io.Serializable} 
 	 * interfaces with the return type <code>T</code>
 	 */
-	private class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable>
+	private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable>
 			implements Submission<T> {
 
 		final S task;
@@ -446,7 +441,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 * @param <T> The return type of the original <code>Future</code> instance.
 	 * @param <S> A subtype of <code>T</code>; the return type of the wrapper <code>Future</code> instance.
 	 */
-	private class CastFuture<T, S extends T> implements Future<T> {
+	private static class CastFuture<T, S extends T> implements Future<T> {
 
 		final Future<S> origFuture;
 		
@@ -477,6 +472,77 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		@Override
 		public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
 			return (T) origFuture.get(timeout, unit);
+		}
+		
+	}
+	
+	/**
+	 * A wrapper class implementing the {@link java.util.concurrent.Callable} interface for turning a serializable 
+	 * <code>Callable</code> instance with a not explicitly serializable return type into a serializable <code>
+	 * Callable</code> instance with an explicitly serializable return type.
+	 * 
+	 * @author Viktor Csomor
+	 *
+	 * @param <T> The serializable return type.
+	 * @param <S> The serializable <code>Callable</code> implementation with a not explicitly serializable return type.
+	 */
+	private static class SerializableCallable<T extends Serializable, S extends Callable<? super T> & Serializable>
+			implements Callable<T>, Serializable {
+
+		static final long serialVersionUID = -5418713087898561239L;
+		
+		Callable<T> task;
+		
+		/**
+		 * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the 
+		 * specified serializable <code>Callable</code> instance with a not explicitly serializable return type.
+		 * 
+		 * @param callable The <code>Callable</code> to wrap.
+		 */
+		@SuppressWarnings("unchecked")
+		SerializableCallable(S callable) {
+			task = (Callable<T>) callable;
+		}
+		@Override
+		public T call() throws Exception {
+			return task.call();
+		}
+
+	}
+	
+	/**
+	 * A wrapper class implementing the {@link java.util.concurrent.Callable} interface for turning serializable 
+	 * {@link java.lang.Runnable} instances with serializable results into serializable {@link java.util.concurrent.Callable} 
+	 * instances with explicitly serialized return types.
+	 * 
+	 * @author Viktor Csomor
+	 *
+	 * @param <T> The return type.
+	 * @param <S> The {@link java.lang.Runnable} and {@link java.io.Serializable} task type.
+	 */
+	private static class SerializableRunnableWithResult<T extends Serializable, S extends Runnable & Serializable> 
+			implements Callable<T>, Serializable {
+		
+		static final long serialVersionUID = -1069566262473097740L;
+		
+		T result;
+		S runnable;
+		
+		/**
+		 * Constructs a serializable <code>Callable</code> instance from the specified <code>Runnable</code> and 
+		 * return object.
+		 * 
+		 * @param runnable The task to execute.
+		 * @param result The object to return as a result of the operation.
+		 */
+		SerializableRunnableWithResult(S runnable, T result) {
+			this.runnable = runnable;
+			this.result = result;
+		}
+		@Override
+		public T call() throws Exception {
+			runnable.run();
+			return result;
 		}
 		
 	}
