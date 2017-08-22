@@ -6,8 +6,10 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The class whose main method is run as a separate process by the Java process based 
@@ -19,22 +21,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 class JavaProcess {
 	
 	/**
-	 * A string for signaling the startup of the Java process; it contains characters that 
-	 * cannot ever appear in Base64 encoded messages.
+	 * A string for signaling the startup of the Java process; it contains characters that cannot 
+	 * ever appear in Base64 encoded messages.
 	 */
 	static final String STARTUP_SIGNAL = "--READY--";
-	private static final Callable<?> WARMUP_TASK = (Callable<?> & Serializable) () -> {
-		Callable<AtomicInteger> task = (Callable<AtomicInteger> & Serializable) () -> {
-			AtomicInteger counter = new AtomicInteger();
-			for (int i = 0; i < 1000; i++)
-				counter.incrementAndGet();
-			return counter;
-		};
-		String encodedTask = ConversionUtil.encode(task);
-		Object decodedTask = ConversionUtil.decode(encodedTask);
-		((Callable<?>) decodedTask).call();
-		return STARTUP_SIGNAL;
-	};
+	/**
+	 * The request for the termination of the program.
+	 */
+	static final String STOP_REQUEST = "--STOP--";
+	/**
+	 * The response to a termination request.
+	 */
+	static final String STOP_SIGNAL = "--STOPPED--";
 	
 	/**
 	 * The method executed as a separate process. It listens to its standard in for 
@@ -53,15 +51,19 @@ class JavaProcess {
 			boolean stop = false;
 			PrintStream out = System.out;
 			PrintStream err = System.err;
-			/* Make sure that as many of the relevant classes are loaded as possible 
-			 * and signal the startup of the process. */
-			System.out.println(WARMUP_TASK.call());
+			warmUp();
+			// Send the startup signal.
+			System.out.println(STARTUP_SIGNAL);
 			try {
 				while (!stop) {
 					try {
 						String line = in.readLine().trim();
 						if (line.isEmpty())
 							continue;
+						if (STOP_REQUEST.equals(line)) {
+							System.out.println(STOP_SIGNAL);
+							return;
+						}
 						Object input = ConversionUtil.decode(line);
 						if (input instanceof Callable<?>) {
 							Callable<?> c = (Callable<?>) input;
@@ -81,6 +83,7 @@ class JavaProcess {
 							continue;
 					} catch (Throwable e) {
 						try {
+							System.setOut(dummyOut);
 							System.setErr(err);
 						} catch (SecurityException e1) { /* Ignore it. */ }
 						System.err.println(ConversionUtil.encode(e));
@@ -96,6 +99,26 @@ class JavaProcess {
 			try {
 				System.err.println(ConversionUtil.encode(e));
 			} catch (Exception e1) { /* Give up all hope. */ }
+		}
+	}
+	/**
+	 * A task for warming up the JVM instance; it ensures that some of the most important and most 
+	 * commonly used classes are loaded.
+	 */
+	private static void warmUp() {
+		try {
+			Callable<Integer> task = (Callable<Integer> & Serializable) () -> {
+				int[] nums = new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+				List<?> list = Arrays.asList(nums);
+				List<?> arrayList = new ArrayList<>(list);
+				arrayList.clear();
+				return (int) Arrays.stream(nums).filter(n -> n%2 != 0).average().getAsDouble();
+			};
+			String encodedTask = ConversionUtil.encode(task);
+			Object decodedTask = ConversionUtil.decode(encodedTask);
+			((Callable<?>) decodedTask).call();
+		} catch (Exception e) {
+			return;
 		}
 	}
 	

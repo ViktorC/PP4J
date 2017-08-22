@@ -14,6 +14,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import net.viktorc.pp4j.api.Command;
@@ -28,6 +29,7 @@ import net.viktorc.pp4j.api.jpp.JavaProcessOptions.JVMType;
 import net.viktorc.pp4j.impl.AbstractProcessManager;
 import net.viktorc.pp4j.impl.ProcessException;
 import net.viktorc.pp4j.impl.SimpleCommand;
+import net.viktorc.pp4j.impl.SimpleSubmission;
 import net.viktorc.pp4j.impl.StandardProcessPool;
 
 /**
@@ -293,6 +295,17 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		public void onStartup(ProcessExecutor executor) { /* Don't do anything. */ }
 		@Override
 		public boolean terminateGracefully(ProcessExecutor executor) {
+			try {
+				AtomicBoolean success = new AtomicBoolean(false);
+				if (executor.execute(new SimpleSubmission(new SimpleCommand(JavaProcess.STOP_REQUEST,
+						(c, l) -> {
+							success.set(JavaProcess.STOP_SIGNAL.equals(l));
+							return true;
+						}, (c, l) -> true), false)))
+					return success.get();
+			} catch (Exception e) {
+				// Nothing to do.
+			}
 			return false;
 		}
 		@Override

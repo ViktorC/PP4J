@@ -81,6 +81,7 @@ public class StandardProcessPool implements ProcessPool {
 	private final StandardProcessExecutorObjectPool procExecutorPool;
 	private final Queue<StandardProcessExecutor> activeProcExecutors;
 	private final BlockingDeque<InternalSubmission<?>> submissionQueue;
+	private final AtomicInteger numOfFiredUpExecutors;
 	private final AtomicInteger numOfActiveSubmissions;
 	private final CountDownLatch prestartLatch;
 	private final Object poolLock;
@@ -136,6 +137,7 @@ public class StandardProcessPool implements ProcessPool {
 		procExecutorPool = new StandardProcessExecutorObjectPool();
 		submissionQueue = new LinkedBlockingDeque<>();
 		activeProcExecutors = new LinkedBlockingQueue<>();
+		numOfFiredUpExecutors = new AtomicInteger(0);
 		numOfActiveSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
 		poolLock = new Object();
@@ -229,8 +231,9 @@ public class StandardProcessPool implements ProcessPool {
 	 * @return Whether the process pool should be extended.
 	 */
 	private boolean doExtendPool() {
-		return !shutdown && (activeProcExecutors.size() < minPoolSize || (activeProcExecutors.size() <
-				Math.min(maxPoolSize, numOfActiveSubmissions.get() + submissionQueue.size() + reserveSize)));
+		return !shutdown && activeProcExecutors.size() < maxPoolSize && (numOfActiveSubmissions.get() < 
+				minPoolSize || numOfFiredUpExecutors.get() < Math.min(maxPoolSize, numOfActiveSubmissions.get() + 
+				submissionQueue.size() + reserveSize));
 	}
 	/**
 	 * Starts a new process by executing the provided {@link StandardProcessExecutor}. If it is null, it borrows 
@@ -844,6 +847,7 @@ public class StandardProcessPool implements ProcessPool {
 							manager.onStartup(this);
 							if (stop)
 								return;
+							numOfFiredUpExecutors.incrementAndGet();
 							// Start accepting submissions.
 							auxThreadPool.submit(this::startHandlingSubmissions);
 							if (doTime) {
@@ -872,6 +876,7 @@ public class StandardProcessPool implements ProcessPool {
 				} catch (Exception e) {
 					throw new ProcessException(e);
 				} finally {
+					numOfFiredUpExecutors.decrementAndGet();
 					// Stop the timer.
 					if (doTime)
 						timer.stop();
