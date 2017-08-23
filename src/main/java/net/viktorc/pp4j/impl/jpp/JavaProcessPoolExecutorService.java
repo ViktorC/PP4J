@@ -68,11 +68,10 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 * @throws IllegalArgumentException If the minimum pool size is less than 0, or the maximum pool size is less 
 	 * than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
 	 */
-	public JavaProcessPoolExecutorService(JavaProcessOptions options, long keepAliveTime, int minPoolSize,
+	public JavaProcessPoolExecutorService(JavaProcessOptions options, int minPoolSize,
 			int maxPoolSize, int reserveSize, boolean verbose)
 					throws InterruptedException {
-		super(new JavaProcessManagerFactory(options, keepAliveTime), minPoolSize, maxPoolSize, reserveSize,
-				verbose);
+		super(new JavaProcessManagerFactory(options), minPoolSize, maxPoolSize, reserveSize, verbose);
 		termLock = new Object();
 	}
 	/**
@@ -331,24 +330,24 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 */
 	private static class JavaProcessManagerFactory implements ProcessManagerFactory {
 		
-		ProcessBuilder procBuilder;
-		long keepAliveTime;
+		JavaProcessOptions options;
 		
 		/**
-		 * Constructs an instance based on the specified JVM options and <code>keepAliveTime</code>. 
-		 * It creates a single <code>ProcessBuilder</code> which it uses for the creation of all 
-		 * processes of the pool.
+		 * Constructs an instance based on the specified JVM options and <code>keepAliveTime</code> 
+		 * which are used for the creation of all processes of the pool.
 		 * 
 		 * @param options The JVM options for starting the Java process.
-		 * @param keepAliveTime The number of milliseconds of idleness after which the processes should be 
-		 * terminated. If it is non-positive, the life-cycle of processes will not be limited based on 
-		 * idleness.
 		 */
-		JavaProcessManagerFactory(JavaProcessOptions options, long keepAliveTime) {
+		JavaProcessManagerFactory(JavaProcessOptions options) {
+			this.options = options;
+		}
+		@Override
+		public ProcessManager newProcessManager() {
 			String javaPath = System.getProperty("java.home") + File.separator + "bin" +
 					File.separator + "java";
 			String classPath = System.getProperty("java.class.path");
 			String className = JavaProcess.class.getCanonicalName();
+			long keepAliveTime = 0;
 			List<String> javaOptions = new ArrayList<>();
 			if (options != null) {
 				JVMArch arch = options.getArch();
@@ -356,15 +355,16 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 				Integer initHeap = options.getInitHeapSizeMb();
 				Integer maxHeap = options.getMaxHeapSizeMb();
 				Integer stack = options.getStackSizeKb();
+				keepAliveTime = options.getKeepAliveTime();
 				if (arch != null)
 					javaOptions.add(arch.equals(JVMArch.BIT_32) ? "-d32" : "-d64");
 				if (type != null)
 					javaOptions.add(type.equals(JVMType.CLIENT) ? "-client" : "-server");
-				if (initHeap != null)
+				if (initHeap > 0)
 					javaOptions.add(String.format("-Xms%dm", initHeap));
-				if (maxHeap != null)
+				if (maxHeap > 0)
 					javaOptions.add(String.format("-Xmx%dm", maxHeap));
-				if (stack != null)
+				if (stack > 0)
 					javaOptions.add(String.format("-Xss%dk", stack));
 			}
 			List<String> args = new ArrayList<>();
@@ -373,12 +373,10 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 			args.add("-cp");
 			args.add(classPath);
 			args.add(className);
-			procBuilder = new ProcessBuilder(args);
-			this.keepAliveTime = keepAliveTime;
-		}
-		@Override
-		public ProcessManager newProcessManager() {
-			return new JavaProcessManager(procBuilder, keepAliveTime);
+			ProcessBuilder builder = new ProcessBuilder(args);
+			// Redirect the error stream to reduce the number of used threads per process.
+			builder.redirectErrorStream(true);
+			return new JavaProcessManager(builder, keepAliveTime);
 		}
 		
 	}
@@ -425,19 +423,16 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		public List<Command> getCommands() {
 			return Arrays.asList(new SimpleCommand(command, (c, l) -> {
 						try {
-							result = (T) Conversion.toObject(l);
+							if (l.startsWith(JavaProcess.ERROR_PREFIX))
+								error = (Throwable) Conversion.toObject(l.substring(
+										JavaProcess.ERROR_PREFIX.length()));
+							else
+								result = (T) Conversion.toObject(l);
+							return true;
 						} catch (Exception e) {
 							throw new ProcessException(e);
 						}
-						return true;
-					}, (c, l) -> {
-						try {
-							error = (Throwable) Conversion.toObject(l);
-						} catch (Exception e) {
-							throw new ProcessException(e);
-						}
-						return true;
-					}));
+					}, (c, l) -> true /* It cannot happen, as stderr is redirected. */));
 		}
 		@Override
 		public boolean doTerminateProcessAfterwards() {

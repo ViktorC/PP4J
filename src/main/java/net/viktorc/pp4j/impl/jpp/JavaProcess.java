@@ -22,6 +22,11 @@ class JavaProcess {
 	 */
 	static final String STARTUP_SIGNAL = "--READY--";
 	/**
+	 * A prefix denoting that the response contains a serialized <code>Throwable<code> instance 
+	 * that was thrown during the execution of the task.
+	 */
+	static final String ERROR_PREFIX = "--ERROR--";
+	/**
 	 * The request for the termination of the program.
 	 */
 	static final String STOP_REQUEST = "--STOP--";
@@ -45,8 +50,13 @@ class JavaProcess {
 				DummyPrintStream dummyOut = new DummyPrintStream();
 				DummyPrintStream dummyErr = new DummyPrintStream()) {
 			boolean stop = false;
+			/* As the process' stderr is redirected to the stdout, there is no need for a 
+			 * reference to this stream; neither should the submissions be able to print to 
+			 * stdout through the System.err stream. */
+			try {
+				System.setErr(dummyErr);
+			} catch (SecurityException e) { /* Ignore it. */ }
 			PrintStream out = System.out;
-			PrintStream err = System.err;
 			// Send the startup signal.
 			System.out.println(STARTUP_SIGNAL);
 			try {
@@ -62,12 +72,11 @@ class JavaProcess {
 						Object input = Conversion.toObject(line);
 						if (input instanceof Callable<?>) {
 							Callable<?> c = (Callable<?>) input;
-							/* Try to redirect the out streams to make sure that print 
+							/* Try to redirect the out stream to make sure that print 
 							 * statements and such do not cause the submission to be assumed 
 							 * done falsely. */
 							try {
 								System.setOut(dummyOut);
-								System.setErr(dummyErr);
 							} catch (SecurityException e) { /* Ignore it. */ }
 							Object output = c.call();
 							try {
@@ -78,21 +87,20 @@ class JavaProcess {
 							continue;
 					} catch (Throwable e) {
 						try {
-							System.setOut(dummyOut);
-							System.setErr(err);
+							System.setOut(out);
 						} catch (SecurityException e1) { /* Ignore it. */ }
-						System.err.println(Conversion.toString(e));
+						System.out.println(ERROR_PREFIX + Conversion.toString(e));
 					}
 				}
 			} catch (Throwable e) {
 				try {
-					System.setErr(err);
+					System.setOut(out);
 				} catch (SecurityException e1) { /* Ignore it. */ }
 				throw e;
 			}
 		} catch (Throwable e) {
 			try {
-				System.err.println(Conversion.toString(e));
+				System.out.println(ERROR_PREFIX + Conversion.toString(e));
 			} catch (Exception e1) { /* Give up all hope. */ }
 		}
 	}

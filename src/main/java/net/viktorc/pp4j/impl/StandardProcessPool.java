@@ -77,8 +77,8 @@ public class StandardProcessPool implements ProcessPool {
 	private final int reserveSize;
 	private final boolean verbose;
 	private final StandardProcessPoolExecutor procExecutorThreadPool;
-	private final ExecutorService auxThreadPool;
 	private final StandardProcessExecutorObjectPool procExecutorPool;
+	private final ExecutorService auxThreadPool;
 	private final Queue<StandardProcessExecutor> activeProcExecutors;
 	private final BlockingDeque<InternalSubmission<?>> submissionQueue;
 	private final AtomicInteger numOfActiveSubmissions;
@@ -127,13 +127,13 @@ public class StandardProcessPool implements ProcessPool {
 		this.reserveSize = reserveSize;
 		this.verbose = verbose;
 		procExecutorThreadPool = new StandardProcessPoolExecutor();
+		procExecutorPool = new StandardProcessExecutorObjectPool();
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
-		/* One process requires minimum 3 auxiliary threads (std_out listener, err_out listener, 
-		 * submission handler); 4 if keepAliveTime is positive (one more for timing). */
-		auxThreadPool = new ThreadPoolExecutor(3*actualMinSize, Integer.MAX_VALUE, EVICT_TIME,
+		/* One normal process requires minimum 2 auxiliary threads (stdout listener, submission handler), 3 if 
+		 * the stderr is not redirected to stdout (stderr listener), and 4 if keepAliveTime is positive (timer). */
+		auxThreadPool = new ThreadPoolExecutor(2*actualMinSize, Integer.MAX_VALUE, EVICT_TIME,
 				TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
 				new CustomizedThreadFactory(this + "-auxThreadPool"));
-		procExecutorPool = new StandardProcessExecutorObjectPool();
 		submissionQueue = new LinkedBlockingDeque<>();
 		activeProcExecutors = new LinkedBlockingQueue<>();
 		numOfActiveSubmissions = new AtomicInteger(0);
@@ -1116,7 +1116,7 @@ public class StandardProcessPool implements ProcessPool {
 				
 				@Override
 				public void uncaughtException(Thread t, Throwable e) {
-					// Log the exception whether verbose or not.
+					e.printStackTrace();
 					logger.error(e.getMessage(), e);
 					StandardProcessPool.this.shutdown();
 				}

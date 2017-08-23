@@ -25,13 +25,12 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test01() throws InterruptedException, ExecutionException {
 		ProcessPoolExecutorService exec = new JavaProcessPoolExecutorService(
-				new SimpleJavaProcessOptions(1, 2, 128), 0, 50, 150, 25, false);
+				new SimpleJavaProcessOptions(2, 4, 256, 0), 1, 1, 0, false);
 		try {
 			List<Future<?>> futures = new ArrayList<>();
 			long start = System.currentTimeMillis();
 			AtomicInteger j = new AtomicInteger(2);
-			for (int i = 0; i < 100; i++) {
-				Thread.sleep(50);
+			for (int i = 0; i < 1; i++) {
 				futures.add(exec.submit((Runnable & Serializable) () -> {
 					j.incrementAndGet();
 					Thread t = new Thread(() -> {

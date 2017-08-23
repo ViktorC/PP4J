@@ -4,7 +4,7 @@ import net.viktorc.pp4j.api.jpp.JavaProcessOptions;
 
 /**
  * A simple implementation of the {@link net.viktorc.pp4j.api.jpp.JavaProcessOptions} interface for the 
- * definition of JVM options.
+ * definition of JVM options and the timeout interval of Java processes.
  * 
  * @author Viktor Csomor
  *
@@ -13,53 +13,58 @@ public class SimpleJavaProcessOptions implements JavaProcessOptions {
 
 	private JVMArch arch;
 	private JVMType type;
-	private Integer initHeapSizeMb;
-	private Integer maxHeapSizeMb;
-	private Integer stackSizeKb;
+	private int initHeapSizeMb;
+	private int maxHeapSizeMb;
+	private int stackSizeKb;
+	private long keepAliveTime;
 	
 	/**
 	 * Constructs an instance according to the specified parameters.
 	 * 
 	 * @param arch The architecture of the JVM. If it is null, it will be ignored.
 	 * @param type The type of the JVM. If it is null, it will be ignored.
-	 * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is null, it will be ignored.
-	 * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is null, it will be ignored.
-	 * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is null, it will be ignored.
+	 * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is non-positive, it will 
+	 * be ignored.
+	 * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is non-positive, it will 
+	 * be ignored.
+	 * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is non-positive, it will 
+	 * be ignored.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it 
+	 * is non-positive, the life span of the process will not be limited.
 	 */
-	public SimpleJavaProcessOptions(JVMArch arch, JVMType type, Integer initHeapSizeMb, Integer maxHeapSizeMb,
-			Integer stackSizeKb) {
-		if (initHeapSizeMb != null && initHeapSizeMb <= 0)
-			throw new IllegalArgumentException("The initHeapSizeMb must be greater than 0.");
-		if (maxHeapSizeMb != null && maxHeapSizeMb <= 0)
-			throw new IllegalArgumentException("The maxHeapSizeMb must be greater than 0.");
-		if (initHeapSizeMb > maxHeapSizeMb)
-			throw new IllegalArgumentException("The initHeapSizeMb cannot be greater than the maxHeapSizeMb.");
-		if (stackSizeKb != null && stackSizeKb <= 0)
-			throw new IllegalArgumentException("The stackSize must be greater than 0.");
+	public SimpleJavaProcessOptions(JVMArch arch, JVMType type, int initHeapSizeMb, int maxHeapSizeMb,
+			int stackSizeKb, long keepAliveTime) {
 		this.arch = arch;
 		this.type = type;
 		this.initHeapSizeMb = initHeapSizeMb;
 		this.maxHeapSizeMb = maxHeapSizeMb;
 		this.stackSizeKb = stackSizeKb;
+		this.keepAliveTime = keepAliveTime;
 	}
 	/**
 	 * Constructs an instance according to the specified parameters.
 	 * 
-	 * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is null, it will be ignored.
-	 * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is null, it will be ignored.
-	 * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is null, it will be ignored.
+	 * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is non-positive, it will 
+	 * be ignored.
+	 * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is non-positive, it will 
+	 * be ignored.
+	 * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is non-positive, it will 
+	 * be ignored.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it 
+	 * is non-positive, the life span of the process will not be limited.
 	 */
-	public SimpleJavaProcessOptions(Integer initHeapSizeMb, Integer maxHeapSizeMb, Integer stackSizeKb) {
-		this(null, null, initHeapSizeMb, maxHeapSizeMb, stackSizeKb);
+	public SimpleJavaProcessOptions(int initHeapSizeMb, int maxHeapSizeMb, int stackSizeKb,
+			long keepAliveTime) {
+		this(null, null, initHeapSizeMb, maxHeapSizeMb, stackSizeKb, keepAliveTime);
 	}
 	/**
 	 * Constructs an instance according to the specified parameters.
 	 * 
-	 * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is null, it will be ignored.
-	 * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is null, it will be ignored.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it 
+	 * is non-positive, the life span of the process will not be limited.
 	 */
-	public SimpleJavaProcessOptions(Integer initHeapSizeMb, Integer maxHeapSizeMb) {
-		this(initHeapSizeMb, maxHeapSizeMb, null);
+	public SimpleJavaProcessOptions(long keepAliveTime) {
+		this(null, null, 0, 0, 0, keepAliveTime);
 	}
 	@Override
 	public JVMArch getArch() {
@@ -70,16 +75,20 @@ public class SimpleJavaProcessOptions implements JavaProcessOptions {
 		return type;
 	}
 	@Override
-	public Integer getInitHeapSizeMb() {
+	public int getInitHeapSizeMb() {
 		return initHeapSizeMb;
 	}
 	@Override
-	public Integer getMaxHeapSizeMb() {
+	public int getMaxHeapSizeMb() {
 		return maxHeapSizeMb;
 	}
 	@Override
-	public Integer getStackSizeKb() {
+	public int getStackSizeKb() {
 		return stackSizeKb;
+	}
+	@Override
+	public long getKeepAliveTime() {
+		return keepAliveTime;
 	}
 	
 }

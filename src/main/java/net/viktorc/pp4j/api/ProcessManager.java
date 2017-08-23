@@ -42,17 +42,6 @@ public interface ProcessManager {
 	 */
 	boolean isStartedUp(String outputLine, boolean standard);
 	/**
-	 * A method called right after the process is started. Its main purpose is to allow for startup 
-	 * activities such as the execution of commands. The <code>executor</code> should be available and ready 
-	 * for processing submissions within this call back, thus its 
-	 * {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} method should always return <code>true
-	 * </code>.
-	 * 
-	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
-	 * It serves as a handle for sending commands to the underlying process after the startup if needed.
-	 */
-	void onStartup(ProcessExecutor executor);
-	/**
 	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
 	 * close resources or to exit the process in an orderly way. The return value of the method denotes 
 	 * whether the process was successfully terminated. If orderly termination fails or for any other reason 
@@ -75,6 +64,17 @@ public interface ProcessManager {
 	default long getKeepAliveTime() {
 		return 0;
 	}
+	/**
+	 * A method called right after the process is started. Its main purpose is to allow for startup 
+	 * activities such as the execution of commands. The <code>executor</code> should be available and ready 
+	 * for processing submissions within this call back, thus its 
+	 * {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} method should always return <code>true
+	 * </code>.
+	 * 
+	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
+	 * It serves as a handle for sending commands to the underlying process after the startup if needed.
+	 */
+	default void onStartup(ProcessExecutor executor) { }
 	/**
 	 * A method called right after the process terminates. Its main purpose is to allow for wrap-up 
 	 * activities.
