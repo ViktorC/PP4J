@@ -54,8 +54,6 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 * 
 	 * @param options The options for the "java" program used to create the new JVM. If it is null, no options 
 	 * are used.
-	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 
-	 * <code>0</code> or less, the life span of the process will not be limited.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.

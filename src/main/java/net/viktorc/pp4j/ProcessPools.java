@@ -203,7 +203,7 @@ public class ProcessPools {
 	}
 	/**
 	 * Returns a fixed size pool holding a single Java process. It is a convenience method for calling the method
-	 * {@link #newSingleProcessPoolExecutorService(JavaProcessOptions, long)} with <code>options</code> set to 
+	 * {@link #newSingleProcessPoolExecutorService(JavaProcessOptions)} with <code>options</code> set to 
 	 * <code>null</code>.
 	 * 
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to 
