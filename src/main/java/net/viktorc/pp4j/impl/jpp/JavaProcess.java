@@ -5,19 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The class whose main method is run as a separate process by the Java process based 
@@ -59,7 +47,6 @@ class JavaProcess {
 			boolean stop = false;
 			PrintStream out = System.out;
 			PrintStream err = System.err;
-			warmUp();
 			// Send the startup signal.
 			System.out.println(STARTUP_SIGNAL);
 			try {
@@ -72,7 +59,7 @@ class JavaProcess {
 							System.out.println(STOP_SIGNAL);
 							return;
 						}
-						Object input = ConversionUtil.decode(line);
+						Object input = Conversion.toObject(line);
 						if (input instanceof Callable<?>) {
 							Callable<?> c = (Callable<?>) input;
 							/* Try to redirect the out streams to make sure that print 
@@ -86,7 +73,7 @@ class JavaProcess {
 							try {
 								System.setOut(out);
 							} catch (SecurityException e) { /* Ignore it. */ }
-							System.out.println(ConversionUtil.encode(output));
+							System.out.println(Conversion.toString(output));
 						} else
 							continue;
 					} catch (Throwable e) {
@@ -94,7 +81,7 @@ class JavaProcess {
 							System.setOut(dummyOut);
 							System.setErr(err);
 						} catch (SecurityException e1) { /* Ignore it. */ }
-						System.err.println(ConversionUtil.encode(e));
+						System.err.println(Conversion.toString(e));
 					}
 				}
 			} catch (Throwable e) {
@@ -105,46 +92,8 @@ class JavaProcess {
 			}
 		} catch (Throwable e) {
 			try {
-				System.err.println(ConversionUtil.encode(e));
+				System.err.println(Conversion.toString(e));
 			} catch (Exception e1) { /* Give up all hope. */ }
-		}
-	}
-	/**
-	 * A task for warming up the JVM instance; it ensures that some of the most important and most 
-	 * commonly used classes are loaded.
-	 */
-	private static void warmUp() {
-		try {
-			Callable<Integer> task = (Callable<Integer> & Serializable) () -> {
-				Set<Object> set = new HashSet<>();
-				set.add(true);
-				set.add('C');
-				set.add((byte) 16);
-				set.add((short) 1024);
-				set.add(100000);
-				set.add(0xe8fc763dL);
-				set.add((float) 0.5);
-				set.add(2.718281);
-				set.add("string");
-				set.add(Thread.currentThread());
-				set.add(Executors.callable(() -> { }, new AtomicInteger()));
-				List<?> linkedList = new LinkedList<>(set);
-				Map<Object,Boolean> map = new HashMap<>();
-				Random rand = new Random();
-				linkedList.stream().forEach(e -> map.put(e, rand.nextDouble() >= 0.5));
-				int[] nums = new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-				List<?> list = Arrays.asList(nums);
-				List<?> arrayList = new ArrayList<>(list);
-				arrayList.clear();
-				return (int) Arrays.stream(nums).filter(n -> n%2 != 0).average().getAsDouble();
-			};
-			String encodedTask = ConversionUtil.encode(task);
-			Object decodedTask = ConversionUtil.decode(encodedTask);
-			((Callable<?>) decodedTask).call();
-		} catch (Exception e) {
-			return;
-		} finally {
-			System.gc();
 		}
 	}
 	

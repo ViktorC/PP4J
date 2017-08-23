@@ -60,7 +60,5 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	public boolean terminateGracefully(ProcessExecutor executor) {
 		return false;
 	}
-	@Override
-	public void onTermination(int resultCode, long lifeTime) { /* Don't do anything. */ }
 
 }

@@ -15,12 +15,12 @@ import java.util.Base64;
  * @author Viktor Csomor
  *
  */
-class ConversionUtil {
+class Conversion {
 
 	/**
 	 * Only static methods.
 	 */
-	private ConversionUtil() { };
+	private Conversion() { };
 	/**
 	 * Serializes the specified object into a string and encodes it using Base64.
 	 * 
@@ -30,7 +30,7 @@ class ConversionUtil {
 	 * @throws NotSerializableException If some object to be serialized does not implement the 
 	 * {@link java.io.Serializable} interface.
 	 */
-	static String encode(Object o) throws IOException {
+	static String toString(Object o) throws IOException {
 		try (ByteArrayOutputStream byteArrayOut = new ByteArrayOutputStream();
 				ObjectOutputStream objectOutput = new ObjectOutputStream(byteArrayOut)) {
 			objectOutput.writeObject(o);
@@ -46,7 +46,7 @@ class ConversionUtil {
 	 * @throws ClassNotFoundException If the deserialization fails due to the class 
 	 * of the object not having been found.
 	 */
-	static Object decode(String s) throws IOException, ClassNotFoundException {
+	static Object toObject(String s) throws IOException, ClassNotFoundException {
 		byte[] bytes = Base64.getDecoder().decode(s);
 		try (ObjectInputStream objectInput = new ObjectInputStream(
 				new ByteArrayInputStream(bytes))) {

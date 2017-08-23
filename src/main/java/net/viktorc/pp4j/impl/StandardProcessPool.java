@@ -57,8 +57,8 @@ import net.viktorc.pp4j.api.Submission;
  * submissions. The submissions are queued and executed as soon as there is an available executor. The size of the 
  * pool is always kept between the minimum pool size and the maximum pool size (both inclusive). The reserve size 
  * specifies the minimum number of processes that should always be available (there are no guarantees that there 
- * actually will be this many available executors at any given time). It uses <a href="https://www.slf4j.org/">
- * SLF4J</a> for logging.
+ * actually will be this many available executors at any given time). It uses 
+ * <a href="https://www.slf4j.org/">SLF4J</a> for logging.
  * 
  * @author Viktor Csomor
  *
@@ -811,6 +811,7 @@ public class StandardProcessPool implements ProcessPool {
 				termSemaphore.drainPermits();
 				int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 				long lifeTime = 0;
+				long startupTime = 0;
 				try {
 					submissionLock.lock();
 					boolean orderly = false;
@@ -826,6 +827,7 @@ public class StandardProcessPool implements ProcessPool {
 							timer = doTime && timer == null ? new KeepAliveTimer() : timer;
 							// Start the process.
 							synchronized (processLock) {
+								startupTime = System.currentTimeMillis();
 								process = manager.start();
 							}
 							lifeTime = System.currentTimeMillis();
@@ -844,6 +846,9 @@ public class StandardProcessPool implements ProcessPool {
 							manager.onStartup(this);
 							if (stop)
 								return;
+							startupTime = System.currentTimeMillis() - startupTime;
+							logger.debug(String.format("Startup time in executor %s: %.3f", this,
+									((float) startupTime)/1000));
 							// Start accepting submissions.
 							auxThreadPool.submit(this::startHandlingSubmissions);
 							if (doTime) {

@@ -15,6 +15,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import net.viktorc.pp4j.api.Command;
@@ -142,7 +143,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 				.filter(s -> s instanceof JavaSubmission)
 				.map(s -> (JavaSubmission<?,?>) s)
 				.filter(s -> s.task instanceof SerializableRunnableWithResult)
-				.map(s -> ((SerializableRunnableWithResult<?,?>) s.task).runnable)
+				.map(s -> ((SerializableRunnableWithResult<?,?>) s.task).task)
 				.collect(Collectors.toList());
 	}
 	@Override
@@ -271,7 +272,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 *
 	 */
 	private static class JavaProcessManager extends AbstractProcessManager {
-
+		
 		/**
 		 * Constructs an instance using the specified <code>builder</code> and <code>keepAliveTime</code>.
 		 * 
@@ -292,7 +293,18 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 			return standard && JavaProcess.STARTUP_SIGNAL.equals(outputLine);
 		}
 		@Override
-		public void onStartup(ProcessExecutor executor) { /* Don't do anything. */ }
+		public void onStartup(ProcessExecutor executor) {
+			// Warm up the JVM by ensuring that the most relevant classes are loaded.
+			try {
+				executor.execute(new JavaSubmission<>(new SerializableCallable<>(
+						(Callable<Integer> & Serializable) () -> 1 + 2), false));
+				executor.execute(new JavaSubmission<>(new SerializableRunnableWithResult<>(
+						(Runnable & Serializable) () -> { System.out.println("test"); },
+						new AtomicInteger()), false));
+			} catch (Exception e) {
+				return;
+			}
+		}
 		@Override
 		public boolean terminateGracefully(ProcessExecutor executor) {
 			try {
@@ -303,13 +315,9 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 							return true;
 						}, (c, l) -> true), false)))
 					return success.get();
-			} catch (Exception e) {
-				// Nothing to do.
-			}
+			} catch (Exception e) { /* Nothing to do. */ }
 			return false;
 		}
-		@Override
-		public void onTermination(int resultCode, long lifeTime) { /* Don't do anything. */ }
 		
 	}
 	
@@ -410,21 +418,21 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 				throws IOException {
 			this.task = task;
 			this.terminateProcessAfterwards = terminateProcessAfterwards;
-			command = ConversionUtil.encode(task);
+			command = Conversion.toString(task);
 		}
 		@SuppressWarnings("unchecked")
 		@Override
 		public List<Command> getCommands() {
 			return Arrays.asList(new SimpleCommand(command, (c, l) -> {
 						try {
-							result = (T) ConversionUtil.decode(l);
+							result = (T) Conversion.toObject(l);
 						} catch (Exception e) {
 							throw new ProcessException(e);
 						}
 						return true;
 					}, (c, l) -> {
 						try {
-							error = (Throwable) ConversionUtil.decode(l);
+							error = (Throwable) Conversion.toObject(l);
 						} catch (Exception e) {
 							throw new ProcessException(e);
 						}
@@ -525,36 +533,36 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	
 	/**
 	 * A wrapper class implementing the {@link java.util.concurrent.Callable} interface for turning serializable 
-	 * {@link java.lang.Runnable} instances with serializable results into serializable {@link java.util.concurrent.Callable} 
-	 * instances with explicitly serialized return types.
+	 * {@link java.lang.Runnable} instances with serializable results into serializable 
+	 * {@link java.util.concurrent.Callable} instances with explicitly serialized return types.
 	 * 
 	 * @author Viktor Csomor
 	 *
-	 * @param <T> The return type.
-	 * @param <S> The {@link java.lang.Runnable} and {@link java.io.Serializable} task type.
+	 * @param <T> The {@link java.lang.Runnable} and {@link java.io.Serializable} task type.
+	 * @param <S> The return type.
 	 */
-	private static class SerializableRunnableWithResult<T extends Serializable, S extends Runnable & Serializable> 
-			implements Callable<T>, Serializable {
+	private static class SerializableRunnableWithResult<T extends Runnable & Serializable, S extends Serializable> 
+			implements Callable<S>, Serializable {
 		
 		static final long serialVersionUID = -1069566262473097740L;
-		
-		T result;
-		S runnable;
+
+		T task;
+		S result;
 		
 		/**
 		 * Constructs a serializable <code>Callable</code> instance from the specified <code>Runnable</code> and 
 		 * return object.
 		 * 
-		 * @param runnable The task to execute.
+		 * @param task The task to execute.
 		 * @param result The object to return as a result of the operation.
 		 */
-		SerializableRunnableWithResult(S runnable, T result) {
-			this.runnable = runnable;
+		SerializableRunnableWithResult(T task, S result) {
+			this.task = task;
 			this.result = result;
 		}
 		@Override
-		public T call() throws Exception {
-			runnable.run();
+		public S call() throws Exception {
+			task.run();
 			return result;
 		}
 		

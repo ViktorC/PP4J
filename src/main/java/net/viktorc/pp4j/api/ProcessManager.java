@@ -13,14 +13,6 @@ import java.io.IOException;
 public interface ProcessManager {
 	
 	/**
-	 * Determines the duration of continuous idleness after which the process is to be terminated. The process 
-	 * is considered idle if it is started up and not processing any submission. If it returns <code>0</code> 
-	 * or less, the life span of the process is not limited.
-	 * 
-	 * @return The number of milliseconds of idleness after which the process is to be terminated.
-	 */
-	long getKeepAliveTime();
-	/**
 	 * A method that starts a new process. The process created should always be the same and it should always 
 	 * be started only upon the call of this method.
 	 * 
@@ -74,12 +66,22 @@ public interface ProcessManager {
 	 */
 	boolean terminateGracefully(ProcessExecutor executor);
 	/**
+	 * Determines the duration of continuous idleness after which the process is to be terminated. The process 
+	 * is considered idle if it is started up and not processing any submission. If it returns <code>0</code> 
+	 * or less, the life span of the process is not limited. By default, it returns <code>0</code>.
+	 * 
+	 * @return The number of milliseconds of idleness after which the process is to be terminated.
+	 */
+	default long getKeepAliveTime() {
+		return 0;
+	}
+	/**
 	 * A method called right after the process terminates. Its main purpose is to allow for wrap-up 
 	 * activities.
 	 * 
 	 * @param resultCode The result code the process returned.
 	 * @param lifeTime The life time of the process in milliseconds.
 	 */
-	void onTermination(int resultCode, long lifeTime);
+	default void onTermination(int resultCode, long lifeTime) { }
 	
 }
