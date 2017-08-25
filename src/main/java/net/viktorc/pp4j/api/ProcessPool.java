@@ -31,7 +31,7 @@ public interface ProcessPool {
 	 */
 	<T> Future<T> submit(Submission<T> submission);
 	/**
-	 * Shuts the executor service down freeing up the associated resources.
+	 * Shuts the process pool down.
 	 */
 	void shutdown();
 	/**

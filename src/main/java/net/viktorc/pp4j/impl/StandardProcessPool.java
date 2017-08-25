@@ -274,6 +274,11 @@ public class StandardProcessPool implements ProcessPool {
 		// Return a Future holding the total execution time including the submission delay.
 		return new InternalSubmissionFuture<T>(internalSubmission);
 	}
+	/**
+	 * See {@link net.viktorc.pp4j.api.ProcessPool}.
+	 * 
+	 * It blocks until the process pool is shut down.
+	 */
 	@Override
 	public synchronized void shutdown() {
 		synchronized (poolLock) {

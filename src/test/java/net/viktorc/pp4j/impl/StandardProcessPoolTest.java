@@ -205,8 +205,11 @@ public class StandardProcessPoolTest {
 			Thread.sleep(cancelTime);
 			for (Future<?> future : futures)
 				future.cancel(forcedCancel);
-		} else if (earlyClose)
+		} else if (earlyClose) {
+			assert !processPool.isShutdown() : "Process pool considered shut down falsely.";
 			processPool.shutdown();
+			assert processPool.isShutdown() : "Process pool considered alive falsely.";
+		}
 		for (int i = 0; i < futures.size(); i++) {
 			Future<?> future = futures.get(i);
 			if (waitTimeout > 0)

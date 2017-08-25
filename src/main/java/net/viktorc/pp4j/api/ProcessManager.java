@@ -5,7 +5,8 @@ import java.io.IOException;
 /**
  * An interface that defines methods that allow for the managing of the life cycle of pooled processes. It 
  * defines methods that start the process, determine and handle its startup behavior, and allow for its 
- * orderly termination.
+ * orderly termination. The same instance may be used for the management of multiple subsequent processes, 
+ * thus the implementation should allow for reusability.
  * 
  * @author Viktor Csomor
  *
