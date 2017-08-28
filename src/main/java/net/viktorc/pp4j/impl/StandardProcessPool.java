@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
@@ -836,9 +837,10 @@ public class StandardProcessPool implements ProcessPool {
 								process = manager.start();
 							}
 							lifeTime = System.currentTimeMillis();
-							stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-							stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-							stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+							Charset chars = manager.getEncoding();
+							stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream(), chars));
+							stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), chars));
+							stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), chars));
 							// Handle the startup; check if the process is to be considered immediately started up.
 							startedUp = manager.startsUpInstantly();
 							auxThreadPool.submit(() -> startListeningToProcess(stdOutReader, true));

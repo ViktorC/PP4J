@@ -1,6 +1,7 @@
 package net.viktorc.pp4j.api;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 
 /**
  * An interface that defines methods that allow for the managing of the life cycle of pooled processes. It 
@@ -55,6 +56,15 @@ public interface ProcessManager {
 	 * @return Whether the process has been successfully terminated.
 	 */
 	boolean terminateGracefully(ProcessExecutor executor);
+	/**
+	 * Returns the character set to use to communicate with the managed process through its standard streams. 
+	 * By default, it returns the platform-default character set.
+	 * 
+	 * @return The character set to when reading from and writing to the process' streams.
+	 */
+	default Charset getEncoding() {
+		return Charset.defaultCharset();
+	}
 	/**
 	 * Determines the duration of continuous idleness after which the process is to be terminated. The process 
 	 * is considered idle if it is started up and not processing any submission. If it returns <code>0</code> 
