@@ -45,9 +45,6 @@ import net.viktorc.pp4j.impl.StandardProcessPool;
  *
  */
 public class JavaProcessPoolExecutorService extends StandardProcessPool implements ProcessPoolExecutorService {
-
-	private final Object termLock;
-	private volatile boolean terminated;
 	
 	/**
 	 * Constructs a Java process pool executor using the specified parameters.
@@ -70,7 +67,6 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 			int maxPoolSize, int reserveSize, boolean verbose)
 					throws InterruptedException {
 		super(new JavaProcessManagerFactory(options), minPoolSize, maxPoolSize, reserveSize, verbose);
-		termLock = new Object();
 	}
 	/**
 	 * It executes a serializable {@link java.util.concurrent.Callable} instance with a serializable 
@@ -110,16 +106,6 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		return submit(new JavaSubmission<>(new SerializableRunnableWithResult<>(task, null),
 				terminateProcessAfterwards));
 	}
-	/**
-	 * Synchronously shuts down the process pool.
-	 */
-	private void syncShutdown() {
-		synchronized (termLock) {
-			super.shutdown();
-			terminated = true;
-			termLock.notifyAll();
-		}
-	}
 	@Override
 	public void execute(Runnable command) {
 		try {
@@ -129,14 +115,16 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		}
 	}
 	@Override
-	public synchronized void shutdown() {
-		if (!isShutdown())
-			(new Thread(this::syncShutdown)).start();
+	public boolean isShutdown() {
+		return super.isShutdown();
+	}
+	@Override
+	public void shutdown() {
+		super.shutdown();
 	}
 	@Override
 	public List<Runnable> shutdownNow() {
-		super.shutdown();
-		return getQueuedSubmissions().stream()
+		return super.forcedShutdown().stream()
 				.filter(s -> s instanceof JavaSubmission)
 				.map(s -> (JavaSubmission<?,?>) s)
 				.filter(s -> s.task instanceof SerializableRunnableWithResult)
@@ -145,19 +133,11 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	}
 	@Override
 	public boolean isTerminated() {
-		return terminated;
+		return super.isTerminated();
 	}
 	@Override
 	public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-		synchronized (termLock) {
-			long waitTimeNs = unit.toNanos(timeout);
-			while (waitTimeNs > 0 && !terminated) {
-				long start = System.nanoTime();
-				termLock.wait(waitTimeNs/1000000, (int) (waitTimeNs%1000000));
-				waitTimeNs -= (System.nanoTime() - start);
-			}
-			return waitTimeNs > 0;
-		}
+		return super.awaitTermination(timeout, unit);
 	}
 	@Override
 	public <T> Future<T> submit(Callable<T> task) {

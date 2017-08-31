@@ -78,10 +78,8 @@ public class StandardProcessPoolTest {
 				pool.getReserveSize() + ".";
 		assert verbose == pool.isVerbose() : "Different verbosity: " + verbose + " and " +
 				pool.isVerbose() + ".";
-		assert pool.getNumOfQueuedSubmissions() == 0 : "Non-zero number of queued submissions on startup: " +
-				pool.getNumOfQueuedSubmissions() + ".";
-		assert pool.getNumOfExecutingSubmissions() == 0 : "Non-zero number of executing submissions on " +
-				"startup: " + pool.getNumOfExecutingSubmissions() + ".";
+		assert pool.getNumOfActiveSubmissions() == 0 : "Non-zero number of active submissions on " +
+				"startup: " + pool.getNumOfActiveSubmissions() + ".";
 		assert pool.getNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of " +
 				"total processes: " + pool.getNumOfProcesses() + " instead of " +
 				Math.max(minPoolSize, reserveSize) + ".";
@@ -207,7 +205,7 @@ public class StandardProcessPoolTest {
 				future.cancel(forcedCancel);
 		} else if (earlyClose) {
 			assert !processPool.isShutdown() : "Process pool considered shut down falsely.";
-			processPool.shutdown();
+			processPool.forcedShutdown();
 			assert processPool.isShutdown() : "Process pool considered alive falsely.";
 		}
 		for (int i = 0; i < futures.size(); i++) {
@@ -218,7 +216,7 @@ public class StandardProcessPoolTest {
 				future.get();
 		}
 		if (!earlyClose)
-			processPool.shutdown();
+			processPool.forcedShutdown();
 		String testArgMessage = "keepAliveTime: %d; throwStartupError: %s; verifyStartup: %s;%n" +
 				"manuallyTerminate: %s; reuse: %s; procTimes: %s; requests: %d; timeSpan: %d;%n" +
 				"throwExecutionError: %s; cancelTime: %d; forcedCancel: %s; earlyClose: %s;%n" +
@@ -466,7 +464,7 @@ public class StandardProcessPoolTest {
 			pool = getPool(20, 30, 0, 0, false, false, true, false);
 		} finally {
 			if (pool != null)
-				pool.shutdown();
+				pool.forcedShutdown();
 		}
 	}
 	// Single process pool performance testing.

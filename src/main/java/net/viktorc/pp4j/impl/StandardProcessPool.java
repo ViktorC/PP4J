@@ -20,6 +20,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
@@ -84,6 +85,7 @@ public class StandardProcessPool implements ProcessPool {
 	private final BlockingDeque<InternalSubmission<?>> submissionQueue;
 	private final AtomicInteger numOfActiveSubmissions;
 	private final CountDownLatch prestartLatch;
+	private final CountDownLatch poolTermLatch;
 	private final Object poolLock;
 	private final Logger logger;
 	private volatile boolean shutdown;
@@ -139,6 +141,7 @@ public class StandardProcessPool implements ProcessPool {
 		activeProcExecutors = new LinkedBlockingQueue<>();
 		numOfActiveSubmissions = new AtomicInteger(0);
 		prestartLatch = new CountDownLatch(actualMinSize);
+		poolTermLatch = new CountDownLatch(1);
 		poolLock = new Object();
 		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 		for (int i = 0; i < actualMinSize && !shutdown; i++) {
@@ -192,28 +195,12 @@ public class StandardProcessPool implements ProcessPool {
 		return activeProcExecutors.size();
 	}
 	/**
-	 * Returns the number of submissions currently being executed in the pool.
+	 * Returns the number of submissions currently being held in the queue or executed in the pool.
 	 * 
-	 * @return The number of submissions currently being executed in the pool.
+	 * @return The number of submissions currently handled by the pool.
 	 */
-	public int getNumOfExecutingSubmissions() {
+	public int getNumOfActiveSubmissions() {
 		return numOfActiveSubmissions.get();
-	}
-	/**
-	 * Returns the number of submissions queued and waiting for execution.
-	 * 
-	 * @return The number of queued submissions.
-	 */
-	public int getNumOfQueuedSubmissions() {
-		return submissionQueue.size();
-	}
-	/**
-	 * Returns a list of the submissions currently in the queue.
-	 * 
-	 * @return A list of the queued submissions.
-	 */
-	protected List<Submission<?>> getQueuedSubmissions() {
-		return submissionQueue.stream().map(s -> s.origSubmission).collect(Collectors.toList());
 	}
 	/**
 	 * Returns the number of active, queued, and currently executing processes as string.
@@ -231,7 +218,7 @@ public class StandardProcessPool implements ProcessPool {
 	 */
 	private boolean doExtendPool() {
 		return !shutdown && (activeProcExecutors.size() < minPoolSize || (activeProcExecutors.size() <
-				Math.min(maxPoolSize, numOfActiveSubmissions.get() + submissionQueue.size() + reserveSize)));
+				Math.min(maxPoolSize, numOfActiveSubmissions.get() + reserveSize)));
 	}
 	/**
 	 * Starts a new process by executing the provided {@link StandardProcessExecutor}. If it is null, it borrows 
@@ -260,9 +247,10 @@ public class StandardProcessPool implements ProcessPool {
 	@Override
 	public <T> Future<T> submit(Submission<T> submission) {
 		if (shutdown)
-			throw new IllegalStateException("The pool has already been shut down.");
+			throw new RejectedExecutionException("The pool has already been shut down.");
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
+		numOfActiveSubmissions.incrementAndGet();
 		InternalSubmission<T> internalSubmission = new InternalSubmission<>(submission);
 		submissionQueue.addLast(internalSubmission);
 		// If necessary, adjust the pool size given the new submission.
@@ -275,45 +263,69 @@ public class StandardProcessPool implements ProcessPool {
 		// Return a Future holding the total execution time including the submission delay.
 		return new InternalSubmissionFuture<T>(internalSubmission);
 	}
-	/**
-	 * See {@link net.viktorc.pp4j.api.ProcessPool}.
-	 * 
-	 * It blocks until the process pool is shut down.
-	 */
 	@Override
-	public synchronized void shutdown() {
+	public void shutdown() {
 		synchronized (poolLock) {
-			if (shutdown)
-				throw new IllegalStateException("The pool has already been shut down.");
-			logger.info("Initiating shutdown...");
-			shutdown = true;
-			while (prestartLatch.getCount() != 0)
-				prestartLatch.countDown();
-			logger.debug("Shutting down process executors...");
-			for (StandardProcessExecutor executor : activeProcExecutors) {
-				if (!executor.stop(true)) {
-					// This should never happen.
-					logger.error("Process executor {} could not be stopped.", executor);
-				}
+			if (!shutdown) {
+				shutdown = true;
+				(new Thread(() -> {
+					logger.info("Initiating shutdown...");
+					synchronized (submissionQueue) {
+						try {
+							while (numOfActiveSubmissions.get() > 0)
+								submissionQueue.wait();
+						} catch (InterruptedException e) {
+							Thread.currentThread().interrupt();
+						}
+					}
+					forcedShutdown();
+				})).start();
 			}
-			logger.debug("Shutting down thread pools...");
-			auxThreadPool.shutdown();
-			procExecutorThreadPool.shutdown();
-			procExecutorPool.close();
 		}
-		try {
-			auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-			procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-			for (InternalSubmission<?> submission : submissionQueue)
-				submission.setException(new Exception("The process pool has been shut down."));
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
+	}
+	@Override
+	public List<Submission<?>> forcedShutdown() {
+		synchronized (poolLock) {
+			shutdown = true;
+			if (poolTermLatch.getCount() != 0) {
+				while (prestartLatch.getCount() != 0)
+					prestartLatch.countDown();
+				logger.debug("Shutting down process executors...");
+				for (StandardProcessExecutor executor : activeProcExecutors) {
+					if (!executor.stop(true)) {
+						// This should never happen.
+						logger.error("Process executor {} could not be stopped.", executor);
+					}
+				}
+				logger.debug("Shutting down thread pools...");
+				auxThreadPool.shutdown();
+				procExecutorThreadPool.shutdown();
+				procExecutorPool.close();
+				try {
+					auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+					procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+					for (InternalSubmission<?> submission : submissionQueue)
+						submission.setException(new Exception("The process pool has been shut down."));
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+				poolTermLatch.countDown();
+				logger.info("Process pool shut down.");
+			}
+			return submissionQueue.stream().map(s -> s.origSubmission).collect(Collectors.toList());
 		}
-		logger.info("Process pool shut down.");
 	}
 	@Override
 	public boolean isShutdown() {
 		return shutdown;
+	}
+	@Override
+	public boolean isTerminated() {
+		return poolTermLatch.getCount() == 0;
+	}
+	@Override
+	public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+		return poolTermLatch.await(timeout, unit);
 	}
 	@Override
 	public String toString() {
@@ -625,7 +637,6 @@ public class StandardProcessPool implements ProcessPool {
 			try {
 				while (running && !stop) {
 					InternalSubmission<?> submission = null;
-					boolean submissionRetrieved = false;
 					boolean completed = false;
 					try {
 						/* Wait until the startup phase is over and the mainLock is available to avoid retrieving 
@@ -635,10 +646,6 @@ public class StandardProcessPool implements ProcessPool {
 						submissionLock.unlock();
 						// Wait for an available submission.
 						submission = submissionQueue.takeFirst();
-						/* Increment the counter for active submissions to keep track of the number of busy 
-						 * processes. */
-						numOfActiveSubmissions.incrementAndGet();
-						submissionRetrieved = true;
 						submission.setThread(subThread);
 						if (submission.isCancelled()) {
 							submission = null;
@@ -675,10 +682,15 @@ public class StandardProcessPool implements ProcessPool {
 								submission.setThread(null);
 								submissionQueue.addFirst(submission);
 							}
-						}
-						// Decrement the active submissions counter if it was incremented in this cycle.
-						if (submissionRetrieved)
+						} else {
 							numOfActiveSubmissions.decrementAndGet();
+							// If the pool is shutdown and there are no more submissions left, signalize it.
+							if (shutdown && numOfActiveSubmissions.get() == 0) {
+								synchronized (submissionQueue) {
+									submissionQueue.notifyAll();
+								}
+							}
+						}
 						// If the submission did not complete due to an error or cancellation, kill the process.
 						if (!completed) {
 							submissionLock.lock();
@@ -1125,7 +1137,7 @@ public class StandardProcessPool implements ProcessPool {
 				public void uncaughtException(Thread t, Throwable e) {
 					e.printStackTrace();
 					logger.error(e.getMessage(), e);
-					StandardProcessPool.this.shutdown();
+					StandardProcessPool.this.forcedShutdown();
 				}
 			});
 			return t;
