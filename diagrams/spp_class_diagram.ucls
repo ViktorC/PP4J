@@ -49,7 +49,7 @@
   </interface>  
   <interface id="6" language="java" name="net.viktorc.pp4j.api.ProcessPool" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/api/ProcessPool.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1821" y="-539"/>    
+    <position height="-1" width="-1" x="1803" y="-555"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -132,167 +132,167 @@
   </class>  
   <nesting id="15">    
     <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="4"/>  
+    <end type="TARGET" refId="14"/>  
   </nesting>  
   <nesting id="16">    
-    <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="2"/>  
-  </nesting>  
-  <association id="17">    
-    <bendpoint x="2033" y="-50"/>    
-    <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="18" name="submissionQueue">        
-        <position height="20" width="112" x="1959" y="-38"/>      
-      </attribute>      
-      <multiplicity id="19" minimum="0" maximum="2147483647">        
-        <position height="18" width="25" x="2036" y="-72"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="8" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <association id="20">    
-    <end type="SOURCE" refId="2" navigable="false">      
-      <attribute id="21" name="submission">        
-        <position height="20" width="78" x="2202" y="-159"/>      
-      </attribute>      
-      <multiplicity id="22" minimum="0" maximum="1">        
-        <position height="18" width="27" x="2170" y="-159"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="8" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <nesting id="23">    
     <end type="SOURCE" refId="10"/>    
     <end type="TARGET" refId="1"/>  
   </nesting>  
-  <association id="24">    
-    <end type="SOURCE" refId="10" navigable="false">      
-      <attribute id="25" name="command">        
-        <position height="18" width="56" x="1871" y="248"/>      
-      </attribute>      
-      <multiplicity id="26" minimum="0" maximum="1">        
-        <position height="16" width="23" x="1840" y="252"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="13" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <association id="27">    
-    <end type="SOURCE" refId="8" navigable="false">      
-      <attribute id="28" name="origSubmission">        
-        <position height="18" width="83" x="2183" y="187"/>      
-      </attribute>      
-      <multiplicity id="29" minimum="0" maximum="1">        
-        <position height="16" width="23" x="2160" y="178"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="3" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <realization id="30">    
-    <end type="SOURCE" refId="8"/>    
-    <end type="TARGET" refId="3"/>  
-  </realization>  
-  <association id="31">    
-    <bendpoint x="1765" y="-23"/>    
+  <association id="17">    
     <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="32" name="activeProcExecutors">        
-        <position height="20" width="127" x="1640" y="-17"/>      
-      </attribute>      
-      <multiplicity id="33" minimum="0" maximum="2147483647">        
-        <position height="18" width="25" x="1775" y="-18"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="10" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <association id="34">    
-    <end type="SOURCE" refId="10" navigable="false">      
-      <attribute id="35" name="timer">        
-        <position height="18" width="33" x="1459" y="214"/>      
-      </attribute>      
-      <multiplicity id="36" minimum="0" maximum="1">        
-        <position height="18" width="27" x="1499" y="229"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="1" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <nesting id="37">    
-    <bendpoint x="2038" y="-93"/>    
-    <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="8"/>  
-  </nesting>  
-  <association id="38">    
-    <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="39" name="procManagerFactory">        
+      <attribute id="18" name="procManagerFactory">        
         <position height="20" width="127" x="2092" y="-428"/>      
       </attribute>      
-      <multiplicity id="40" minimum="0" maximum="1">        
+      <multiplicity id="19" minimum="0" maximum="1">        
         <position height="18" width="27" x="2041" y="-433"/>      
       </multiplicity>    
     </end>    
     <end type="TARGET" refId="12" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
-  <realization id="41">    
-    <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="6"/>  
-  </realization>  
-  <realization id="42">    
-    <end type="SOURCE" refId="10"/>    
-    <end type="TARGET" refId="5"/>  
-  </realization>  
-  <association id="43">    
-    <end type="SOURCE" refId="10" navigable="false">      
-      <attribute id="44" name="manager">        
-        <position height="18" width="52" x="1548" y="54"/>      
+  <association id="20">    
+    <end type="SOURCE" refId="8" navigable="false">      
+      <attribute id="21" name="origSubmission">        
+        <position height="18" width="83" x="2183" y="187"/>      
       </attribute>      
-      <multiplicity id="45" minimum="0" maximum="1">        
-        <position height="16" width="23" x="1551" y="87"/>      
+      <multiplicity id="22" minimum="0" maximum="1">        
+        <position height="16" width="23" x="2160" y="178"/>      
       </multiplicity>    
     </end>    
-    <end type="TARGET" refId="11" navigable="true"/>    
+    <end type="TARGET" refId="3" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
-  <association id="46">    
+  <association id="23">    
+    <bendpoint x="1765" y="-23"/>    
     <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="47" name="procExecutorPool">        
-        <position height="20" width="111" x="1394" y="-458"/>      
+      <attribute id="24" name="activeProcExecutors">        
+        <position height="20" width="127" x="1640" y="-17"/>      
       </attribute>      
-      <multiplicity id="48" minimum="0" maximum="1">        
-        <position height="18" width="27" x="1520" y="-448"/>      
+      <multiplicity id="25" minimum="0" maximum="2147483647">        
+        <position height="18" width="25" x="1775" y="-18"/>      
       </multiplicity>    
     </end>    
-    <end type="TARGET" refId="7" navigable="true"/>    
+    <end type="TARGET" refId="10" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
-  <association id="49">    
+  <association id="26">    
     <bendpoint x="1581" y="-229"/>    
     <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="50" name="procExecutorThreadPool">        
+      <attribute id="27" name="procExecutorThreadPool">        
         <position height="20" width="150" x="1390" y="-226"/>      
       </attribute>      
-      <multiplicity id="51" minimum="0" maximum="1">        
+      <multiplicity id="28" minimum="0" maximum="1">        
         <position height="18" width="27" x="1521" y="-197"/>      
       </multiplicity>    
     </end>    
     <end type="TARGET" refId="14" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
-  <nesting id="52">    
+  <association id="29">    
+    <end type="SOURCE" refId="10" navigable="false">      
+      <attribute id="30" name="timer">        
+        <position height="18" width="33" x="1459" y="214"/>      
+      </attribute>      
+      <multiplicity id="31" minimum="0" maximum="1">        
+        <position height="18" width="27" x="1499" y="229"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="1" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <nesting id="32">    
+    <end type="SOURCE" refId="9"/>    
+    <end type="TARGET" refId="4"/>  
+  </nesting>  
+  <association id="33">    
+    <end type="SOURCE" refId="9" navigable="false">      
+      <attribute id="34" name="procExecutorPool">        
+        <position height="20" width="111" x="1394" y="-458"/>      
+      </attribute>      
+      <multiplicity id="35" minimum="0" maximum="1">        
+        <position height="18" width="27" x="1520" y="-448"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="7" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <nesting id="36">    
+    <end type="SOURCE" refId="9"/>    
+    <end type="TARGET" refId="2"/>  
+  </nesting>  
+  <realization id="37">    
+    <end type="SOURCE" refId="10"/>    
+    <end type="TARGET" refId="5"/>  
+  </realization>  
+  <association id="38">    
+    <end type="SOURCE" refId="10" navigable="false">      
+      <attribute id="39" name="manager">        
+        <position height="18" width="52" x="1548" y="54"/>      
+      </attribute>      
+      <multiplicity id="40" minimum="0" maximum="1">        
+        <position height="16" width="23" x="1551" y="87"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="11" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <association id="41">    
+    <end type="SOURCE" refId="2" navigable="false">      
+      <attribute id="42" name="submission">        
+        <position height="20" width="78" x="2202" y="-159"/>      
+      </attribute>      
+      <multiplicity id="43" minimum="0" maximum="1">        
+        <position height="18" width="27" x="2170" y="-159"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="8" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <realization id="44">    
+    <end type="SOURCE" refId="8"/>    
+    <end type="TARGET" refId="3"/>  
+  </realization>  
+  <realization id="45">    
+    <end type="SOURCE" refId="9"/>    
+    <end type="TARGET" refId="6"/>  
+  </realization>  
+  <nesting id="46">    
+    <bendpoint x="2038" y="-93"/>    
+    <end type="SOURCE" refId="9"/>    
+    <end type="TARGET" refId="8"/>  
+  </nesting>  
+  <association id="47">    
+    <bendpoint x="2033" y="-50"/>    
+    <end type="SOURCE" refId="9" navigable="false">      
+      <attribute id="48" name="submissionQueue">        
+        <position height="20" width="112" x="1959" y="-38"/>      
+      </attribute>      
+      <multiplicity id="49" minimum="0" maximum="2147483647">        
+        <position height="18" width="25" x="2036" y="-72"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="8" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <nesting id="50">    
     <end type="SOURCE" refId="9"/>    
     <end type="TARGET" refId="7"/>  
   </nesting>  
-  <nesting id="53">    
-    <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="10"/>  
-  </nesting>  
+  <association id="51">    
+    <end type="SOURCE" refId="10" navigable="false">      
+      <attribute id="52" name="command">        
+        <position height="18" width="56" x="1871" y="248"/>      
+      </attribute>      
+      <multiplicity id="53" minimum="0" maximum="1">        
+        <position height="16" width="23" x="1840" y="252"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="13" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
   <nesting id="54">    
     <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="14"/>  
+    <end type="TARGET" refId="10"/>  
   </nesting>  
   <classifier-display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
     sort-features="false" accessors="true" visibility="true">    

@@ -31,6 +31,7 @@ import net.viktorc.pp4j.api.jpp.ProcessPoolExecutorService;
  */
 public class JavaProcessPoolExecutorTest {
 
+	@SuppressWarnings("unused")
 	private <T> List<Entry<T,Long>> test(ProcessPoolExecutorService exec, Callable<T> task,
 			int reps, int freq) throws InterruptedException, ExecutionException {
 		List<Entry<T,Long>> times = new ArrayList<>();
@@ -86,19 +87,6 @@ public class JavaProcessPoolExecutorTest {
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Integer.MAX_VALUE, TimeUnit.DAYS);
-		}
-	}
-	@Test
-	public void test02() throws InterruptedException, ExecutionException {
-		ProcessPoolExecutorService exec = new JavaProcessPoolExecutorService(
-				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 10000),
-				0, 20, 0, false);
-		int expectedResult = 0;
-		List<Entry<Integer,Long>> res = test(exec, (Callable<Integer> & Serializable) () -> {
-					return 0;
-				}, 20, 2);
-		for (Entry<Integer,Long> e : res) {
-			Assert.assertTrue(expectedResult == e.getKey() && e.getValue() < 500);
 		}
 	}
 	

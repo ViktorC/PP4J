@@ -44,7 +44,7 @@ public interface ProcessPool {
 	 * 
 	 * @return A list of the submissions that were waiting execution.
 	 */
-	List<Submission<?>> forcedShutdown();
+	List<Submission<?>> forceShutdown();
 	/**
 	 * Returns whether the shutdown of the pool has been initiated. See 
 	 * {@link java.util.concurrent.ExecutorService#isShutdown()}.

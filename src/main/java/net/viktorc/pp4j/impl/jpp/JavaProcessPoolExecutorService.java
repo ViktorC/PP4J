@@ -115,31 +115,6 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		}
 	}
 	@Override
-	public boolean isShutdown() {
-		return super.isShutdown();
-	}
-	@Override
-	public void shutdown() {
-		super.shutdown();
-	}
-	@Override
-	public List<Runnable> shutdownNow() {
-		return super.forcedShutdown().stream()
-				.filter(s -> s instanceof JavaSubmission)
-				.map(s -> (JavaSubmission<?,?>) s)
-				.filter(s -> s.task instanceof SerializableRunnableWithResult)
-				.map(s -> ((SerializableRunnableWithResult<?,?>) s.task).task)
-				.collect(Collectors.toList());
-	}
-	@Override
-	public boolean isTerminated() {
-		return super.isTerminated();
-	}
-	@Override
-	public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-		return super.awaitTermination(timeout, unit);
-	}
-	@Override
 	public <T> Future<T> submit(Callable<T> task) {
 		try {
 			return new CastFuture<>(submit(new SerializableCallable<>((Callable<T> & Serializable) task),
@@ -239,6 +214,21 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		if (execException == null)
 			throw new TimeoutException();
 		throw execException;
+	}
+	/**
+	 * See {@link java.util.concurrent.ExecutorService#shutdownNow()}. It is equivalent to 
+	 * {@link #forceShutdown()} with the only difference being that this method filters and converts the 
+	 * returned submissions to a list of {@link java.lang.Runnable} instances excluding 
+	 * {@link java.util.concurrent.Callable} based submissions.
+	 */
+	@Override
+	public List<Runnable> shutdownNow() {
+		return super.forceShutdown().stream()
+				.filter(s -> s instanceof JavaSubmission)
+				.map(s -> (JavaSubmission<?,?>) s)
+				.filter(s -> s.task instanceof SerializableRunnableWithResult)
+				.map(s -> ((SerializableRunnableWithResult<?,?>) s.task).task)
+				.collect(Collectors.toList());
 	}
 	
 	/**
