@@ -293,35 +293,37 @@ public class StandardProcessPool implements ProcessPool {
 	public List<Submission<?>> forceShutdown() {
 		synchronized (shutdownLock) {
 			if (poolTermLatch.getCount() != 0) {
-				poolLock.lock();
-				try {
-					shutdown = true;
-					while (prestartLatch.getCount() != 0)
-						prestartLatch.countDown();
-					logger.debug("Shutting down process executors...");
-					for (StandardProcessExecutor executor : activeProcExecutors) {
-						if (!executor.stop(true)) {
-							// This should never happen.
-							logger.error("Process executor {} could not be stopped.", executor);
+				(new Thread(() -> {
+					synchronized (shutdownLock) {
+						poolLock.lock();
+						try {
+							shutdown = true;
+							while (prestartLatch.getCount() != 0)
+								prestartLatch.countDown();
+							logger.debug("Shutting down process executors...");
+							for (StandardProcessExecutor executor : activeProcExecutors) {
+								if (!executor.stop(true)) // This should never happen.
+									logger.error("Process executor {} could not be stopped.", executor);
+							}
+							logger.debug("Shutting down thread pools...");
+							auxThreadPool.shutdown();
+							procExecutorThreadPool.shutdown();
+							procExecutorPool.close();
+						} finally {
+							poolLock.unlock();
 						}
+						try {
+							auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+							procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+							for (InternalSubmission<?> submission : submissionQueue)
+								submission.setException(new Exception("The process pool has been shut down."));
+						} catch (InterruptedException e) {
+							Thread.currentThread().interrupt();
+						}
+						poolTermLatch.countDown();
+						logger.info("Process pool shut down.");
 					}
-					logger.debug("Shutting down thread pools...");
-					auxThreadPool.shutdown();
-					procExecutorThreadPool.shutdown();
-					procExecutorPool.close();
-				} finally {
-					poolLock.unlock();
-				}
-				try {
-					auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-					procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-					for (InternalSubmission<?> submission : submissionQueue)
-						submission.setException(new Exception("The process pool has been shut down."));
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-				}
-				poolTermLatch.countDown();
-				logger.info("Process pool shut down.");
+				})).start();
 			}
 			return submissionQueue.stream().map(s -> s.origSubmission).collect(Collectors.toList());
 		}
@@ -690,11 +692,9 @@ public class StandardProcessPool implements ProcessPool {
 					} finally {
 						/* If the execute method failed and there was no exception thrown, put the submission 
 						 * back into the queue at the front. */
-						if (submission != null) {
-							if (!submission.isCancelled()) {
-								submission.setThread(null);
-								submissionQueue.addFirst(submission);
-							}
+						if (submission != null && !submission.isCancelled()) {
+							submission.setThread(null);
+							submissionQueue.addFirst(submission);
 						} else if (submissionRetrieved) {
 							// If the pool is shutdown and there are no more submissions left, signalize it.
 							synchronized (submissionQueue) {
@@ -707,7 +707,7 @@ public class StandardProcessPool implements ProcessPool {
 						if (!completed) {
 							submissionLock.lock();
 							try {
-								stop(false);
+								stop(true);
 							} finally {
 								submissionLock.unlock();
 							}
@@ -1185,8 +1185,8 @@ public class StandardProcessPool implements ProcessPool {
 
 						@Override
 						public boolean offer(Runnable r) {
-							/* If there is at least one thread waiting on the queue, delegate the task immediately; 
-							 * else decline it and force the pool to create a new thread for running the task. */
+							/* If there is at least one thread waiting on the queue, delegate the runnable immediately; 
+							 * else decline it and force the pool to create a new thread for running the runnable. */
 							return tryTransfer(r);
 						}
 					}, new CustomizedThreadFactory(StandardProcessPool.this + "-procExecThreadPool"),
@@ -1198,7 +1198,7 @@ public class StandardProcessPool implements ProcessPool {
 								/* If there are no threads waiting on the queue (all of them are busy executing) 
 								 * and the maximum pool size has been reached, when the queue declines the offer, 
 								 * the pool will not create any more threads but call this handler instead. This 
-								 * handler 'forces' the declined task on the queue, ensuring that it is not 
+								 * handler 'forces' the declined runnable on the queue, ensuring that it is not 
 								 * rejected. */
 								executor.getQueue().put(r);
 							} catch (InterruptedException e) {

@@ -44,19 +44,6 @@ public interface ProcessManager {
 	 */
 	boolean isStartedUp(String outputLine, boolean standard);
 	/**
-	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
-	 * close resources or to exit the process in an orderly way. The return value of the method denotes 
-	 * whether the process was successfully terminated. If orderly termination fails or for any other reason 
-	 * this method returns <code>false</code>, the process is killed forcibly. If the return value is <code>
-	 * true</code>, the process is considered successfully terminated.
-	 * 
-	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
-	 * It serves as a handle for sending commands to the underlying process to terminate it in an orderly 
-	 * way.
-	 * @return Whether the process has been successfully terminated.
-	 */
-	boolean terminateGracefully(ProcessExecutor executor);
-	/**
 	 * Returns the character set to use to communicate with the managed process through its standard streams. 
 	 * By default, it returns the platform-default character set.
 	 * 
@@ -86,6 +73,21 @@ public interface ProcessManager {
 	 * It serves as a handle for sending commands to the underlying process after the startup if needed.
 	 */
 	default void onStartup(ProcessExecutor executor) { }
+	/**
+	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
+	 * close resources or to exit the process in an orderly way. The return value of the method denotes 
+	 * whether the process was successfully terminated. If orderly termination fails or for any other reason 
+	 * this method returns <code>false</code>, the process is killed forcibly. If the return value is <code>
+	 * true</code>, the process is considered successfully terminated. By default, it returns null.
+	 * 
+	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
+	 * It serves as a handle for sending commands to the underlying process to terminate it in an orderly 
+	 * way.
+	 * @return Whether the process has been successfully terminated.
+	 */
+	default boolean terminateGracefully(ProcessExecutor executor) {
+		return false;
+	}
 	/**
 	 * A method called right after the process terminates. Its main purpose is to allow for wrap-up 
 	 * activities.

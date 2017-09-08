@@ -33,7 +33,9 @@ public interface Submission<T> {
 	 * the submission.
 	 * @throws ExecutionException if an error occurred while executing the submission.
 	 */
-	default T getResult() throws ExecutionException { return null; }
+	default T getResult() throws ExecutionException {
+		return null;
+	}
 	/**
 	 * A method that is executed once the processing of the submitted commands has begun.
 	 */

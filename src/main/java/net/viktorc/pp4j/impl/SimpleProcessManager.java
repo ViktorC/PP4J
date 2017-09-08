@@ -26,12 +26,23 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 
 	 * <code>0</code> or less, the life span of the process will not be limited.
 	 * @param onStartup A consumer that is called after the process started up to allow for the execution 
-	 * of commands to 'prepare' the process for the pool.
+	 * of commands to 'prepare' the process for the pool. If it is null, no preprocessing is performed.
 	 */
 	public SimpleProcessManager(ProcessBuilder builder, long keepAliveTime,
 			Consumer<ProcessExecutor> onStartup) {
 		super(builder, keepAliveTime);
 		this.onStartup = onStartup;
+	}
+	/**
+	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with the 
+	 * specified maximum life span.
+	 * 
+	 * @param builder The instance to build the processes with.
+	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 
+	 * <code>0</code> or less, the life span of the process will not be limited.
+	 */
+	public SimpleProcessManager(ProcessBuilder builder, long keepAliveTime) {
+		this(builder, keepAliveTime, null);
 	}
 	/**
 	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder}.
@@ -41,8 +52,15 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	 * of commands to 'prepare' the process for the pool.
 	 */
 	public SimpleProcessManager(ProcessBuilder builder, Consumer<ProcessExecutor> onStartup) {
-		super(builder, 0);
-		this.onStartup = onStartup;
+		this(builder, 0, onStartup);
+	}
+	/**
+	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder}.
+	 * 
+	 * @param builder The instance to build the processes with.
+	 */
+	public SimpleProcessManager(ProcessBuilder builder) {
+		this(builder, 0, null);
 	}
 	@Override
 	public boolean startsUpInstantly() {
@@ -54,7 +72,8 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	}
 	@Override
 	public void onStartup(ProcessExecutor executor) {
-		onStartup.accept(executor);
+		if (onStartup != null)
+			onStartup.accept(executor);
 	}
 	@Override
 	public boolean terminateGracefully(ProcessExecutor executor) {

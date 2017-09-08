@@ -7,7 +7,7 @@ import java.util.List;
  * outputs of the process in response to the instruction. Besides possible processing activities, the 
  * {@link #isProcessed(String, boolean)} method is also responsible for determining when the process finished 
  * processing the command. E.g. if a process takes the command "go" which triggers the execution of a long-running 
- * task, and it prints "ready" to its standard out stream once the task is completed, the method should only return 
+ * runnable, and it prints "ready" to its standard out stream once the runnable is completed, the method should only return 
  * true if the output "ready" has been written to the standard out, in any other case, it should return false 
  * (unless perhaps an error message is printed to the standard error stream). The interface also defines a method that 
  * is called before the execution of chained commands with the previous command as its parameter to determine 
@@ -24,17 +24,6 @@ public interface Command {
 	 * @return The instruction to write to the process' standard in.
 	 */
 	String getInstruction();
-	/**
-	 * A method called before the execution of every command, except the first, in a submission containing 
-	 * multiple commands. It determines whether the command is to be executed. This allows for the establishment 
-	 * of conditions on which certain commands should be executed. If a submission contains only a single command, 
-	 * this method is not called at all.
-	 * 
-	 * @param prevCommands The commands preceding this one in the submission that have already been executed and 
-	 * processed or skipped if their respective {@link #doExecute(List)} methods returned false.
-	 * @return Whether this command should be executed.
-	 */
-	boolean doExecute(List<Command> prevCommands);
 	/**
 	 * A method called before the printing of the instruction of the process' standard in. It denotes whether the 
 	 * command is expected to generate output from the process. If it returns false, the command is considered 
@@ -56,5 +45,18 @@ public interface Command {
 	 * until the processing of the command is completed.
 	 */
 	boolean isProcessed(String outputLine, boolean standard);
+	/**
+	 * A method called before the execution of every command, except the first, in a submission containing 
+	 * multiple commands. It determines whether the command is to be executed. This allows for the establishment 
+	 * of conditions on which certain commands should be executed. If a submission contains only a single command, 
+	 * this method is not called at all. By default, it returns true in all cases.
+	 * 
+	 * @param prevCommands The commands preceding this one in the submission that have already been executed and 
+	 * processed or skipped if their respective {@link #doExecute(List)} methods returned false.
+	 * @return Whether this command should be executed.
+	 */
+	default boolean doExecute(List<Command> prevCommands) {
+		return true;
+	}
 	
 }

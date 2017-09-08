@@ -51,6 +51,24 @@ public class SimpleSubmission implements Submission<Object> {
 	public SimpleSubmission(Command command, boolean terminateProcessAfterwards) {
 		this(Arrays.asList(command), terminateProcessAfterwards);
 	}
+	/**
+	 * Constructs an instance according to the specified commands.
+	 * 
+	 * @param commands A list of commands to execute. It should not contain null references.
+	 * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
+	 */
+	public SimpleSubmission(List<Command> commands) {
+		this(commands, false);
+	}
+	/**
+	 * Constructs an instance according to the specified command.
+	 * 
+	 * @param command A command to execute.
+	 * @throws IllegalArgumentException If the command is null.
+	 */
+	public SimpleSubmission(Command command) {
+		this(command, false);
+	}
 	@Override
 	public List<Command> getCommands() {
 		return new ArrayList<>(commands);

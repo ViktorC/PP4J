@@ -26,7 +26,7 @@ public interface ProcessPool {
 	ProcessManagerFactory getProcessManagerFactory();
 	/**
 	 * Submits the specified submission for execution and returns a {@link java.util.concurrent.Future} instance 
-	 * which allows for the cancellation of the submission.
+	 * which allows for the cancellation of the submission. It does not block until the processes terminate.
 	 * 
 	 * @param submission The submission to execute.
 	 * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of 
@@ -40,7 +40,8 @@ public interface ProcessPool {
 	void shutdown();
 	/**
 	 * Kills all the processes, blocks until the pool is shutdown, and returns a list of the submissions that 
-	 * have been submitted but never processed. See {@link java.util.concurrent.ExecutorService#shutdownNow()}.
+	 * have been submitted but never processed. It does not block until the processes terminate. See 
+	 * {@link java.util.concurrent.ExecutorService#shutdownNow()}.
 	 * 
 	 * @return A list of the submissions that were waiting execution.
 	 */
