@@ -292,12 +292,12 @@ public class StandardProcessPool implements ProcessPool {
 	@Override
 	public List<Submission<?>> forceShutdown() {
 		synchronized (shutdownLock) {
+			shutdown = true;
 			if (poolTermLatch.getCount() != 0) {
 				(new Thread(() -> {
 					synchronized (shutdownLock) {
 						poolLock.lock();
 						try {
-							shutdown = true;
 							while (prestartLatch.getCount() != 0)
 								prestartLatch.countDown();
 							logger.debug("Shutting down process executors...");
