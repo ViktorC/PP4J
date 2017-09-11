@@ -936,7 +936,7 @@ public class StandardProcessPool implements ProcessPool {
 					synchronized (processLock) {
 						if (process != null) {
 							if (process.isAlive()) {
-								process.destroy();
+								process.destroyForcibly();
 								try {
 									process.waitFor();
 								} catch (InterruptedException e) {
