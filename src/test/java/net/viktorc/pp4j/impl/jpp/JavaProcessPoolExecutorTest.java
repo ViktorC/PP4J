@@ -563,7 +563,7 @@ public class JavaProcessPoolExecutorTest {
 		System.out.printf(TEST_TITLE_FORMAT, 22);
 		JavaProcessPoolExecutorService exec = new JavaProcessPoolExecutorService(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 500),
-				50, 150, 25, false);
+				50, 150, 25, true);
 		try {
 			List<Future<AtomicInteger>> results = new ArrayList<>();
 			long start = System.currentTimeMillis();
@@ -591,7 +591,7 @@ public class JavaProcessPoolExecutorTest {
 		System.out.printf(TEST_TITLE_FORMAT, 23);
 		SimpleJavaProcessOptions options = new SimpleJavaProcessOptions(2, 4, 256, 0);
 		JavaProcessPoolExecutorService exec = new JavaProcessPoolExecutorService(options,
-				5, 5, 0, true);
+				5, 5, 0, false);
 		try {
 			Assert.assertTrue(exec.getJavaProcessOptions() == options);
 		} finally {
