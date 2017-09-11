@@ -231,7 +231,7 @@ public class JavaProcessPoolExecutorTest {
 			});
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 5080);
+			Assert.assertTrue(time < 5300);
 			Assert.assertTrue(time > 4995);
 		} finally {
 			exec.shutdown();
@@ -260,7 +260,7 @@ public class JavaProcessPoolExecutorTest {
 			results = exec.invokeAll(tasks);
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 4080);
+			Assert.assertTrue(time < 4300);
 			Assert.assertTrue(time > 3995);
 			Assert.assertTrue(results.get(0).get() == 169);
 			Assert.assertTrue(results.get(1).get() == 2197);
@@ -290,7 +290,7 @@ public class JavaProcessPoolExecutorTest {
 			results = exec.invokeAll(tasks);
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 6080);
+			Assert.assertTrue(time < 6300);
 			Assert.assertTrue(time > 5995);
 			Assert.assertTrue(results.get(0).get() == 169);
 			Assert.assertTrue(results.get(1).get() == 2197);
@@ -320,7 +320,7 @@ public class JavaProcessPoolExecutorTest {
 			results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 3080);
+			Assert.assertTrue(time < 3300);
 			Assert.assertTrue(time > 2995);
 			Assert.assertTrue(results.get(0).get() == 169);
 			exceptionRule.expect(CancellationException.class);
@@ -351,7 +351,7 @@ public class JavaProcessPoolExecutorTest {
 			results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 3080);
+			Assert.assertTrue(time < 3300);
 			Assert.assertTrue(time > 2995);
 			Assert.assertTrue(results.get(0).get() == 169);
 			exceptionRule.expect(CancellationException.class);
@@ -381,7 +381,7 @@ public class JavaProcessPoolExecutorTest {
 			int result = exec.invokeAny(tasks);
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 4080);
+			Assert.assertTrue(time < 4300);
 			Assert.assertTrue(time > 3995);
 			Assert.assertTrue(result == 169 || result == 2197);
 		} finally {
@@ -408,7 +408,7 @@ public class JavaProcessPoolExecutorTest {
 			int result = exec.invokeAny(tasks);
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 2080);
+			Assert.assertTrue(time < 2300);
 			Assert.assertTrue(time > 1995);
 			Assert.assertTrue(result == 169);
 		} finally {
@@ -436,7 +436,7 @@ public class JavaProcessPoolExecutorTest {
 			int result = exec.invokeAny(tasks, 3000, TimeUnit.MILLISECONDS);
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 3080);
+			Assert.assertTrue(time < 3300);
 			Assert.assertTrue(time > 2995);
 			Assert.assertTrue(result == 169);
 		} finally {
@@ -524,7 +524,7 @@ public class JavaProcessPoolExecutorTest {
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
 			Assert.assertTrue(res.get() == 13);
-			Assert.assertTrue(time < 2080);
+			Assert.assertTrue(time < 2300);
 			Assert.assertTrue(time > 1995);
 		} finally {
 			exec.shutdown();
@@ -591,7 +591,7 @@ public class JavaProcessPoolExecutorTest {
 		System.out.printf(TEST_TITLE_FORMAT, 23);
 		SimpleJavaProcessOptions options = new SimpleJavaProcessOptions(2, 4, 256, 0);
 		JavaProcessPoolExecutorService exec = new JavaProcessPoolExecutorService(options,
-				5, 5, 0, false);
+				5, 5, 0, true);
 		try {
 			Assert.assertTrue(exec.getJavaProcessOptions() == options);
 		} finally {

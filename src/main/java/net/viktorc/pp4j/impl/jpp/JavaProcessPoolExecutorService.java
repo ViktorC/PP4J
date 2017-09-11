@@ -255,8 +255,9 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		public void onStartup(ProcessExecutor executor) {
 			// Warm up the JVM by ensuring that the most relevant classes are loaded.
 			try {
-				executor.execute(new JavaSubmission<>(new SerializableCallable<>((Callable<Integer> & Serializable)
-						() -> 1 + 2, () -> {}), false));
+				executor.execute(new JavaSubmission<>(new SerializableCallable<>((Callable<Integer> &
+						Serializable) () -> Integer.MAX_VALUE, (Runnable & Serializable) () -> {}),
+						false));
 			} catch (Exception e) {
 				return;
 			}
