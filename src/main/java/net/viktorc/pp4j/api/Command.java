@@ -7,7 +7,7 @@ import java.util.List;
  * outputs of the process in response to the instruction. Besides possible processing activities, the 
  * {@link #isProcessed(String, boolean)} method is also responsible for determining when the process finished 
  * processing the command. E.g. if a process takes the command "go" which triggers the execution of a long-running 
- * runnable, and it prints "ready" to its standard out stream once the runnable is completed, the method should only return 
+ * runnablePart, and it prints "ready" to its standard out stream once the runnablePart is completed, the method should only return 
  * true if the output "ready" has been written to the standard out, in any other case, it should return false 
  * (unless perhaps an error message is printed to the standard error stream). The interface also defines a method that 
  * is called before the execution of chained commands with the previous command as its parameter to determine 

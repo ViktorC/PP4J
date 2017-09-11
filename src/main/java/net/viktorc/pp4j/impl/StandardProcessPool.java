@@ -84,7 +84,7 @@ public class StandardProcessPool implements ProcessPool {
 	private final BlockingDeque<InternalSubmission<?>> submissionQueue;
 	private final CountDownLatch prestartLatch;
 	private final CountDownLatch poolTermLatch;
-	private final Object shutdownLock;
+	private final Lock shutdownLock;
 	private final Lock poolLock;
 	private final Logger logger;
 	private volatile int numOfSubmissions;
@@ -141,7 +141,7 @@ public class StandardProcessPool implements ProcessPool {
 		activeProcExecutors = new LinkedBlockingQueue<>();
 		prestartLatch = new CountDownLatch(actualMinSize);
 		poolTermLatch = new CountDownLatch(1);
-		shutdownLock = new Object();
+		shutdownLock = new ReentrantLock();
 		poolLock = new ReentrantLock(true);
 		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 		for (int i = 0; i < actualMinSize && !shutdown; i++) {
@@ -240,6 +240,58 @@ public class StandardProcessPool implements ProcessPool {
 		logger.debug("Process executor {} started.{}", executor, System.lineSeparator() + getPoolStats());
 		return true;
 	}
+	/**
+	 * Waits until all submissions are completed and calls {@link #syncForceShutdown()}.
+	 */
+	private void syncShutdown() {
+		synchronized (submissionQueue) {
+			logger.info("Waiting for submissions to complete...");
+			try {
+				while (numOfSubmissions > 0)
+					submissionQueue.wait();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return;
+			}
+		}
+		syncForceShutdown();
+	}
+	/**
+	 * Kills all the processes, shuts down the pool, and waits for termination.
+	 */
+	private void syncForceShutdown() {
+		shutdownLock.lock();
+		try {
+			poolLock.lock();
+			try {
+				while (prestartLatch.getCount() != 0)
+					prestartLatch.countDown();
+				logger.debug("Shutting down process executors...");
+				for (StandardProcessExecutor executor : activeProcExecutors) {
+					if (!executor.stop(true)) // This should never happen.
+						logger.error("Process executor {} could not be stopped.", executor);
+				}
+				logger.debug("Shutting down thread pools...");
+				auxThreadPool.shutdown();
+				procExecutorThreadPool.shutdown();
+				procExecutorPool.close();
+			} finally {
+				poolLock.unlock();
+			}
+			try {
+				auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+				procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+				for (InternalSubmission<?> submission : submissionQueue)
+					submission.setException(new Exception("The process pool has been shut down."));
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			logger.info("Process pool shut down.");
+			poolTermLatch.countDown();
+		} finally {
+			shutdownLock.unlock();
+		}
+	}
 	@Override
 	public ProcessManagerFactory getProcessManagerFactory() {
 		return procManagerFactory;
@@ -248,13 +300,14 @@ public class StandardProcessPool implements ProcessPool {
 	public <T> Future<T> submit(Submission<T> submission) {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
+		InternalSubmission<T> internalSubmission;
 		synchronized (submissionQueue) {
 			if (shutdown)
 				throw new RejectedExecutionException("The pool has already been shut down.");
 			numOfSubmissions++;
+			internalSubmission = new InternalSubmission<>(submission);
+			submissionQueue.addLast(internalSubmission);
 		}
-		InternalSubmission<T> internalSubmission = new InternalSubmission<>(submission);
-		submissionQueue.addLast(internalSubmission);
 		// If necessary, adjust the pool size given the new submission.
 		poolLock.lock();
 		try {
@@ -270,63 +323,31 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	@Override
 	public void shutdown() {
-		synchronized (shutdownLock) {
-			if (!shutdown) {
+		if (!shutdown && shutdownLock.tryLock()) {
+			try {
 				shutdown = true;
-				(new Thread(() -> {
-					logger.info("Initiating shutdown...");
-					synchronized (submissionQueue) {
-						try {
-							while (numOfSubmissions > 0)
-								submissionQueue.wait();
-						} catch (InterruptedException e) {
-							Thread.currentThread().interrupt();
-							return;
-						}
-					}
-					forceShutdown();
-				})).start();
+				(new Thread(this::syncShutdown)).start();
+			} finally {
+				shutdownLock.unlock();
 			}
 		}
 	}
 	@Override
 	public List<Submission<?>> forceShutdown() {
-		synchronized (shutdownLock) {
+		List<Submission<?>> queuedSubmissions = null;
+		synchronized (submissionQueue) {
 			shutdown = true;
-			if (poolTermLatch.getCount() != 0) {
-				(new Thread(() -> {
-					synchronized (shutdownLock) {
-						poolLock.lock();
-						try {
-							while (prestartLatch.getCount() != 0)
-								prestartLatch.countDown();
-							logger.debug("Shutting down process executors...");
-							for (StandardProcessExecutor executor : activeProcExecutors) {
-								if (!executor.stop(true)) // This should never happen.
-									logger.error("Process executor {} could not be stopped.", executor);
-							}
-							logger.debug("Shutting down thread pools...");
-							auxThreadPool.shutdown();
-							procExecutorThreadPool.shutdown();
-							procExecutorPool.close();
-						} finally {
-							poolLock.unlock();
-						}
-						try {
-							auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-							procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-							for (InternalSubmission<?> submission : submissionQueue)
-								submission.setException(new Exception("The process pool has been shut down."));
-						} catch (InterruptedException e) {
-							Thread.currentThread().interrupt();
-						}
-						poolTermLatch.countDown();
-						logger.info("Process pool shut down.");
-					}
-				})).start();
-			}
-			return submissionQueue.stream().map(s -> s.origSubmission).collect(Collectors.toList());
+			queuedSubmissions = submissionQueue.stream().map(s -> s.origSubmission)
+					.collect(Collectors.toList());
 		}
+		if (poolTermLatch.getCount() != 0 && shutdownLock.tryLock()) {
+			try {
+				(new Thread(this::syncForceShutdown)).start();
+			} finally {
+				shutdownLock.unlock();
+			}
+		}
+		return queuedSubmissions;
 	}
 	@Override
 	public boolean isShutdown() {
@@ -1185,8 +1206,8 @@ public class StandardProcessPool implements ProcessPool {
 
 						@Override
 						public boolean offer(Runnable r) {
-							/* If there is at least one thread waiting on the queue, delegate the runnable immediately; 
-							 * else decline it and force the pool to create a new thread for running the runnable. */
+							/* If there is at least one thread waiting on the queue, delegate the runnablePart immediately; 
+							 * else decline it and force the pool to create a new thread for running the runnablePart. */
 							return tryTransfer(r);
 						}
 					}, new CustomizedThreadFactory(StandardProcessPool.this + "-procExecThreadPool"),
@@ -1198,7 +1219,7 @@ public class StandardProcessPool implements ProcessPool {
 								/* If there are no threads waiting on the queue (all of them are busy executing) 
 								 * and the maximum pool size has been reached, when the queue declines the offer, 
 								 * the pool will not create any more threads but call this handler instead. This 
-								 * handler 'forces' the declined runnable on the queue, ensuring that it is not 
+								 * handler 'forces' the declined runnablePart on the queue, ensuring that it is not 
 								 * rejected. */
 								executor.getQueue().put(r);
 							} catch (InterruptedException e) {

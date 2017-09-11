@@ -23,7 +23,7 @@ class JavaProcess {
 	static final String STARTUP_SIGNAL = "--READY--";
 	/**
 	 * A prefix denoting that the response contains a serialized <code>Throwable<code> instance 
-	 * that was thrown during the execution of the runnable.
+	 * that was thrown during the execution of the runnablePart.
 	 */
 	static final String ERROR_PREFIX = "--ERROR--";
 	/**

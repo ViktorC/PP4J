@@ -75,9 +75,5 @@ public class SimpleProcessManager extends AbstractProcessManager {
 		if (onStartup != null)
 			onStartup.accept(executor);
 	}
-	@Override
-	public boolean terminateGracefully(ProcessExecutor executor) {
-		return false;
-	}
 
 }

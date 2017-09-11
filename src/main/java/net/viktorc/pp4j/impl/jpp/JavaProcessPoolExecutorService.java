@@ -15,7 +15,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import net.viktorc.pp4j.api.Command;
@@ -82,11 +81,11 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 * contains non-serializable, non-transient fields, or the return type is not serializable, the method 
 	 * fails.
 	 * 
-	 * @param task The runnable to execute.
-	 * @param terminateProcessAfterwards Whether the process that executes the runnable should be terminated 
+	 * @param task The runnablePart to execute.
+	 * @param terminateProcessAfterwards Whether the process that executes the runnablePart should be terminated 
 	 * afterwards.
 	 * @return A {@link java.util.concurrent.Future} instance associated with the return value of the 
-	 * runnable.
+	 * runnablePart.
 	 * @throws IOException If the serialization fails.
 	 * @throws NotSerializableException If some object to be serialized does not implement the 
 	 * {@link java.io.Serializable} interface.
@@ -96,23 +95,6 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		/* Due to the limitation of generics in Java, the serializability of the return type cannot be enforced 
 		 * while adhering to the ExecutorService API. */
 		return submit(new JavaSubmission<>(task, terminateProcessAfterwards));
-	}
-	/**
-	 * It executes a serializable {@link #submit(Runnable)} instance in one of the processes of the pool. 
-	 * If the implementation contains non-serializable, non-transient fields, the method fails.
-	 * 
-	 * @param task The runnable to execute.
-	 * @param terminateProcessAfterwards Whether the process that executes the runnable should be terminated 
-	 * afterwards.
-	 * @return A {@link java.util.concurrent.Future} instance.
-	 * @throws IOException If the serialization fails.
-	 * @throws NotSerializableException If some object to be serialized does not implement the 
-	 * {@link java.io.Serializable} interface.
-	 */
-	public <T extends Runnable & Serializable> Future<?> submit(T task, boolean terminateProcessAfterwards)
-			throws IOException {
-		return submit(new JavaSubmission<>(new SerializableRunnableWithResult<>(task, null),
-				terminateProcessAfterwards));
 	}
 	@Override
 	public void execute(Runnable command) {
@@ -134,8 +116,11 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	@Override
 	public <T> Future<T> submit(Runnable task, T result) {
 		try {
-			return new CastFuture<>(submit(new SerializableRunnableWithResult<>((Runnable & Serializable) task,
-					(T & Serializable) result), false));
+			return new CastFuture<>(submit(new SerializableCallable<>((Callable<T> & Serializable)
+					() -> {
+						task.run();
+						return result;
+					}, task), false));
 		} catch (Exception e) {
 			throw new IllegalArgumentException("The task is not serializable.", e);
 		}
@@ -143,7 +128,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	@Override
 	public Future<?> submit(Runnable task) {
 		try {
-			return submit((Runnable & Serializable) task, false);
+			return submit((Runnable & Serializable) task, null);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("The task is not serializable.", e);
 		}
@@ -203,7 +188,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 			}
 		}
 		if (execException == null)
-			throw new ExecutionException(new Exception("No runnable completed successfully."));
+			throw new ExecutionException(new Exception("No runnablePart completed successfully."));
 		throw execException;
 	}
 	@Override
@@ -233,9 +218,8 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	public List<Runnable> shutdownNow() {
 		return super.forceShutdown().stream()
 				.filter(s -> s instanceof JavaSubmission)
-				.map(s -> (JavaSubmission<?,?>) s)
-				.filter(s -> s.task instanceof SerializableRunnableWithResult)
-				.map(s -> ((SerializableRunnableWithResult<?,?>) s.task).runnable)
+				.map(s -> ((SerializableCallable<?,?>) ((JavaSubmission<?,?>) s).task).runnablePart)
+				.filter(r -> r != null)
 				.collect(Collectors.toList());
 	}
 	
@@ -271,11 +255,8 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		public void onStartup(ProcessExecutor executor) {
 			// Warm up the JVM by ensuring that the most relevant classes are loaded.
 			try {
-				executor.execute(new JavaSubmission<>(new SerializableCallable<>(
-						(Callable<Integer> & Serializable) () -> 1 + 2), false));
-				executor.execute(new JavaSubmission<>(new SerializableRunnableWithResult<>(
-						(Runnable & Serializable) () -> { System.out.println("test"); },
-						new AtomicInteger()), false));
+				executor.execute(new JavaSubmission<>(new SerializableCallable<>((Callable<Integer> & Serializable)
+						() -> 1 + 2, () -> {}), false));
 			} catch (Exception e) {
 				return;
 			}
@@ -359,13 +340,13 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	
 	/**
 	 * An implementation of {@link net.viktorc.pp4j.api.Submission} for serializable {@link java.util.concurrent.Callable} 
-	 * instances to submit in Java process. It serializes, encodes, and sends the runnable to the process for execution. It 
+	 * instances to submit in Java process. It serializes, encodes, and sends the runnablePart to the process for execution. It 
 	 * also looks for the serialized and encoded return value of the <code>Callable</code>, and for a serialized and 
 	 * encoded {@link java.lang.Throwable} instance output to the stderr stream in case of an error.
 	 * 
 	 * @author Viktor Csomor
 	 *
-	 * @param <T> The return type of the runnable.
+	 * @param <T> The return type of the runnablePart.
 	 * @param <S> An implementation of the {@link java.util.concurrent.Callable} and {@link java.io.Serializable} 
 	 * interfaces with the return type <code>T</code>
 	 */
@@ -381,10 +362,10 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		/**
 		 * Creates a submission for the specified {@link java.util.concurrent.Callable}.
 		 * 
-		 * @param runnable The runnable to execute.
+		 * @param runnablePart The runnablePart to execute.
 		 * @param terminateProcessAfterwards Whether the process should be terminated after the execution 
-		 * of the runnable.
-		 * @throws IOException If the encoding of the serialized runnable fails.
+		 * of the runnablePart.
+		 * @throws IOException If the encoding of the serialized runnablePart fails.
 		 * @throws NotSerializableException If some object to be serialized does not implement the 
 		 * {@link java.io.Serializable} interface.
 		 */
@@ -484,59 +465,35 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 		static final long serialVersionUID = -5418713087898561239L;
 		
 		Callable<T> callable;
+		Runnable runnablePart;
 		
 		/**
 		 * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the 
 		 * specified serializable <code>Callable</code> instance with a not explicitly serializable return type.
 		 * 
 		 * @param callable The <code>Callable</code> to wrap.
+		 * @param runnablePart The optional <code>Runnable</code> part of the <code>Callable</code> instance in case 
+		 * it consists of a <code>Runnable</code> and a return object.
 		 */
 		@SuppressWarnings("unchecked")
+		SerializableCallable(S callable, Runnable runnablePart) {
+			this.callable = (Callable<T> & Serializable) callable;
+			this.runnablePart = runnablePart;
+		}
+		/**
+		 * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the 
+		 * specified serializable <code>Callable</code> instance with a not explicitly serializable return type.
+		 * 
+		 * @param callable The <code>Callable</code> to wrap.
+		 */
 		SerializableCallable(S callable) {
-			this.callable = (Callable<T>) callable;
+			this(callable, null);
 		}
 		@Override
 		public T call() throws Exception {
 			return callable.call();
 		}
 
-	}
-	
-	/**
-	 * A wrapper class implementing the {@link java.util.concurrent.Callable} interface for turning serializable 
-	 * {@link java.lang.Runnable} instances with serializable results into serializable 
-	 * {@link java.util.concurrent.Callable} instances with explicitly serialized return types.
-	 * 
-	 * @author Viktor Csomor
-	 *
-	 * @param <T> The {@link java.lang.Runnable} and {@link java.io.Serializable} runnable type.
-	 * @param <S> The return type.
-	 */
-	private static class SerializableRunnableWithResult<T extends Runnable & Serializable, S extends Serializable> 
-			implements Callable<S>, Serializable {
-		
-		static final long serialVersionUID = -1069566262473097740L;
-
-		T runnable;
-		S result;
-		
-		/**
-		 * Constructs a serializable <code>Callable</code> instance from the specified <code>Runnable</code> and 
-		 * return object.
-		 * 
-		 * @param runnable The <code>Runnable</code> to execute.
-		 * @param result The object to return as a result of the operation.
-		 */
-		SerializableRunnableWithResult(T runnable, S result) {
-			this.runnable = runnable;
-			this.result = result;
-		}
-		@Override
-		public S call() throws Exception {
-			runnable.run();
-			return result;
-		}
-		
 	}
 	
 }

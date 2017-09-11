@@ -1,9 +1,6 @@
 package net.viktorc.pp4j.impl;
 
-import java.util.List;
 import java.util.function.BiPredicate;
-
-import net.viktorc.pp4j.api.Command;
 
 /**
  * A simplified sub-class of the {@link net.viktorc.pp4j.impl.AbstractCommand} abstract class that relies on lambda 
@@ -33,10 +30,6 @@ public class SimpleCommand extends AbstractCommand {
 		super(instruction);
 		this.onStandardOutput = onStandardOutput;
 		this.onErrorOutput = onErrorOutput;
-	}
-	@Override
-	public boolean doExecute(List<Command> prevCommands) {
-		return true;
 	}
 	@Override
 	public boolean generatesOutput() {
