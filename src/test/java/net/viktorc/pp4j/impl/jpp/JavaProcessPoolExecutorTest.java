@@ -551,7 +551,7 @@ public class JavaProcessPoolExecutorTest {
 				res.get();
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 9000);
+			Assert.assertTrue(time < 1200);
 			Assert.assertTrue(time > 7495);
 		} finally {
 			exec.shutdown();
@@ -578,7 +578,7 @@ public class JavaProcessPoolExecutorTest {
 				res.get();
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 12000);
+			Assert.assertTrue(time < 15000);
 			Assert.assertTrue(time > 7500);
 		} finally {
 			exec.shutdown();
