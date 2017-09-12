@@ -44,7 +44,7 @@ public class JavaProcessPoolExecutorTest {
 		try {
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 500);
+			Assert.assertTrue(time <= 750);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -91,7 +91,7 @@ public class JavaProcessPoolExecutorTest {
 		try {
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 1000);
+			Assert.assertTrue(time <= 2000);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -107,7 +107,7 @@ public class JavaProcessPoolExecutorTest {
 		try {
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 1000);
+			Assert.assertTrue(time <= 2000);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -123,7 +123,7 @@ public class JavaProcessPoolExecutorTest {
 		try {
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 1000);
+			Assert.assertTrue(time <= 2000);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -501,8 +501,8 @@ public class JavaProcessPoolExecutorTest {
 			List<Runnable> queuedTasks = exec.shutdownNow();
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(queuedTasks.get(0) == r1);
-			Assert.assertTrue(queuedTasks.get(1) == r2);
+			Assert.assertTrue((queuedTasks.get(0) == r1 && queuedTasks.get(1) == r2) ||
+					(queuedTasks.get(0) == r2 && queuedTasks.get(1) == r1));
 			Assert.assertTrue(time < 20);
 		} finally {
 			exec.shutdown();
@@ -536,11 +536,11 @@ public class JavaProcessPoolExecutorTest {
 		System.out.printf(TEST_TITLE_FORMAT, 21);
 		JavaProcessPoolExecutorService exec = new JavaProcessPoolExecutorService(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
-				50, 150, 25, false);
+				30, 80, 10, false);
 		try {
 			List<Future<AtomicInteger>> results = new ArrayList<>();
 			long start = System.currentTimeMillis();
-			for (int i = 0; i < 100; i++) {
+			for (int i = 0; i < 50; i++) {
 				Thread.sleep(50);
 				results.add(exec.submit((Callable<AtomicInteger> & Serializable) () -> {
 					Thread.sleep(5000);
@@ -551,8 +551,8 @@ public class JavaProcessPoolExecutorTest {
 				res.get();
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 11500);
-			Assert.assertTrue(time > 9995);
+			Assert.assertTrue(time < 9000);
+			Assert.assertTrue(time > 7495);
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -563,11 +563,11 @@ public class JavaProcessPoolExecutorTest {
 		System.out.printf(TEST_TITLE_FORMAT, 22);
 		JavaProcessPoolExecutorService exec = new JavaProcessPoolExecutorService(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 500),
-				50, 150, 25, false);
+				30, 80, 10, false);
 		try {
 			List<Future<AtomicInteger>> results = new ArrayList<>();
 			long start = System.currentTimeMillis();
-			for (int i = 0; i < 100; i++) {
+			for (int i = 0; i < 50; i++) {
 				Thread.sleep(50);
 				results.add(exec.submit((Callable<AtomicInteger> & Serializable) () -> {
 					Thread.sleep(5000);
@@ -578,8 +578,8 @@ public class JavaProcessPoolExecutorTest {
 				res.get();
 			long time = System.currentTimeMillis() - start;
 			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 12500);
-			Assert.assertTrue(time > 10000);
+			Assert.assertTrue(time < 12000);
+			Assert.assertTrue(time > 7500);
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
