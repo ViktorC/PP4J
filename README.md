@@ -97,7 +97,7 @@ Once the pool is initialized, it is sent 30 instructions within 3 seconds. The i
 ## Java Process Pool
 PP4J also includes a pure Java process pool implementation built on top of the *StandardProcessPool*. The [*StandardJavaProcessPool*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/impl/jpp/StandardJavaProcessPool) implements both the *ProcessPool* and [*ExecutorService*](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html) interfaces through the [*JavaProcessPool*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/api/jpp/JavaProcessPool) interface. This allows it to be used similarly to the standard Java thread pools. It relies on a simple class that is executed using the *java* program to instantiate processes. These JVM processes are sent tasks using serialization and Base64 encoding. The results and exceptions are sent to the process pool the same way. The below snippet presents a sample usage of this process pool.
 
-	JavaProcessPool pool = new JavaProcessPool(new SimpleJavaProcessOptions(
+	JavaProcessPool pool = new StandardJavaProcessPool(new SimpleJavaProcessOptions(
 			JVMArch.BIT_64, JVMType.CLIENT, 2, 8, 256, 60000), 10, 20, 2, false);
 	Random rand = new Random();
 	List<Future<Long>> results = new ArrayList<>();
