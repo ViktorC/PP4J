@@ -1,4 +1,4 @@
-package net.viktorc.pp4j.impl.jpp;
+package net.viktorc.pp4j.impl;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,23 +18,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.JavaProcessOptions;
+import net.viktorc.pp4j.api.JavaProcessPool;
 import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
-import net.viktorc.pp4j.api.jpp.JavaProcessOptions;
-import net.viktorc.pp4j.api.jpp.ProcessPoolExecutorService;
-import net.viktorc.pp4j.api.jpp.JavaProcessOptions.JVMArch;
-import net.viktorc.pp4j.api.jpp.JavaProcessOptions.JVMType;
-import net.viktorc.pp4j.impl.AbstractProcessManager;
-import net.viktorc.pp4j.impl.ProcessException;
-import net.viktorc.pp4j.impl.SimpleCommand;
-import net.viktorc.pp4j.impl.SimpleSubmission;
-import net.viktorc.pp4j.impl.StandardProcessPool;
+import net.viktorc.pp4j.api.JavaProcessOptions.JVMArch;
+import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
 
 /**
  * A sub-class of {@link net.viktorc.pp4j.impl.StandardProcessPool} that implements the 
- * {@link net.viktorc.pp4j.api.jpp.ProcessPoolExecutorService} interface. It uses Java processes for the 
+ * {@link net.viktorc.pp4j.api.JavaProcessPool} interface. It uses Java processes for the 
  * implementation of multiprocessing. It communicates with the processes via their standard streams 
  * exchanging serialized and encoded objects. It can send {@link java.lang.Runnable} and 
  * {@link java.util.concurrent.Callable} instances to the processes; and it receives the result
@@ -43,7 +38,7 @@ import net.viktorc.pp4j.impl.StandardProcessPool;
  * @author Viktor Csomor
  *
  */
-public class JavaProcessPoolExecutorService extends StandardProcessPool implements ProcessPoolExecutorService {
+public class StandardJavaProcessPool extends StandardProcessPool implements JavaProcessPool {
 	
 	/**
 	 * Constructs a Java process pool executor using the specified parameters.
@@ -62,9 +57,8 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	 * @throws IllegalArgumentException If the minimum pool size is less than 0, or the maximum pool size is less 
 	 * than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
 	 */
-	public JavaProcessPoolExecutorService(JavaProcessOptions options, int minPoolSize,
-			int maxPoolSize, int reserveSize, boolean verbose)
-					throws InterruptedException {
+	public StandardJavaProcessPool(JavaProcessOptions options, int minPoolSize, int maxPoolSize, int reserveSize,
+			boolean verbose) throws InterruptedException {
 		super(new JavaProcessManagerFactory(options), minPoolSize, maxPoolSize, reserveSize, verbose);
 	}
 	/**
@@ -225,7 +219,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	
 	/**
 	 * A sub-class of {@link net.viktorc.pp4j.impl.AbstractProcessManager} for the management of process instances 
-	 * of the {@link net.viktorc.pp4j.impl.jpp.JavaProcess} class.
+	 * of the {@link net.viktorc.pp4j.impl.JavaProcess} class.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -280,7 +274,7 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	
 	/**
 	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} for the creation 
-	 * of {@link net.viktorc.pp4j.impl.jpp.JavaProcessPoolExecutorService.JavaProcessManager} instances 
+	 * of {@link net.viktorc.pp4j.impl.StandardJavaProcessPool.JavaProcessManager} instances 
 	 * using a single {@link java.lang.ProcessBuilder} instance.
 	 * 
 	 * @author Viktor Csomor
@@ -341,9 +335,9 @@ public class JavaProcessPoolExecutorService extends StandardProcessPool implemen
 	
 	/**
 	 * An implementation of {@link net.viktorc.pp4j.api.Submission} for serializable {@link java.util.concurrent.Callable} 
-	 * instances to submit in Java process. It serializes, encodes, and sends the runnablePart to the process for execution. It 
-	 * also looks for the serialized and encoded return value of the <code>Callable</code>, and for a serialized and 
-	 * encoded {@link java.lang.Throwable} instance output to the stderr stream in case of an error.
+	 * instances to submit in Java process. It serializes, encodes, and sends the <code>Callable</code> to the process for 
+	 * execution. It also looks for the serialized and encoded return value of the <code>Callable</code>, and for a 
+	 * serialized and encoded {@link java.lang.Throwable} instance output to the stderr stream in case of an error.
 	 * 
 	 * @author Viktor Csomor
 	 *

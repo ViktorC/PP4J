@@ -1,4 +1,4 @@
-package net.viktorc.pp4j.api.jpp;
+package net.viktorc.pp4j.api;
 
 /**
  * An interface for the definition of the timeout of Java processes and the options for the "java" 

@@ -1171,7 +1171,6 @@ public class StandardProcessPool implements ProcessPool {
 				
 				@Override
 				public void uncaughtException(Thread t, Throwable e) {
-					e.printStackTrace();
 					logger.error(e.getMessage(), e);
 					StandardProcessPool.this.forceShutdown();
 				}

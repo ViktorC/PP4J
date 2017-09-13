@@ -4,7 +4,7 @@
   <class id="1" language="java" name="net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor.KeepAliveTimer" 
     project="PP4J" file="/PP4J/src/main/java/net/viktorc/pp4j/impl/StandardProcessPool.java" binary="false" 
     corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1393" y="269"/>    
+    <position height="-1" width="-1" x="334" y="213"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -13,7 +13,7 @@
   </class>  
   <class id="2" language="java" name="net.viktorc.pp4j.impl.StandardProcessPool.InternalSubmissionFuture" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/impl/StandardProcessPool.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="2194" y="-270"/>    
+    <position height="-1" width="-1" x="964" y="-538"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -22,7 +22,7 @@
   </class>  
   <interface id="3" language="java" name="net.viktorc.pp4j.api.Submission" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/api/Submission.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="2170" y="286"/>    
+    <position height="-1" width="-1" x="975" y="54"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -31,7 +31,7 @@
   </interface>  
   <class id="4" language="java" name="net.viktorc.pp4j.impl.StandardProcessPool.CustomizedThreadFactory" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/impl/StandardProcessPool.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1380" y="-325"/>    
+    <position height="-1" width="-1" x="229" y="-411"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -40,7 +40,7 @@
   </class>  
   <interface id="5" language="java" name="net.viktorc.pp4j.api.ProcessExecutor" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/api/ProcessExecutor.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1620" y="334"/>    
+    <position height="-1" width="-1" x="614" y="322"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -49,7 +49,7 @@
   </interface>  
   <interface id="6" language="java" name="net.viktorc.pp4j.api.ProcessPool" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/api/ProcessPool.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1803" y="-555"/>    
+    <position height="-1" width="-1" x="623" y="-550"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -59,7 +59,7 @@
   <class id="7" language="java" name="net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutorObjectPool" 
     project="PP4J" file="/PP4J/src/main/java/net/viktorc/pp4j/impl/StandardProcessPool.java" binary="false" 
     corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1463" y="-506"/>    
+    <position height="-1" width="-1" x="216" y="-283"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -68,7 +68,7 @@
   </class>  
   <class id="8" language="java" name="net.viktorc.pp4j.impl.StandardProcessPool.InternalSubmission" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/impl/StandardProcessPool.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="2206" y="-4"/>    
+    <position height="-1" width="-1" x="1009" y="-226"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -77,7 +77,7 @@
   </class>  
   <class id="9" language="java" name="net.viktorc.pp4j.impl.StandardProcessPool" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/impl/StandardProcessPool.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1786" y="-233"/>    
+    <position height="-1" width="-1" x="617" y="-203"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -86,7 +86,7 @@
   </class>  
   <class id="10" language="java" name="net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessExecutor" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/impl/StandardProcessPool.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1822" y="110"/>    
+    <position height="-1" width="-1" x="632" y="156"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -95,7 +95,7 @@
   </class>  
   <interface id="11" language="java" name="net.viktorc.pp4j.api.ProcessManager" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/api/ProcessManager.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1413" y="62"/>    
+    <position height="-1" width="-1" x="962" y="275"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -104,7 +104,7 @@
   </interface>  
   <interface id="12" language="java" name="net.viktorc.pp4j.api.ProcessManagerFactory" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/api/ProcessManagerFactory.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="2171" y="-483"/>    
+    <position height="-1" width="-1" x="235" y="-142"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -113,7 +113,7 @@
   </interface>  
   <interface id="13" language="java" name="net.viktorc.pp4j.api.Command" project="PP4J" 
     file="/PP4J/src/main/java/net/viktorc/pp4j/api/Command.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1889" y="343"/>    
+    <position height="-1" width="-1" x="230" y="10"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
@@ -123,176 +123,173 @@
   <class id="14" language="java" name="net.viktorc.pp4j.impl.StandardProcessPool.StandardProcessPoolExecutor" 
     project="PP4J" file="/PP4J/src/main/java/net/viktorc/pp4j/impl/StandardProcessPool.java" binary="false" 
     corner="BOTTOM_RIGHT">    
-    <position height="-1" width="-1" x="1388" y="-140"/>    
+    <position height="-1" width="-1" x="287" y="-559"/>    
     <display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="false" protected="false" private="false" static="false"/>      
       <operations public="true" package="true" protected="true" private="true" static="true"/>    
     </display>  
   </class>  
-  <nesting id="15">    
-    <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="14"/>  
-  </nesting>  
-  <nesting id="16">    
-    <end type="SOURCE" refId="10"/>    
-    <end type="TARGET" refId="1"/>  
-  </nesting>  
-  <association id="17">    
-    <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="18" name="procManagerFactory">        
-        <position height="20" width="127" x="2092" y="-428"/>      
-      </attribute>      
-      <multiplicity id="19" minimum="0" maximum="1">        
-        <position height="18" width="27" x="2041" y="-433"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="12" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <association id="20">    
-    <end type="SOURCE" refId="8" navigable="false">      
-      <attribute id="21" name="origSubmission">        
-        <position height="18" width="83" x="2183" y="187"/>      
-      </attribute>      
-      <multiplicity id="22" minimum="0" maximum="1">        
-        <position height="16" width="23" x="2160" y="178"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="3" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <association id="23">    
-    <bendpoint x="1765" y="-23"/>    
-    <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="24" name="activeProcExecutors">        
-        <position height="20" width="127" x="1640" y="-17"/>      
-      </attribute>      
-      <multiplicity id="25" minimum="0" maximum="2147483647">        
-        <position height="18" width="25" x="1775" y="-18"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="10" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <association id="26">    
-    <bendpoint x="1581" y="-229"/>    
-    <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="27" name="procExecutorThreadPool">        
-        <position height="20" width="150" x="1390" y="-226"/>      
-      </attribute>      
-      <multiplicity id="28" minimum="0" maximum="1">        
-        <position height="18" width="27" x="1521" y="-197"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="14" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <association id="29">    
+  <association id="15">    
     <end type="SOURCE" refId="10" navigable="false">      
-      <attribute id="30" name="timer">        
-        <position height="18" width="33" x="1459" y="214"/>      
+      <attribute id="16" name="timer">        
+        <position height="18" width="33" x="399" y="222"/>      
       </attribute>      
-      <multiplicity id="31" minimum="0" maximum="1">        
-        <position height="18" width="27" x="1499" y="229"/>      
+      <multiplicity id="17" minimum="0" maximum="1">        
+        <position height="16" width="23" x="412" y="200"/>      
       </multiplicity>    
     </end>    
     <end type="TARGET" refId="1" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
-  <nesting id="32">    
+  <nesting id="18">    
     <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="4"/>  
+    <end type="TARGET" refId="10"/>  
   </nesting>  
-  <association id="33">    
-    <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="34" name="procExecutorPool">        
-        <position height="20" width="111" x="1394" y="-458"/>      
-      </attribute>      
-      <multiplicity id="35" minimum="0" maximum="1">        
-        <position height="18" width="27" x="1520" y="-448"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="7" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <nesting id="36">    
+  <realization id="19">    
     <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="2"/>  
-  </nesting>  
-  <realization id="37">    
-    <end type="SOURCE" refId="10"/>    
-    <end type="TARGET" refId="5"/>  
+    <end type="TARGET" refId="6"/>  
   </realization>  
-  <association id="38">    
+  <association id="20">    
     <end type="SOURCE" refId="10" navigable="false">      
-      <attribute id="39" name="manager">        
-        <position height="18" width="52" x="1548" y="54"/>      
+      <attribute id="21" name="manager">        
+        <position height="18" width="52" x="781" y="229"/>      
       </attribute>      
-      <multiplicity id="40" minimum="0" maximum="1">        
-        <position height="16" width="23" x="1551" y="87"/>      
+      <multiplicity id="22" minimum="0" maximum="1">        
+        <position height="16" width="23" x="808" y="192"/>      
       </multiplicity>    
     </end>    
     <end type="TARGET" refId="11" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
-  <association id="41">    
-    <end type="SOURCE" refId="2" navigable="false">      
-      <attribute id="42" name="submission">        
-        <position height="20" width="78" x="2202" y="-159"/>      
-      </attribute>      
-      <multiplicity id="43" minimum="0" maximum="1">        
-        <position height="18" width="27" x="2170" y="-159"/>      
-      </multiplicity>    
-    </end>    
-    <end type="TARGET" refId="8" navigable="true"/>    
-    <display labels="true" multiplicity="true"/>  
-  </association>  
-  <realization id="44">    
-    <end type="SOURCE" refId="8"/>    
-    <end type="TARGET" refId="3"/>  
-  </realization>  
-  <realization id="45">    
-    <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="6"/>  
-  </realization>  
-  <nesting id="46">    
-    <bendpoint x="2038" y="-93"/>    
-    <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="8"/>  
-  </nesting>  
-  <association id="47">    
-    <bendpoint x="2033" y="-50"/>    
+  <association id="23">    
     <end type="SOURCE" refId="9" navigable="false">      
-      <attribute id="48" name="submissionQueue">        
-        <position height="20" width="112" x="1959" y="-38"/>      
+      <attribute id="24" name="procExecutorPool">        
+        <position height="18" width="93" x="339" y="-281"/>      
       </attribute>      
-      <multiplicity id="49" minimum="0" maximum="2147483647">        
-        <position height="18" width="25" x="2036" y="-72"/>      
+      <multiplicity id="25" minimum="0" maximum="1">        
+        <position height="16" width="23" x="347" y="-253"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="7" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <association id="26">    
+    <end type="SOURCE" refId="2" navigable="false">      
+      <attribute id="27" name="submission">        
+        <position height="18" width="64" x="993" y="-382"/>      
+      </attribute>      
+      <multiplicity id="28" minimum="0" maximum="1">        
+        <position height="16" width="23" x="958" y="-382"/>      
       </multiplicity>    
     </end>    
     <end type="TARGET" refId="8" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
-  <nesting id="50">    
+  <nesting id="29">    
+    <end type="SOURCE" refId="9"/>    
+    <end type="TARGET" refId="4"/>  
+  </nesting>  
+  <association id="30">    
+    <end type="SOURCE" refId="9" navigable="false">      
+      <attribute id="31" name="procManagerFactory">        
+        <position height="18" width="109" x="318" y="-95"/>      
+      </attribute>      
+      <multiplicity id="32" minimum="0" maximum="1">        
+        <position height="16" width="23" x="361" y="-139"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="12" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <association id="33">    
+    <end type="SOURCE" refId="8" navigable="false">      
+      <attribute id="34" name="origSubmission">        
+        <position height="18" width="83" x="1005" y="-42"/>      
+      </attribute>      
+      <multiplicity id="35" minimum="0" maximum="1">        
+        <position height="16" width="23" x="958" y="-47"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="3" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <nesting id="36">    
     <end type="SOURCE" refId="9"/>    
     <end type="TARGET" refId="7"/>  
   </nesting>  
-  <association id="51">    
-    <end type="SOURCE" refId="10" navigable="false">      
-      <attribute id="52" name="command">        
-        <position height="18" width="56" x="1871" y="248"/>      
+  <association id="37">    
+    <bendpoint x="370" y="-428"/>    
+    <end type="SOURCE" refId="9" navigable="false">      
+      <attribute id="38" name="procExecutorThreadPool">        
+        <position height="18" width="127" x="352" y="-504"/>      
       </attribute>      
-      <multiplicity id="53" minimum="0" maximum="1">        
-        <position height="16" width="23" x="1840" y="252"/>      
+      <multiplicity id="39" minimum="0" maximum="1">        
+        <position height="16" width="23" x="295" y="-500"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="14" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <realization id="40">    
+    <end type="SOURCE" refId="8"/>    
+    <end type="TARGET" refId="3"/>  
+  </realization>  
+  <realization id="41">    
+    <end type="SOURCE" refId="10"/>    
+    <end type="TARGET" refId="5"/>  
+  </realization>  
+  <association id="42">    
+    <end type="SOURCE" refId="9" navigable="false">      
+      <attribute id="43" name="activeProcExecutors">        
+        <position height="18" width="108" x="635" y="41"/>      
+      </attribute>      
+      <multiplicity id="44" minimum="0" maximum="2147483647">        
+        <position height="16" width="21" x="604" y="35"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="10" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
+  <association id="45">    
+    <end type="SOURCE" refId="10" navigable="false">      
+      <attribute id="46" name="command">        
+        <position height="18" width="56" x="347" y="32"/>      
+      </attribute>      
+      <multiplicity id="47" minimum="0" maximum="1">        
+        <position height="16" width="23" x="343" y="69"/>      
       </multiplicity>    
     </end>    
     <end type="TARGET" refId="13" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
+  <nesting id="48">    
+    <end type="SOURCE" refId="9"/>    
+    <end type="TARGET" refId="2"/>  
+  </nesting>  
+  <nesting id="49">    
+    <end type="SOURCE" refId="10"/>    
+    <end type="TARGET" refId="1"/>  
+  </nesting>  
+  <nesting id="50">    
+    <end type="SOURCE" refId="9"/>    
+    <end type="TARGET" refId="8"/>  
+  </nesting>  
+  <association id="51">    
+    <end type="SOURCE" refId="9" navigable="false">      
+      <attribute id="52" name="submissionQueue">        
+        <position height="18" width="94" x="799" y="-183"/>      
+      </attribute>      
+      <multiplicity id="53" minimum="0" maximum="2147483647">        
+        <position height="16" width="21" x="853" y="-213"/>      
+      </multiplicity>    
+    </end>    
+    <end type="TARGET" refId="8" navigable="true"/>    
+    <display labels="true" multiplicity="true"/>  
+  </association>  
   <nesting id="54">    
     <end type="SOURCE" refId="9"/>    
-    <end type="TARGET" refId="10"/>  
+    <end type="TARGET" refId="14"/>  
   </nesting>  
   <classifier-display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
     sort-features="false" accessors="true" visibility="true">    

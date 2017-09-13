@@ -1,4 +1,4 @@
-package net.viktorc.pp4j.impl.jpp;
+package net.viktorc.pp4j.impl;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

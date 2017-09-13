@@ -3,9 +3,9 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.viktorc</groupId>
 	<artifactId>pp4j</artifactId>
-	<version>1.2</version>
+	<version>1.0</version>
 	<name>PP4J</name>
-	<description>A small library that provides a pool for maintaining pre-started processes.</description>
+	<description>A library that provides a pool for maintaining pre-started processes.</description>
 	<url>https://github.com/ViktorC</url>
 	<packaging>jar</packaging>
 	<licenses>

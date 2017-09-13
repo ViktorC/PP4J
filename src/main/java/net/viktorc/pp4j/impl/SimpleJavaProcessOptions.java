@@ -1,9 +1,9 @@
-package net.viktorc.pp4j.impl.jpp;
+package net.viktorc.pp4j.impl;
 
-import net.viktorc.pp4j.api.jpp.JavaProcessOptions;
+import net.viktorc.pp4j.api.JavaProcessOptions;
 
 /**
- * A simple implementation of the {@link net.viktorc.pp4j.api.jpp.JavaProcessOptions} interface for the 
+ * A simple implementation of the {@link net.viktorc.pp4j.api.JavaProcessOptions} interface for the 
  * definition of JVM options and the timeout interval of Java processes.
  * 
  * @author Viktor Csomor

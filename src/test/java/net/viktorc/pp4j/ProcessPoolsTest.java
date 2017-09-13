@@ -7,10 +7,10 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Assert;
 import org.junit.Test;
 
+import net.viktorc.pp4j.api.JavaProcessPool;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.ProcessPool;
-import net.viktorc.pp4j.api.jpp.ProcessPoolExecutorService;
 import net.viktorc.pp4j.impl.SimpleProcessManager;
 import net.viktorc.pp4j.impl.StandardProcessPool;
 
@@ -82,7 +82,7 @@ public class ProcessPoolsTest {
 	}
 	@Test
 	public void test05() throws InterruptedException, URISyntaxException {
-		ProcessPoolExecutorService pool = ProcessPools.newCustomProcessPoolExecutorService(0, 5, 2);
+		JavaProcessPool pool = ProcessPools.newCustomJavaProcessPool(0, 5, 2);
 		try {
 			Assert.assertTrue(test(pool, 0, 5, 2, false));
 		} finally {
@@ -92,7 +92,7 @@ public class ProcessPoolsTest {
 	}
 	@Test
 	public void test06() throws InterruptedException, URISyntaxException {
-		ProcessPoolExecutorService pool = ProcessPools.newFixedProcessPoolExecutorService(5);
+		JavaProcessPool pool = ProcessPools.newFixedJavaProcessPool(5);
 		try {
 			Assert.assertTrue(test(pool, 5, 5, 0, false));
 		} finally {
@@ -102,7 +102,7 @@ public class ProcessPoolsTest {
 	}
 	@Test
 	public void test07() throws InterruptedException, URISyntaxException {
-		ProcessPoolExecutorService pool = ProcessPools.newCachedProcessPoolExecutorService();
+		JavaProcessPool pool = ProcessPools.newCachedJavaProcessPool();
 		try {
 			Assert.assertTrue(test(pool, 0, Integer.MAX_VALUE, 0, false));
 		} finally {
@@ -112,7 +112,7 @@ public class ProcessPoolsTest {
 	}
 	@Test
 	public void test08() throws InterruptedException, URISyntaxException {
-		ProcessPoolExecutorService pool = ProcessPools.newSingleProcessPoolExecutorService();
+		JavaProcessPool pool = ProcessPools.newSingleJavaProcessPool();
 		try {
 			Assert.assertTrue(test(pool, 1, 1, 0, false));
 		} finally {
