@@ -43,8 +43,9 @@ public class JavaProcessPoolExecutorTest {
 				0, false);
 		try {
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 750);
+			boolean success = time < 750;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -59,8 +60,9 @@ public class JavaProcessPoolExecutorTest {
 				1, 1, 0, false);
 		try {
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 500);
+			boolean success = time < 500;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -75,8 +77,9 @@ public class JavaProcessPoolExecutorTest {
 				5000), 1, 1, 0, false);
 		try {
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 500);
+			boolean success = time < 500;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -90,8 +93,9 @@ public class JavaProcessPoolExecutorTest {
 				5, false);
 		try {
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 2000);
+			boolean success = time < 2000;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -106,8 +110,9 @@ public class JavaProcessPoolExecutorTest {
 				10, 15, 5, false);
 		try {
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 2000);
+			boolean success = time < 2000;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -122,8 +127,9 @@ public class JavaProcessPoolExecutorTest {
 				5000), 10, 15, 5, false);
 		try {
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time <= 2000);
+			boolean success = time < 2000;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdownNow();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -230,9 +236,9 @@ public class JavaProcessPoolExecutorTest {
 				}
 			});
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 5300);
-			Assert.assertTrue(time > 4995);
+			boolean success = time < 5300 && time > 4995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -259,9 +265,9 @@ public class JavaProcessPoolExecutorTest {
 			long start = System.currentTimeMillis();
 			results = exec.invokeAll(tasks);
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 4300);
-			Assert.assertTrue(time > 3995);
+			boolean success = time < 4300 && time > 3995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 			Assert.assertTrue(results.get(0).get() == 169);
 			Assert.assertTrue(results.get(1).get() == 2197);
 		} finally {
@@ -289,9 +295,9 @@ public class JavaProcessPoolExecutorTest {
 			long start = System.currentTimeMillis();
 			results = exec.invokeAll(tasks);
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 6300);
-			Assert.assertTrue(time > 5995);
+			boolean success = time < 6300 && time > 5995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 			Assert.assertTrue(results.get(0).get() == 169);
 			Assert.assertTrue(results.get(1).get() == 2197);
 		} finally {
@@ -319,9 +325,9 @@ public class JavaProcessPoolExecutorTest {
 			long start = System.currentTimeMillis();
 			results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 3300);
-			Assert.assertTrue(time > 2995);
+			boolean success = time < 3300 && time > 2995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 			Assert.assertTrue(results.get(0).get() == 169);
 			exceptionRule.expect(CancellationException.class);
 			results.get(1).get();
@@ -350,9 +356,9 @@ public class JavaProcessPoolExecutorTest {
 			long start = System.currentTimeMillis();
 			results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 3300);
-			Assert.assertTrue(time > 2995);
+			boolean success = time < 3300 && time > 2995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 			Assert.assertTrue(results.get(0).get() == 169);
 			exceptionRule.expect(CancellationException.class);
 			results.get(1).get();
@@ -380,9 +386,9 @@ public class JavaProcessPoolExecutorTest {
 			long start = System.currentTimeMillis();
 			int result = exec.invokeAny(tasks);
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 4300);
-			Assert.assertTrue(time > 3995);
+			boolean success = time < 4300 && time > 3995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 			Assert.assertTrue(result == 169 || result == 2197);
 		} finally {
 			exec.shutdown();
@@ -407,9 +413,9 @@ public class JavaProcessPoolExecutorTest {
 			long start = System.currentTimeMillis();
 			int result = exec.invokeAny(tasks);
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 2300);
-			Assert.assertTrue(time > 1995);
+			boolean success = time < 2300 && time > 1995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 			Assert.assertTrue(result == 169);
 		} finally {
 			exec.shutdown();
@@ -435,9 +441,9 @@ public class JavaProcessPoolExecutorTest {
 			long start = System.currentTimeMillis();
 			int result = exec.invokeAny(tasks, 3000, TimeUnit.MILLISECONDS);
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 3300);
-			Assert.assertTrue(time > 2995);
+			boolean success = time < 3300 && time > 2995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 			Assert.assertTrue(result == 169);
 		} finally {
 			exec.shutdown();
@@ -499,11 +505,19 @@ public class JavaProcessPoolExecutorTest {
 			exec.submit(r2);
 			long start = System.currentTimeMillis();
 			List<Runnable> queuedTasks = exec.shutdownNow();
+			Runnable a1, a2;
+			if (queuedTasks.size() == 2) {
+				a1 = queuedTasks.get(0);
+				a2 = queuedTasks.get(1);
+			} else {
+				a1 = queuedTasks.get(1);
+				a2 = queuedTasks.get(2);
+			}
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue((queuedTasks.get(0) == r1 && queuedTasks.get(1) == r2) ||
-					(queuedTasks.get(0) == r2 && queuedTasks.get(1) == r1));
-			Assert.assertTrue(time < 20);
+			boolean success = time < 20;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
+			Assert.assertTrue(a1 == r1 && a2 == r2);
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -522,10 +536,10 @@ public class JavaProcessPoolExecutorTest {
 				return new AtomicInteger(13);
 			}).get();
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
+			boolean success = time < 2300 && time > 1995;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 			Assert.assertTrue(res.get() == 13);
-			Assert.assertTrue(time < 2300);
-			Assert.assertTrue(time > 1995);
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -550,9 +564,9 @@ public class JavaProcessPoolExecutorTest {
 			for (Future<AtomicInteger> res : results)
 				res.get();
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 1200);
-			Assert.assertTrue(time > 7495);
+			boolean success = time < 12000 && time > 7495;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -577,9 +591,9 @@ public class JavaProcessPoolExecutorTest {
 			for (Future<AtomicInteger> res : results)
 				res.get();
 			long time = System.currentTimeMillis() - start;
-			System.out.printf("Time: %.3f%n", ((double) time)/1000);
-			Assert.assertTrue(time < 15000);
-			Assert.assertTrue(time > 7500);
+			boolean success = time < 15000 && time > 7500;
+			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);

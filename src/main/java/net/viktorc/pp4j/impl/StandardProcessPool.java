@@ -334,11 +334,14 @@ public class StandardProcessPool implements ProcessPool {
 	}
 	@Override
 	public List<Submission<?>> forceShutdown() {
-		List<Submission<?>> queuedSubmissions = null;
+		List<Submission<?>> queuedSubmissions = new ArrayList<>();
 		synchronized (submissionQueue) {
 			shutdown = true;
-			queuedSubmissions = submissionQueue.stream().map(s -> s.origSubmission)
-					.collect(Collectors.toList());
+			/* Using the stream here resulted in strange behaviour that had the LBDSpliterator 
+			 * freeze forever (not waiting on any lock)  presumably in response to concurrent 
+			 * modification. */
+			for (InternalSubmission<?> s : submissionQueue)
+				queuedSubmissions.add(s.origSubmission);
 		}
 		if (poolTermLatch.getCount() != 0 && shutdownLock.tryLock()) {
 			try {
