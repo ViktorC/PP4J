@@ -45,7 +45,7 @@ public class JavaProcessPoolExecutorTest {
 				0, false);
 		try {
 			long time = System.currentTimeMillis() - start;
-			boolean success = time < 750;
+			boolean success = time < 1000;
 			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
 			Assert.assertTrue(success);
 		} finally {
