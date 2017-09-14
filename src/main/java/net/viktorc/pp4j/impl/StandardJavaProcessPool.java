@@ -397,6 +397,10 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 				throw new ExecutionException(error);
 			return result;
 		}
+		@Override
+		public String toString() {
+			return task.toString();
+		}
 		
 	}
 	

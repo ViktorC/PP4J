@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
@@ -475,10 +474,7 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public String toString() {
-			return String.format("{commands:[%s],terminate:%s}@%s", String.join(",", origSubmission.getCommands()
-					.stream().map(c -> "\"" + c.getInstruction() + "\"").collect(Collectors.toList())),
-					Boolean.toString(origSubmission.doTerminateProcessAfterwards()),
-					Integer.toHexString(hashCode()));
+			return String.format("%s@%s", origSubmission, Integer.toHexString(hashCode()));
 		}
 		
 	}

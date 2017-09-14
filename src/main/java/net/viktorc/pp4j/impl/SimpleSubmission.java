@@ -77,5 +77,11 @@ public class SimpleSubmission implements Submission<Object> {
 	public boolean doTerminateProcessAfterwards() {
 		return terminateProcessAfterwards;
 	}
+	@Override
+	public String toString() {
+		return String.format("{commands:[%s],terminate:%s}", String.join(",", commands
+				.stream().map(c -> "\"" + c.getInstruction() + "\"").collect(Collectors.toList())),
+				Boolean.toString(terminateProcessAfterwards));
+	}
 
 }
