@@ -10,7 +10,6 @@ import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
-import net.viktorc.pp4j.impl.AbstractProcessManager;
 import net.viktorc.pp4j.impl.ProcessException;
 import net.viktorc.pp4j.impl.SimpleCommand;
 import net.viktorc.pp4j.impl.StandardProcessPool;
@@ -161,15 +160,15 @@ public class StandardProcessPoolTest {
 					commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
 								if ("ready".equals(o)) {
 									// Output line caching check.
-									assert c.getStandardOutLines().size() == procTime &&
+									assert c.getStandardOutLines().size() == procTime - 1 &&
 											c.getStandardErrLines().size() == 0 :
 											"Unexpected numbers of output lines: " +
 											c.getStandardOutLines().size() + " instead of " +
-											procTime + " and " + c.getStandardErrLines().size() + 
+											(procTime - 1) + " and " + c.getStandardErrLines().size() + 
 											" instead of " + 0 + ".";
 									String expectedStdOutput = Arrays.stream(new String[procTime - 1])
 											.map(s -> "in progress").reduce("", (s1, s2) -> (s1 +
-											"\n" + s2).trim()) + "\nready";
+											"\n" + s2).trim());
 									assert expectedStdOutput.equals(c.getJointStandardOutLines()) :
 											"Wrongly captured standard output. Expected: \"" +
 											expectedStdOutput + "\"" + System.lineSeparator() +
@@ -193,13 +192,44 @@ public class StandardProcessPoolTest {
 							});
 			}
 			int index = i;
-			Submission<?> submission = new SimpleSubmission(commands, !reuse) {
-				
-				@Override
-				public void onFinishedProcessing() {
-					times.set(index, System.nanoTime() - times.get(index));
+			Submission<?> submission;
+			if (commands != null && commands.size() == 1) {
+				if (reuse) {
+					submission = new SimpleSubmission(commands.get(0)) {
+					
+						@Override
+						public void onFinishedProcessing() {
+							times.set(index, System.nanoTime() - times.get(index));
+						}
+					};
+				} else {
+					submission = new SimpleSubmission(commands.get(0), true) {
+						
+						@Override
+						public void onFinishedProcessing() {
+							times.set(index, System.nanoTime() - times.get(index));
+						}
+					};
 				}
-			};
+			} else {
+				if (reuse) {
+					submission = new SimpleSubmission(commands) {
+						
+						@Override
+						public void onFinishedProcessing() {
+							times.set(index, System.nanoTime() - times.get(index));
+						}
+					};
+				} else {
+					submission = new SimpleSubmission(commands, true) {
+						
+						@Override
+						public void onFinishedProcessing() {
+							times.set(index, System.nanoTime() - times.get(index));
+						}
+					};
+				}
+			}
 			times.add(System.nanoTime());
 			futures.add(processPool.submit(submission));
 		}
@@ -611,28 +641,26 @@ public class StandardProcessPoolTest {
 		}
 		@Override
 		public ProcessManager newProcessManager() {
-			return new AbstractProcessManager(new ProcessBuilder(programLocation), keepAliveTime) {
+			return new SimpleProcessManager(new ProcessBuilder(programLocation),
+					s -> {
+						try {
+							s.execute(new SimpleSubmission(new SimpleCommand("start",
+									(c, o) -> "ok".equals(o), (c, o) -> true), false));
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}) {
 				
 				@Override
 				public boolean startsUpInstantly() {
 					if (throwStartupException)
 						throw new ProcessException("Test startup exception.");
-					return !verifyStartup;
+					return !verifyStartup && super.startsUpInstantly();
 				}
 				@Override
 				public boolean isStartedUp(String output, boolean standard) {
-					if (throwStartupException)
-						throw new ProcessException("Test startup exception.");
-					return !verifyStartup || (standard && "hi".equals(output));
-				}
-				@Override
-				public void onStartup(ProcessExecutor executor) {
-					try {
-						executor.execute(new SimpleSubmission(new SimpleCommand("start",
-								(c, o) -> "ok".equals(o), (c, o) -> true), false));
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
+					return (!verifyStartup && super.isStartedUp(output, standard)) ||
+							(standard && "hi".equals(output));
 				}
 				@Override
 				public boolean terminateGracefully(ProcessExecutor executor) {
@@ -650,10 +678,12 @@ public class StandardProcessPoolTest {
 							e.printStackTrace();
 						}
 					}
-					return false;
+					return super.terminateGracefully(executor);
 				}
 				@Override
-				public void onTermination(int resultCode, long lifeTime) { }
+				public long getKeepAliveTime() {
+					return keepAliveTime > 0 ? keepAliveTime : super.getKeepAliveTime();
+				}
 			};
 		}
 		

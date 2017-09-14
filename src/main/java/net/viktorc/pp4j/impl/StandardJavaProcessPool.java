@@ -43,8 +43,7 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	/**
 	 * Constructs a Java process pool executor using the specified parameters.
 	 * 
-	 * @param options The options for the "java" program used to create the new JVM. If it is null, no options 
-	 * are used.
+	 * @param options The options for the "java" program used to create the new JVM.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
@@ -54,8 +53,9 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	 * logging will be performed by the constructed instance.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start 
 	 * up.
-	 * @throws IllegalArgumentException If the minimum pool size is less than 0, or the maximum pool size is less 
-	 * than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
+	 * @throws IllegalArgumentException If <code>options</code> is <code>null</code>, the minimum pool size is less 
+	 * than 0, or the maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 
+	 * or greater than the maximum pool size.
 	 */
 	public StandardJavaProcessPool(JavaProcessOptions options, int minPoolSize, int maxPoolSize, int reserveSize,
 			boolean verbose) throws InterruptedException {
@@ -289,8 +289,11 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 		 * which are used for the creation of all processes of the pool.
 		 * 
 		 * @param options The JVM options for starting the Java process.
+		 * @throws IllegalArgumentException If <code>options</code> is <code>null</code>.
 		 */
 		JavaProcessManagerFactory(JavaProcessOptions options) {
+			if (options == null)
+				throw new IllegalArgumentException("The options argument cannot be null.");
 			this.options = options;
 		}
 		@Override
@@ -301,24 +304,22 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 			String className = JavaProcess.class.getCanonicalName();
 			long keepAliveTime = 0;
 			List<String> javaOptions = new ArrayList<>();
-			if (options != null) {
-				JVMArch arch = options.getArch();
-				JVMType type = options.getType();
-				Integer initHeap = options.getInitHeapSizeMb();
-				Integer maxHeap = options.getMaxHeapSizeMb();
-				Integer stack = options.getStackSizeKb();
-				keepAliveTime = options.getKeepAliveTime();
-				if (arch != null)
-					javaOptions.add(arch.equals(JVMArch.BIT_32) ? "-d32" : "-d64");
-				if (type != null)
-					javaOptions.add(type.equals(JVMType.CLIENT) ? "-client" : "-server");
-				if (initHeap > 0)
-					javaOptions.add(String.format("-Xms%dm", initHeap));
-				if (maxHeap > 0)
-					javaOptions.add(String.format("-Xmx%dm", maxHeap));
-				if (stack > 0)
-					javaOptions.add(String.format("-Xss%dk", stack));
-			}
+			JVMArch arch = options.getArch();
+			JVMType type = options.getType();
+			Integer initHeap = options.getInitHeapSizeMb();
+			Integer maxHeap = options.getMaxHeapSizeMb();
+			Integer stack = options.getStackSizeKb();
+			keepAliveTime = options.getKeepAliveTime();
+			if (arch != null)
+				javaOptions.add(arch.equals(JVMArch.BIT_32) ? "-d32" : "-d64");
+			if (type != null)
+				javaOptions.add(type.equals(JVMType.CLIENT) ? "-client" : "-server");
+			if (initHeap > 0)
+				javaOptions.add(String.format("-Xms%dm", initHeap));
+			if (maxHeap > 0)
+				javaOptions.add(String.format("-Xmx%dm", maxHeap));
+			if (stack > 0)
+				javaOptions.add(String.format("-Xss%dk", stack));
 			List<String> args = new ArrayList<>();
 			args.add(javaPath);
 			args.addAll(javaOptions);

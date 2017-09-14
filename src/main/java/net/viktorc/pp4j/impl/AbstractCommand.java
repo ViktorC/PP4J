@@ -78,11 +78,12 @@ public abstract class AbstractCommand implements Command {
 	}
 	@Override
 	public final boolean isProcessed(String outputLine, boolean standard) {
+		boolean processed = onOutput(outputLine, standard);
 		if (standard)
 			stdOutLines.add(outputLine);
 		else
 			stdErrLines.add(outputLine);
-		return onOutput(outputLine, standard);
+		return processed;
 	}
 	/**
 	 * It stores the output line before calling and returning the result of {@link #isProcessed(String, boolean)}.

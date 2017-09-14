@@ -1,5 +1,9 @@
 package net.viktorc.pp4j.impl;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
 import java.io.Serializable;
 import java.lang.Runnable;
 import java.util.ArrayList;
@@ -17,6 +21,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import net.viktorc.pp4j.api.JavaProcessOptions;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
 import net.viktorc.pp4j.impl.SimpleJavaProcessOptions;
@@ -28,7 +33,7 @@ import net.viktorc.pp4j.impl.StandardJavaProcessPool;
  * @author Viktor Csomor
  *
  */
-public class JavaProcessPoolExecutorTest {
+public class StandardJavaProcessPoolTest {
 
 	private static final String TEST_TITLE_FORMAT = "%nTest %d%n" +
 			"-------------------------------------------------%n";
@@ -41,8 +46,8 @@ public class JavaProcessPoolExecutorTest {
 	public void test01() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 1);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 1, 1,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				1, 1, 0, false);
 		try {
 			long time = System.currentTimeMillis() - start;
 			boolean success = time < 1000;
@@ -91,8 +96,8 @@ public class JavaProcessPoolExecutorTest {
 	public void test04() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 4);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 10, 15,
-				5, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				10, 15, 5, false);
 		try {
 			long time = System.currentTimeMillis() - start;
 			boolean success = time < 2000;
@@ -141,8 +146,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test07() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 7);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 5, 5,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				5, 5, 0, false);
 		try {
 			List<Future<?>> futures = new ArrayList<>();
 			AtomicInteger j = new AtomicInteger(2);
@@ -211,8 +216,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test09() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 9);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 1, 1,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				1, 1, 0, false);
 		int base = 13;
 		try {
 			Assert.assertTrue(exec.submit((Callable<Integer> & Serializable) () -> 4*base)
@@ -226,8 +231,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test10() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 10);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 1, 1,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				2, 2, 0, false);
 		try {
 			long start = System.currentTimeMillis();
 			exec.execute((Runnable & Serializable) () -> {
@@ -250,8 +255,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test11() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 11);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 2, 2,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Future<Integer>> results = new ArrayList<>();
@@ -280,8 +285,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test12() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 12);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 1, 1,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				1, 1, 0, false);
 		try {
 			int base = 13;
 			List<Future<Integer>> results = new ArrayList<>();
@@ -310,8 +315,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test13() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 13);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 2, 2,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Future<Integer>> results = new ArrayList<>();
@@ -341,8 +346,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test14() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 14);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 1, 1,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				1, 1, 0, false);
 		try {
 			int base = 13;
 			List<Future<Integer>> results = new ArrayList<>();
@@ -372,8 +377,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test15() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 15);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 2, 2,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Callable<Integer>> tasks = new ArrayList<>();
@@ -400,8 +405,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test16() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 16);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 2, 2,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Callable<Integer>> tasks = new ArrayList<>();
@@ -427,8 +432,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test17() throws InterruptedException, ExecutionException, TimeoutException {
 		System.out.printf(TEST_TITLE_FORMAT, 17);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 2, 2,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Callable<Integer>> tasks = new ArrayList<>();
@@ -455,8 +460,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test18() throws InterruptedException, ExecutionException, TimeoutException {
 		System.out.printf(TEST_TITLE_FORMAT, 18);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 2, 2,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Callable<Integer>> tasks = new ArrayList<>();
@@ -479,8 +484,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test19() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 19);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 1, 1,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				1, 1, 0, false);
 		try {
 			Runnable r1 = (Runnable & Serializable) () -> {
 				try {
@@ -529,8 +534,8 @@ public class JavaProcessPoolExecutorTest {
 	@Test
 	public void test20() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 20);
-		StandardJavaProcessPool exec = new StandardJavaProcessPool(null, 1, 1,
-				0, false);
+		StandardJavaProcessPool exec = new StandardJavaProcessPool(new JavaProcessOptions() {},
+				1, 1, 0, false);
 		try {
 			long start = System.currentTimeMillis();
 			AtomicInteger res = exec.submit((Callable<AtomicInteger> & Serializable) () -> {
@@ -613,6 +618,31 @@ public class JavaProcessPoolExecutorTest {
 		} finally {
 			exec.shutdown();
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+		}
+	}
+	// Java process testing.
+	@Test
+	public void test24() throws IOException, InterruptedException, ClassNotFoundException {
+		String testInput = String.format("%s%n%s%n%s%n", Conversion.toString((Callable<Long> & Serializable)
+				() -> Math.round(Math.E)), Conversion.toString((Callable<Object> & Serializable) () -> {
+					throw new Exception("test");
+				}), JavaProcess.STOP_REQUEST);
+		try (ByteArrayOutputStream out = new ByteArrayOutputStream();
+				ByteArrayInputStream in = new ByteArrayInputStream(testInput.getBytes())) {
+			System.setOut(new PrintStream(out));
+			System.setIn(in);
+			Thread t = new Thread(() -> JavaProcess.main(new String[0]));
+			t.start();
+			Thread.sleep(3000);
+			String[] lines = out.toString().split(System.lineSeparator());
+			Assert.assertTrue(!t.isAlive());
+			Assert.assertTrue(lines.length == 4);
+			Assert.assertTrue(JavaProcess.STARTUP_SIGNAL.equals(lines[0]));
+			Assert.assertTrue(((Long) Conversion.toObject(lines[1])) == 3);
+			Assert.assertTrue(lines[2].startsWith(JavaProcess.ERROR_PREFIX));
+			Assert.assertTrue("test".equals(((Exception) Conversion.toObject(lines[2]
+					.substring(JavaProcess.ERROR_PREFIX.length()))).getMessage()));
+			Assert.assertTrue(JavaProcess.STOP_SIGNAL.equals(lines[3]));
 		}
 	}
 	

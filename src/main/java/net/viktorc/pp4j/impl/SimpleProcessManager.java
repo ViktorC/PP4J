@@ -74,6 +74,8 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	public void onStartup(ProcessExecutor executor) {
 		if (onStartup != null)
 			onStartup.accept(executor);
+		else
+			super.onStartup(executor);
 	}
 
 }

@@ -95,8 +95,7 @@ public class ProcessPools {
 	 * {@link net.viktorc.pp4j.impl.StandardJavaProcessPool#StandardJavaProcessPool(JavaProcessOptions, int, int, int, boolean)} 
 	 * with <code>verbose</code> set to <code>false</code>.
 	 * 
-	 * @param options The options for the "java" program used to create the new JVM. If it is null, no options 
-	 * are used.
+	 * @param options The options for the "java" program used to create the new JVM.
 	 * @param minPoolSize The minimum size of the process pool.
 	 * @param maxPoolSize The maximum size of the process pool.
 	 * @param reserveSize The number of available processes to keep in the pool.
@@ -128,7 +127,7 @@ public class ProcessPools {
 	 */
 	public static JavaProcessPool newCustomJavaProcessPool(int minPoolSize, int maxPoolSize, int reserveSize)
 			throws InterruptedException {
-		return newCustomJavaProcessPool(null, minPoolSize, maxPoolSize, reserveSize);
+		return newCustomJavaProcessPool(new JavaProcessOptions() {}, minPoolSize, maxPoolSize, reserveSize);
 	}
 	/**
 	 * Returns a pool of a fixed number of Java processes. It is a convenience method for calling
@@ -136,8 +135,7 @@ public class ProcessPools {
 	 * </code> and <code>maxPoolSize</code> set to the value of <code>size</code> and <code>reserveSize</code> 
 	 * set to <code>0</code>. The number of executors in the pool is always kept at the specified value.
 	 * 
-	 * @param options The options for the "java" program used to create the new JVM. If it is null, no options 
-	 * are used.
+	 * @param options The options for the "java" program used to create the new JVM.
 	 * @param size The number of processes to maintain in the pool.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start 
 	 * up.
@@ -156,7 +154,7 @@ public class ProcessPools {
 	 * up.
 	 */
 	public static JavaProcessPool newFixedJavaProcessPool(int size) throws InterruptedException {
-		return newFixedJavaProcessPool(null, size);
+		return newFixedJavaProcessPool(new JavaProcessOptions() {}, size);
 	}
 	/**
 	 * Returns a pool of Java processes that grows in size as required.. It is a convenience method for calling
@@ -164,8 +162,7 @@ public class ProcessPools {
 	 * </code> set to <code>0</code>, <code>maxPoolSize</code> set to <code>Integer.MAX_VALUE</code> and <code>
 	 * reserveSize</code> set to <code>0</code>.
 	 * 
-	 * @param options The options for the "java" program used to create the new JVM. If it is null, no options 
-	 * are used.
+	 * @param options The options for the "java" program used to create the new JVM.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to 
 	 * start up.
 	 */
@@ -183,15 +180,14 @@ public class ProcessPools {
 	 */
 	public static JavaProcessPool newCachedJavaProcessPool()
 			throws InterruptedException {
-		return newCachedJavaProcessPool(null);
+		return newCachedJavaProcessPool(new JavaProcessOptions() {});
 	}
 	/**
 	 * Returns a fixed size pool holding a single Java process. It is a convenience method for calling the method
 	 * {@link #newFixedJavaProcessPool(JavaProcessOptions, int)} with <code>size</code> set to 
 	 * <code>1</code>.
 	 * 
-	 * @param options The options for the "java" program used to create the new JVM. If it is null, no options 
-	 * are used.
+	 * @param options The options for the "java" program used to create the new JVM.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to 
 	 * start up.
 	 */
@@ -208,7 +204,7 @@ public class ProcessPools {
 	 * start up.
 	 */
 	public static JavaProcessPool newSingleJavaProcessPool() throws InterruptedException {
-		return newSingleJavaProcessPool(null);
+		return newSingleJavaProcessPool(new JavaProcessOptions() {});
 	}
 	
 }
