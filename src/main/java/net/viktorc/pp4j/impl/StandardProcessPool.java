@@ -296,7 +296,7 @@ public class StandardProcessPool implements ProcessPool {
 		return procManagerFactory;
 	}
 	@Override
-	public <T> Future<T> submit(Submission<T> submission) {
+	public <T> Future<T> submit(Submission<T> submission, boolean terminateProcessAfterwards) {
 		if (submission == null)
 			throw new IllegalArgumentException("The submission cannot be null or empty.");
 		InternalSubmission<T> internalSubmission;
@@ -304,7 +304,7 @@ public class StandardProcessPool implements ProcessPool {
 			if (shutdown)
 				throw new RejectedExecutionException("The pool has already been shut down.");
 			numOfSubmissions++;
-			internalSubmission = new InternalSubmission<>(submission);
+			internalSubmission = new InternalSubmission<>(submission, terminateProcessAfterwards);
 			submissionQueue.addLast(internalSubmission);
 		}
 		// If necessary, adjust the pool size given the new submission.
@@ -379,6 +379,7 @@ public class StandardProcessPool implements ProcessPool {
 	private class InternalSubmission<T> implements Submission<T> {
 		
 		final Submission<T> origSubmission;
+		final boolean terminateProcessAfterwards;
 		final long receivedTime;
 		final Object lock;
 		Thread thread;
@@ -394,10 +395,11 @@ public class StandardProcessPool implements ProcessPool {
 		 * @param origSubmission The submission to wrap into an internal submission with extended features.
 		 * @throws IllegalArgumentException If the submission is null.
 		 */
-		InternalSubmission(Submission<T> originalSubmission) {
+		InternalSubmission(Submission<T> originalSubmission, boolean terminateProcessAfterwards) {
 			if (originalSubmission == null)
 				throw new IllegalArgumentException("The submission cannot be null.");
 			this.origSubmission = originalSubmission;
+			this.terminateProcessAfterwards = terminateProcessAfterwards;
 			receivedTime = System.nanoTime();
 			lock = new Object();
 		}
@@ -445,10 +447,6 @@ public class StandardProcessPool implements ProcessPool {
 		@Override
 		public List<Command> getCommands() {
 			return origSubmission.getCommands();
-		}
-		@Override
-		public boolean doTerminateProcessAfterwards() {
-			return origSubmission.doTerminateProcessAfterwards();
 		}
 		@Override
 		public T getResult() throws ExecutionException {
@@ -597,7 +595,6 @@ public class StandardProcessPool implements ProcessPool {
 		Thread subThread;
 		Command command;
 		long keepAliveTime;
-		boolean terminating;
 		boolean doTime;
 		boolean onWait;
 		boolean commandCompleted;
@@ -689,7 +686,7 @@ public class StandardProcessPool implements ProcessPool {
 						/* It can happen of course that in the mean time, the mainLock has been stolen (for 
 						 * terminating the process) or that the process is already terminated, and thus the 
 						 * execute method fails. In this case, the submission is put back into the queue. */
-						if (execute(submission)) {
+						if (execute(submission, submission.terminateProcessAfterwards)) {
 							logger.info(String.format("Submission %s processed; delay: %.3f; " +
 									"execution time: %.3f.%n%s", submission, (float) ((double)
 									(submission.submittedTime - submission.receivedTime)/1000000000),
@@ -779,9 +776,20 @@ public class StandardProcessPool implements ProcessPool {
 				stopLock.unlock();
 			}
 		}
-		@Override
-		public boolean execute(Submission<?> submission)
-				throws IOException, InterruptedException, CancellationException {
+		/**
+		 * Executes the specified submission synchronously by delegating its commands to the underlying process 
+		 * serially and processing the responses of the process.
+		 * 
+		 * @param submission The submission to process and execute.
+		 * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the 
+		 * submission.
+		 * @return Whether the execution of the submission has completed successfully.
+		 * @throws IOException If there is an error while writing to the standard in of the process.
+		 * @throws InterruptedException If the thread is interrupted during the execution.
+		 * @throws NullPointerException If <code>submission</code> is <code>null</code>.
+		 */
+		private boolean execute(Submission<?> submission, boolean terminateProcessAfterwards)
+				throws IOException, InterruptedException {
 			if (submissionLock.tryLock()) {
 				// Make sure that the reader thread can only process output lines if this one is ready and waiting.
 				synchronized (execLock) {
@@ -823,16 +831,11 @@ public class StandardProcessPool implements ProcessPool {
 								processedCommands.add(command);
 						}
 						command = null;
-						if (running && !stop && !terminating && submission.doTerminateProcessAfterwards() &&
-								stopLock.tryLock()) {
-							/* Prevent infinite loops in case a terminal-submission is used for terminating the 
-							 * process */
-							terminating = true;
+						if (running && !stop && terminateProcessAfterwards && stopLock.tryLock()) {
 							try {
 								if (!stop(false))
 									stop(true);
 							} finally {
-								terminating = false;
 								stopLock.unlock();
 							}
 						}
@@ -854,6 +857,11 @@ public class StandardProcessPool implements ProcessPool {
 				}
 			}
 			return false;
+		}
+		@Override
+		public boolean execute(Submission<?> submission)
+				throws IOException, InterruptedException {
+			return execute(submission, false);
 		}
 		@Override
 		public void run() {

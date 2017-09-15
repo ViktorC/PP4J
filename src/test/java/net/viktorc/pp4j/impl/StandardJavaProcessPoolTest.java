@@ -623,26 +623,28 @@ public class StandardJavaProcessPoolTest {
 	// Java process testing.
 	@Test
 	public void test24() throws IOException, InterruptedException, ClassNotFoundException {
-		String testInput = String.format("%s%n%s%n%s%n", Conversion.toString((Callable<Long> & Serializable)
-				() -> Math.round(Math.E)), Conversion.toString((Callable<Object> & Serializable) () -> {
+		String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n", "", Conversion.toString("test"),
+				Conversion.toString((Callable<Long> & Serializable) () -> Math.round(Math.E)),
+				Conversion.toString((Callable<Object> & Serializable) () -> {
 					throw new Exception("test");
-				}), JavaProcess.STOP_REQUEST);
+				}), "test", JavaProcess.STOP_REQUEST);
 		try (ByteArrayOutputStream out = new ByteArrayOutputStream();
 				ByteArrayInputStream in = new ByteArrayInputStream(testInput.getBytes())) {
 			System.setOut(new PrintStream(out));
 			System.setIn(in);
 			Thread t = new Thread(() -> JavaProcess.main(new String[0]));
 			t.start();
-			Thread.sleep(3000);
+			t.join();
 			String[] lines = out.toString().split(System.lineSeparator());
 			Assert.assertTrue(!t.isAlive());
-			Assert.assertTrue(lines.length == 4);
+			Assert.assertTrue(lines.length == 5);
 			Assert.assertTrue(JavaProcess.STARTUP_SIGNAL.equals(lines[0]));
 			Assert.assertTrue(((Long) Conversion.toObject(lines[1])) == 3);
 			Assert.assertTrue(lines[2].startsWith(JavaProcess.ERROR_PREFIX));
 			Assert.assertTrue("test".equals(((Exception) Conversion.toObject(lines[2]
 					.substring(JavaProcess.ERROR_PREFIX.length()))).getMessage()));
-			Assert.assertTrue(JavaProcess.STOP_SIGNAL.equals(lines[3]));
+			Assert.assertTrue(lines[3].startsWith(JavaProcess.ERROR_PREFIX));
+			Assert.assertTrue(JavaProcess.STOP_SIGNAL.equals(lines[4]));
 		}
 	}
 	

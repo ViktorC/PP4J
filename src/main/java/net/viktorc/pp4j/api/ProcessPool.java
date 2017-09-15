@@ -26,13 +26,16 @@ public interface ProcessPool {
 	ProcessManagerFactory getProcessManagerFactory();
 	/**
 	 * Submits the specified submission for execution and returns a {@link java.util.concurrent.Future} instance 
-	 * which allows for the cancellation of the submission. It does not block until the processes terminate.
+	 * which allows for the cancellation of the submission. It does not block until the submission is processed. 
+	 * The termination of the executing process may be requested.
 	 * 
 	 * @param submission The submission to execute.
+	 * @param terminateProcessAfterwards Whether the process to which the submission is delegated should be 
+	 * terminated after the execution of the submission.
 	 * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of 
 	 * the execution, the cancellation thereof, or the retrieval of its optional result.
 	 */
-	<T> Future<T> submit(Submission<T> submission);
+	<T> Future<T> submit(Submission<T> submission, boolean terminateProcessAfterwards);
 	/**
 	 * Initiates the orderly shutdown of the process pool. It does not affect the execution of previously 
 	 * submitted tasks. See {@link java.util.concurrent.ExecutorService#shutdown()}.
@@ -70,5 +73,18 @@ public interface ProcessPool {
 	 * @throws InterruptedException If the thread is interrupted while the method is blocking.
 	 */
 	boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
+	/**
+	 * Submits the specified submission for execution and returns a {@link java.util.concurrent.Future} instance 
+	 * which allows for the cancellation of the submission. It does not block until the submission is processed. 
+	 * It is equivalent to calling {@link #submit(Submission, boolean)} with <code>terminateProcessAfterwards</code> 
+	 * set to <code>false</code>.
+	 * 
+	 * @param submission The submission to execute.
+	 * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of 
+	 * the execution, the cancellation thereof, or the retrieval of its optional result.
+	 */
+	default <T> Future<T> submit(Submission<T> submission) {
+		return submit(submission, false);
+	}
 	
 }

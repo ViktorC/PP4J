@@ -194,44 +194,24 @@ public class StandardProcessPoolTest {
 			int index = i;
 			Submission<?> submission;
 			if (commands != null && commands.size() == 1) {
-				if (reuse) {
-					submission = new SimpleSubmission(commands.get(0)) {
+				submission = new SimpleSubmission(commands.get(0)) {
 					
-						@Override
-						public void onFinishedProcessing() {
-							times.set(index, System.nanoTime() - times.get(index));
-						}
-					};
-				} else {
-					submission = new SimpleSubmission(commands.get(0), true) {
-						
-						@Override
-						public void onFinishedProcessing() {
-							times.set(index, System.nanoTime() - times.get(index));
-						}
-					};
-				}
+					@Override
+					public void onFinishedProcessing() {
+						times.set(index, System.nanoTime() - times.get(index));
+					}
+				};
 			} else {
-				if (reuse) {
-					submission = new SimpleSubmission(commands) {
-						
-						@Override
-						public void onFinishedProcessing() {
-							times.set(index, System.nanoTime() - times.get(index));
-						}
-					};
-				} else {
-					submission = new SimpleSubmission(commands, true) {
-						
-						@Override
-						public void onFinishedProcessing() {
-							times.set(index, System.nanoTime() - times.get(index));
-						}
-					};
-				}
+				submission = new SimpleSubmission(commands) {
+					
+					@Override
+					public void onFinishedProcessing() {
+						times.set(index, System.nanoTime() - times.get(index));
+					}
+				};
 			}
 			times.add(System.nanoTime());
-			futures.add(processPool.submit(submission));
+			futures.add(reuse ? processPool.submit(submission) : processPool.submit(submission, false));
 		}
 		if (cancelTime > 0) {
 			Thread.sleep(cancelTime);
@@ -495,7 +475,7 @@ public class StandardProcessPoolTest {
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 0, false, 0, false, true, false,
 				0, 4995, 5100));
 		exceptionRule.expect(RejectedExecutionException.class);
-		pool.submit(new SimpleSubmission(new SimpleCommand(null, null, null), false));
+		pool.submit(new SimpleSubmission(new SimpleCommand(null, null, null)), false);
 		pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 	}
 	// Interrupted construction testing.
@@ -645,7 +625,7 @@ public class StandardProcessPoolTest {
 					s -> {
 						try {
 							s.execute(new SimpleSubmission(new SimpleCommand("start",
-									(c, o) -> "ok".equals(o), (c, o) -> true), false));
+									(c, o) -> "ok".equals(o), (c, o) -> true)));
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -659,7 +639,7 @@ public class StandardProcessPoolTest {
 				}
 				@Override
 				public boolean isStartedUp(String output, boolean standard) {
-					return (!verifyStartup && super.isStartedUp(output, standard)) ||
+					return (super.isStartedUp(output, standard) && !verifyStartup) ||
 							(standard && "hi".equals(output));
 				}
 				@Override
@@ -672,7 +652,7 @@ public class StandardProcessPoolTest {
 									(c, o) -> {
 										success.set(false);
 										return true;
-									}), false)))
+									}))))
 								return success.get();
 						} catch (Exception e) {
 							e.printStackTrace();

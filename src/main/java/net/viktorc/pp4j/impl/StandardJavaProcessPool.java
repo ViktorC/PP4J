@@ -88,7 +88,7 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 			boolean terminateProcessAfterwards) throws IOException {
 		/* Due to the limitation of generics in Java, the serializability of the return type cannot be enforced 
 		 * while adhering to the ExecutorService API. */
-		return submit(new JavaSubmission<>(task, terminateProcessAfterwards));
+		return submit(new JavaSubmission<>(task), terminateProcessAfterwards);
 	}
 	@Override
 	public void execute(Runnable command) {
@@ -218,61 +218,6 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	}
 	
 	/**
-	 * A sub-class of {@link net.viktorc.pp4j.impl.AbstractProcessManager} for the management of process instances 
-	 * of the {@link net.viktorc.pp4j.impl.JavaProcess} class.
-	 * 
-	 * @author Viktor Csomor
-	 *
-	 */
-	private static class JavaProcessManager extends AbstractProcessManager {
-		
-		/**
-		 * Constructs an instance using the specified <code>builder</code> and <code>keepAliveTime</code>.
-		 * 
-		 * @param builder The <code>ProcessBuilder</code> to use for starting the Java processes.
-		 * @param keepAliveTime The number of milliseconds of idleness after which the processes should be 
-		 * terminated. If it is non-positive, the life-cycle of processes will not be limited based on 
-		 * idleness.
-		 */
-		JavaProcessManager(ProcessBuilder builder, long keepAliveTime) {
-			super(builder, keepAliveTime);
-		}
-		@Override
-		public boolean startsUpInstantly() {
-			return false;
-		}
-		@Override
-		public boolean isStartedUp(String outputLine, boolean standard) {
-			return standard && JavaProcess.STARTUP_SIGNAL.equals(outputLine);
-		}
-		@Override
-		public void onStartup(ProcessExecutor executor) {
-			// Warm up the JVM by ensuring that the most relevant classes are loaded.
-			try {
-				executor.execute(new JavaSubmission<>(new SerializableCallable<>((Callable<Integer> &
-						Serializable) () -> Integer.MAX_VALUE, (Runnable & Serializable) () -> {}),
-						false));
-			} catch (Exception e) {
-				return;
-			}
-		}
-		@Override
-		public boolean terminateGracefully(ProcessExecutor executor) {
-			try {
-				AtomicBoolean success = new AtomicBoolean(false);
-				if (executor.execute(new SimpleSubmission(new SimpleCommand(JavaProcess.STOP_REQUEST,
-						(c, l) -> {
-							success.set(JavaProcess.STOP_SIGNAL.equals(l));
-							return true;
-						}, (c, l) -> true), false)))
-					return success.get();
-			} catch (Exception e) { /* Nothing to do. */ }
-			return false;
-		}
-		
-	}
-	
-	/**
 	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} for the creation 
 	 * of {@link net.viktorc.pp4j.impl.StandardJavaProcessPool.JavaProcessManager} instances 
 	 * using a single {@link java.lang.ProcessBuilder} instance.
@@ -335,6 +280,60 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	}
 	
 	/**
+	 * A sub-class of {@link net.viktorc.pp4j.impl.AbstractProcessManager} for the management of process instances 
+	 * of the {@link net.viktorc.pp4j.impl.JavaProcess} class.
+	 * 
+	 * @author Viktor Csomor
+	 *
+	 */
+	private static class JavaProcessManager extends AbstractProcessManager {
+		
+		/**
+		 * Constructs an instance using the specified <code>builder</code> and <code>keepAliveTime</code>.
+		 * 
+		 * @param builder The <code>ProcessBuilder</code> to use for starting the Java processes.
+		 * @param keepAliveTime The number of milliseconds of idleness after which the processes should be 
+		 * terminated. If it is non-positive, the life-cycle of processes will not be limited based on 
+		 * idleness.
+		 */
+		JavaProcessManager(ProcessBuilder builder, long keepAliveTime) {
+			super(builder, keepAliveTime);
+		}
+		@Override
+		public boolean startsUpInstantly() {
+			return false;
+		}
+		@Override
+		public boolean isStartedUp(String outputLine, boolean standard) {
+			return standard && JavaProcess.STARTUP_SIGNAL.equals(outputLine);
+		}
+		@Override
+		public void onStartup(ProcessExecutor executor) {
+			// Warm up the JVM by ensuring that the most relevant classes are loaded.
+			try {
+				executor.execute(new JavaSubmission<>(new SerializableCallable<>((Callable<Long> &
+						Serializable) () -> Math.round(Math.E), (Runnable & Serializable) () -> {})));
+			} catch (Exception e) {
+				return;
+			}
+		}
+		@Override
+		public boolean terminateGracefully(ProcessExecutor executor) {
+			try {
+				AtomicBoolean success = new AtomicBoolean(false);
+				if (executor.execute(new SimpleSubmission(new SimpleCommand(JavaProcess.STOP_REQUEST,
+						(c, l) -> {
+							success.set(JavaProcess.STOP_SIGNAL.equals(l));
+							return true;
+						}, (c, l) -> true))))
+					return success.get();
+			} catch (Exception e) { /* Nothing to do. */ }
+			return false;
+		}
+		
+	}
+	
+	/**
 	 * An implementation of {@link net.viktorc.pp4j.api.Submission} for serializable {@link java.util.concurrent.Callable} 
 	 * instances to submit in Java process. It serializes, encodes, and sends the <code>Callable</code> to the process for 
 	 * execution. It also looks for the serialized and encoded return value of the <code>Callable</code>, and for a 
@@ -351,7 +350,6 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 
 		final S task;
 		final String command;
-		final boolean terminateProcessAfterwards;
 		volatile T result;
 		volatile Throwable error;
 		
@@ -359,16 +357,13 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 		 * Creates a submission for the specified {@link java.util.concurrent.Callable}.
 		 * 
 		 * @param runnablePart The runnablePart to execute.
-		 * @param terminateProcessAfterwards Whether the process should be terminated after the execution 
-		 * of the runnablePart.
 		 * @throws IOException If the encoding of the serialized runnablePart fails.
 		 * @throws NotSerializableException If some object to be serialized does not implement the 
 		 * {@link java.io.Serializable} interface.
 		 */
-		JavaSubmission(S task, boolean terminateProcessAfterwards)
+		JavaSubmission(S task)
 				throws IOException {
 			this.task = task;
-			this.terminateProcessAfterwards = terminateProcessAfterwards;
 			command = Conversion.toString(task);
 		}
 		@SuppressWarnings("unchecked")
@@ -386,10 +381,6 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 							throw new ProcessException(e);
 						}
 					}, (c, l) -> true /* It cannot happen, as stderr is redirected. */));
-		}
-		@Override
-		public boolean doTerminateProcessAfterwards() {
-			return terminateProcessAfterwards;
 		}
 		@Override
 		public T getResult() throws ExecutionException {

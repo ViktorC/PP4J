@@ -21,12 +21,6 @@ public interface Submission<T> {
 	 */
 	List<Command> getCommands();
 	/**
-	 * Returns whether the process should be terminated after the execution of the commands.
-	 * 
-	 * @return Whether the process should be terminated after the execution of the commands.
-	 */
-	boolean doTerminateProcessAfterwards();
-	/**
 	 * Returns the result of the submission. By default, it returns null.
 	 * 
 	 * @return The object representing the result of the submission or null if no result is associated with 
