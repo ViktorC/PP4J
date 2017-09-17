@@ -632,11 +632,8 @@ public class StandardJavaProcessPoolTest {
 				ByteArrayInputStream in = new ByteArrayInputStream(testInput.getBytes())) {
 			System.setOut(new PrintStream(out));
 			System.setIn(in);
-			Thread t = new Thread(() -> JavaProcess.main(new String[0]));
-			t.start();
-			t.join();
+			JavaProcess.main(new String[0]);
 			String[] lines = out.toString().split(System.lineSeparator());
-			Assert.assertTrue(!t.isAlive());
 			Assert.assertTrue(lines.length == 5);
 			Assert.assertTrue(JavaProcess.STARTUP_SIGNAL.equals(lines[0]));
 			Assert.assertTrue(((Long) Conversion.toObject(lines[1])) == 3);
