@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -31,7 +32,7 @@ import net.viktorc.pp4j.api.Submission;
  * @author Viktor Csomor
  *
  */
-public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
+abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
 	
 	/**
 	 * If a process cannot be started or an exception occurs which would make it impossible to retrieve the 
@@ -47,6 +48,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	protected final Object execLock;
 	protected final Object processLock;
 	protected final Semaphore termSemaphore;
+	protected final AtomicInteger threadsToWaitFor;
 	protected final Logger logger;
 	private Process process;
 	private KeepAliveTimer timer;
@@ -77,6 +79,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 		execLock = new Object();
 		processLock = new Object();
 		termSemaphore = new Semaphore(0);
+		threadsToWaitFor = new AtomicInteger(0);
 		logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 	}
 	/**
@@ -130,7 +133,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	 * ineffective if the process is currently executing a command or has not started up.
 	 * @return Whether the process was successfully terminated.
 	 */
-	public boolean stop(boolean forcibly) {
+	protected boolean stop(boolean forcibly) {
 		stopLock.lock();
 		try {
 			if (stop)
@@ -264,6 +267,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 						keepAliveTime = manager.getKeepAliveTime();
 						doTime = keepAliveTime > 0;
 						timer = doTime && timer == null ? new KeepAliveTimer() : timer;
+						threadsToWaitFor.set(doTime ? 3 : 2);
 						// Start the process.
 						synchronized (processLock) {
 							startupTime = System.currentTimeMillis();
@@ -302,7 +306,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 					 * was thrown, release as many permits as there are slave threads to ensure that the 
 					 * semaphore does not block in the finally clause. */
 					if (!orderly)
-						termSemaphore.release(doTime ? 4 : 3);
+						termSemaphore.release(threadsToWaitFor.get());
 					submissionLock.unlock();
 				}
 				/* If the startup failed, the process might not be initialized. Otherwise, wait for the process 
@@ -350,7 +354,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 				}
 				// Wait for all the slave threads to finish.
 				try {
-					termSemaphore.acquire(doTime ? 4 : 3);
+					termSemaphore.acquire(threadsToWaitFor.get());
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
 				}

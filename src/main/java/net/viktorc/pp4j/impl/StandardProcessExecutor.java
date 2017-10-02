@@ -11,7 +11,11 @@ import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.Submission;
 
 /**
- * 
+ * An implementation of the {@link net.viktorc.pp4j.api.ProcessExecutor} interface that allows for the 
+ * running and management of a process based on a {@link net.viktorc.pp4j.api.ProcessManager} instance 
+ * to enable the execution of submissions in this process. The process may be launched by invoking the 
+ * {@link #start()} method and submissions may be executed in the process using the 
+ * {@link #execute(Submission)} method
  * 
  * @author Viktor Csomor
  *
@@ -22,8 +26,9 @@ public class StandardProcessExecutor extends AbstractProcessExecutor implements 
 	private final Lock runLock;
 	
 	/**
+	 * Constructs a process executor instance using the argument to manage the life-cycle of the process.
 	 * 
-	 * @param manager
+	 * @param manager The manager of the underlying process.
 	 */
 	public StandardProcessExecutor(ProcessManager manager) {
 		super(manager, Executors.newCachedThreadPool(), false);
@@ -31,18 +36,20 @@ public class StandardProcessExecutor extends AbstractProcessExecutor implements 
 		runLock = new ReentrantLock();
 	}
 	/**
+	 * It launches the underlying process and blocks until it is ready for the execution of submissions.
 	 * 
-	 * 
-	 * @throws InterruptedException 
+	 * @throws InterruptedException If the thread is interrupted while waiting for the startup to 
+	 * complete.
+	 * @throws IllegalStateException If the process is already running.
 	 */
 	public void start() throws InterruptedException {
 		if (runLock.tryLock()) {
 			try {
 				threadPool.submit(this);
-				startupSemaphore.acquire();
 			} finally {
 				runLock.unlock();
 			}
+			startupSemaphore.acquire();
 		} else
 			throw new IllegalStateException("The executor is already running.");
 	}

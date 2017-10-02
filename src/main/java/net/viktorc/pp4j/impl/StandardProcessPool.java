@@ -67,8 +67,8 @@ public class StandardProcessPool implements ProcessPool {
 	private final int maxPoolSize;
 	private final int reserveSize;
 	private final boolean verbose;
-	private final InternalProcessExecutorThreadPool procExecutorThreadPool;
-	private final InternalProcessExecutorObjectPool procExecutorPool;
+	private final InternalProcessExecutorThreadPool procExecThreadPool;
+	private final InternalProcessExecutorObjectPool procExecObjectPool;
 	private final ExecutorService auxThreadPool;
 	private final Queue<InternalProcessExecutor> activeProcExecutors;
 	private final BlockingDeque<InternalSubmission<?>> submissionQueue;
@@ -119,8 +119,8 @@ public class StandardProcessPool implements ProcessPool {
 		this.maxPoolSize = maxPoolSize;
 		this.reserveSize = reserveSize;
 		this.verbose = verbose;
-		procExecutorThreadPool = new InternalProcessExecutorThreadPool();
-		procExecutorPool = new InternalProcessExecutorObjectPool();
+		procExecThreadPool = new InternalProcessExecutorThreadPool();
+		procExecObjectPool = new InternalProcessExecutorObjectPool();
 		int actualMinSize = Math.max(minPoolSize, reserveSize);
 		/* One normal process requires minimum 2 auxiliary threads (stdout listener, submission handler), 3 if 
 		 * the stderr is not redirected to stdout (stderr listener), and 4 if keepAliveTime is positive (timer). */
@@ -221,11 +221,11 @@ public class StandardProcessPool implements ProcessPool {
 	private boolean startNewProcess() {
 		InternalProcessExecutor executor = null;
 		try {
-			executor = procExecutorPool.borrowObject();
+			executor = procExecObjectPool.borrowObject();
 		} catch (Exception e) {
 			return false;
 		}
-		procExecutorThreadPool.execute(executor);
+		procExecThreadPool.execute(executor);
 		activeProcExecutors.add(executor);
 		logger.debug("Process executor {} started.{}", executor, System.lineSeparator() + getPoolStats());
 		return true;
@@ -263,14 +263,14 @@ public class StandardProcessPool implements ProcessPool {
 				}
 				logger.debug("Shutting down thread pools...");
 				auxThreadPool.shutdown();
-				procExecutorThreadPool.shutdown();
-				procExecutorPool.close();
+				procExecThreadPool.shutdown();
+				procExecObjectPool.close();
 			} finally {
 				poolLock.unlock();
 			}
 			try {
 				auxThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-				procExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+				procExecThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 				for (InternalSubmission<?> submission : submissionQueue)
 					submission.setException(new Exception("The process pool has been shut down."));
 			} catch (InterruptedException e) {
@@ -656,8 +656,10 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		protected void onExecutorStartup(boolean orderly) {
-			if (orderly)
+			if (orderly) {
+				threadsToWaitFor.incrementAndGet();
 				threadPool.submit(this::startHandlingSubmissions);
+			}
 			prestartLatch.countDown();
 		}
 		@Override
@@ -821,7 +823,7 @@ public class StandardProcessPool implements ProcessPool {
 			super.afterExecute(r, t);
 			InternalProcessExecutor executor = (InternalProcessExecutor) r;
 			activeProcExecutors.remove(executor);
-			procExecutorPool.returnObject(executor);
+			procExecObjectPool.returnObject(executor);
 			logger.debug("Process executor {} stopped.{}", executor, System.lineSeparator() + getPoolStats());
 			// A process has terminated. Extend the pool if necessary by using the pooled executors.
 			poolLock.lock();

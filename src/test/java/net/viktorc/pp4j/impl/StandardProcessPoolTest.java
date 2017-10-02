@@ -12,6 +12,7 @@ import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
 import net.viktorc.pp4j.impl.ProcessException;
 import net.viktorc.pp4j.impl.SimpleCommand;
+import net.viktorc.pp4j.impl.SimpleProcessManager;
 import net.viktorc.pp4j.impl.StandardProcessPool;
 import net.viktorc.pp4j.impl.SimpleSubmission;
 
@@ -49,11 +50,7 @@ public class StandardProcessPoolTest {
 	 * @throws URISyntaxException If the path to the test program cannot be resolved.
 	 */
 	public StandardProcessPoolTest() throws URISyntaxException {
-		// Support testing on Linux and Windows.
-		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-		File programFile = new File(ClassLoader.getSystemClassLoader()
-				.getResource(windows ? "win/test.exe" : "linux/test")
-				.toURI().getPath());
+		File programFile = TestUtils.getExecutable();
 		programFile.setExecutable(true);
 		programLocation = programFile.getAbsolutePath();
 	}

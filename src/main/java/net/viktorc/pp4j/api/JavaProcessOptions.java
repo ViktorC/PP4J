@@ -72,7 +72,7 @@ public interface JavaProcessOptions {
 	 * @author Viktor Csomor
 	 *
 	 */
-	public static enum JVMArch {
+	public enum JVMArch {
 		BIT_32, BIT_64; 
 	}
 	
@@ -82,7 +82,7 @@ public interface JavaProcessOptions {
 	 * @author Viktor Csomor
 	 *
 	 */
-	public static enum JVMType {
+	public enum JVMType {
 		CLIENT, SERVER;
 	}
 	

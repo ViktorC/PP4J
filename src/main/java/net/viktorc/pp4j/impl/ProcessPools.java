@@ -1,11 +1,9 @@
-package net.viktorc.pp4j;
+package net.viktorc.pp4j.impl;
 
 import net.viktorc.pp4j.api.JavaProcessOptions;
 import net.viktorc.pp4j.api.JavaProcessPool;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.ProcessPool;
-import net.viktorc.pp4j.impl.StandardJavaProcessPool;
-import net.viktorc.pp4j.impl.StandardProcessPool;
 
 /**
  * A class for convenience and factory methods for creating instances of implementations of the 

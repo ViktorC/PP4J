@@ -24,6 +24,8 @@ import org.junit.rules.ExpectedException;
 import net.viktorc.pp4j.api.JavaProcessOptions;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
+import net.viktorc.pp4j.impl.Conversion;
+import net.viktorc.pp4j.impl.JavaProcess;
 import net.viktorc.pp4j.impl.SimpleJavaProcessOptions;
 import net.viktorc.pp4j.impl.StandardJavaProcessPool;
 

@@ -86,8 +86,6 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	 */
 	public <T extends Serializable, S extends Callable<T> & Serializable> Future<T> submit(S task,
 			boolean terminateProcessAfterwards) throws IOException {
-		/* Due to the limitation of generics in Java, the serializability of the return type cannot be enforced 
-		 * while adhering to the ExecutorService API. */
 		return submit(new JavaSubmission<>(task), terminateProcessAfterwards);
 	}
 	@Override
