@@ -6,7 +6,7 @@
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,10 +18,10 @@ package net.viktorc.pp4j.impl;
 import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.Submission;
 
@@ -35,10 +35,11 @@ import net.viktorc.pp4j.api.Submission;
  * @author Viktor Csomor
  *
  */
-public class StandardProcessExecutor extends AbstractProcessExecutor implements AutoCloseable {
+public class StandardProcessExecutor extends AbstractProcessExecutor {
 
 	private final Semaphore startupSemaphore;
 	private final Lock runLock;
+	private boolean started;
 	
 	/**
 	 * Constructs a process executor instance using the argument to manage the life-cycle of the process.
@@ -55,18 +56,34 @@ public class StandardProcessExecutor extends AbstractProcessExecutor implements 
 	 * 
 	 * @throws InterruptedException If the thread is interrupted while waiting for the startup to 
 	 * complete.
-	 * @throws IllegalStateException If the process is already running.
+	 * @throws IllegalStateException If this method has already been invoked on this instance before..
 	 */
 	public void start() throws InterruptedException {
 		if (runLock.tryLock()) {
+			if (started)
+				throw new IllegalStateException("The executor can only run once.");
 			try {
 				threadPool.submit(this);
+				started = true;
 			} finally {
 				runLock.unlock();
 			}
 			startupSemaphore.acquire();
 		} else
 			throw new IllegalStateException("The executor is already running.");
+	}
+	/**
+	 * It prompts the currently running process, if there is one, to terminate. Once the process has been 
+	 * successfully terminated, subsequent calls are ignored and return true.
+	 * 
+	 * @param forcibly Whether the process should be killed forcibly or using the 
+	 * {@link net.viktorc.pp4j.api.ProcessManager#terminateGracefully(ProcessExecutor)} method of the 
+	 * <code>ProcessManager</code> instance assigned to the executor. The latter might be ineffective if 
+	 * the process is currently executing a command or has not started up.
+	 * @return Whether the process was successfully terminated.
+	 */
+	public boolean stop(boolean forcibly) {
+		return super.stop(forcibly);
 	}
 	@Override
 	public boolean execute(Submission<?> submission) throws IOException, InterruptedException {
@@ -91,12 +108,8 @@ public class StandardProcessExecutor extends AbstractProcessExecutor implements 
 		startupSemaphore.release();
 	}
 	@Override
-	protected void onExecutorTermination() { }
-	@Override
-	public void close() throws Exception {
-		stop(true);
+	protected void onExecutorTermination() {
 		threadPool.shutdown();
-		threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 	}
 
 }

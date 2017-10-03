@@ -6,7 +6,7 @@
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -49,11 +49,11 @@ import org.slf4j.helpers.NOPLogger;
 
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
-import net.viktorc.pp4j.api.ProcessPool;
+import net.viktorc.pp4j.api.ProcessExecutorService;
 import net.viktorc.pp4j.api.Submission;
 
 /**
- * An implementation of the {@link net.viktorc.pp4j.api.ProcessPool} interface for maintaining and managing a pool 
+ * An implementation of the {@link net.viktorc.pp4j.api.ProcessExecutorService} interface for maintaining and managing a pool 
  * of pre-started processes. The processes are executed in instances of an own 
  * {@link net.viktorc.pp4j.api.ProcessExecutor} implementation. Each executor is assigned an instance of an 
  * implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface using an implementation of the 
@@ -69,7 +69,7 @@ import net.viktorc.pp4j.api.Submission;
  * @author Viktor Csomor
  *
  */
-public class StandardProcessPool implements ProcessPool {
+public class StandardProcessExecutorService implements ProcessExecutorService {
 	
 	/**
 	 * The number of milliseconds after which idle process executor instances and process executor threads are 
@@ -117,7 +117,7 @@ public class StandardProcessPool implements ProcessPool {
 	 * the maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater 
 	 * than the maximum pool size.
 	 */
-	public StandardProcessPool(ProcessManagerFactory procManagerFactory, int minPoolSize, int maxPoolSize,
+	public StandardProcessExecutorService(ProcessManagerFactory procManagerFactory, int minPoolSize, int maxPoolSize,
 			int reserveSize, boolean verbose) throws InterruptedException {
 		if (procManagerFactory == null)
 			throw new IllegalArgumentException("The process manager factory cannot be null.");
@@ -228,7 +228,7 @@ public class StandardProcessPool implements ProcessPool {
 				Math.min(maxPoolSize, numOfSubmissions + reserveSize)));
 	}
 	/**
-	 * Starts a new process by borrowing a {@link net.viktorc.pp4j.impl.StandardProcessPool.InternalProcessExecutor} 
+	 * Starts a new process by borrowing a {@link net.viktorc.pp4j.impl.StandardProcessExecutorService.InternalProcessExecutor} 
 	 * instance from the pool and executing it.
 	 * 
 	 * @return Whether the process was successfully started.
@@ -300,6 +300,13 @@ public class StandardProcessPool implements ProcessPool {
 	@Override
 	public ProcessManagerFactory getProcessManagerFactory() {
 		return procManagerFactory;
+	}
+	@Override
+	public boolean execute(Submission<?> submission) throws Exception {
+		InternalProcessExecutor executor = procExecObjectPool.borrowObject();
+		boolean success = executor.execute(submission);
+		procExecObjectPool.returnObject(executor);
+		return success;
 	}
 	@Override
 	public <T> Future<T> submit(Submission<T> submission, boolean terminateProcessAfterwards) {
@@ -688,7 +695,7 @@ public class StandardProcessPool implements ProcessPool {
 		}
 		@Override
 		public String toString() {
-			return String.format("%s-stdProcExecutor@%s", StandardProcessPool.this,
+			return String.format("%s-stdProcExecutor@%s", StandardProcessExecutorService.this,
 					Integer.toHexString(hashCode()));
 		}
 		
@@ -696,7 +703,7 @@ public class StandardProcessPool implements ProcessPool {
 	
 	/**
 	 * A sub-class of {@link org.apache.commons.pool2.impl.GenericObjectPool} for the pooling of 
-	 * {@link net.viktorc.pp4j.impl.StandardProcessPool.InternalProcessExecutor} instances.
+	 * {@link net.viktorc.pp4j.impl.StandardProcessExecutorService.InternalProcessExecutor} instances.
 	 * 
 	 * @author Viktor Csomor
 	 *
@@ -705,7 +712,7 @@ public class StandardProcessPool implements ProcessPool {
 
 		/**
 		 * Constructs an object pool instance to facilitate the reuse of 
-		 * {@link net.viktorc.pp4j.impl.StandardProcessPool.InternalProcessExecutor} instances. The pool 
+		 * {@link net.viktorc.pp4j.impl.StandardProcessExecutorService.InternalProcessExecutor} instances. The pool 
 		 * does not block if there are no available objects, it accommodates <code>maxPoolSize</code> 
 		 * objects, and if there are more than <code>Math.max(minPoolSize, reserveSize)</code> idle objects 
 		 * in the pool, excess idle objects are eligible for eviction after <code>EVICT_TIME</code> 
@@ -744,7 +751,7 @@ public class StandardProcessPool implements ProcessPool {
 	/**
 	 * An implementation the {@link java.util.concurrent.ThreadFactory} interface that provides more descriptive 
 	 * thread  names and extends the {@link java.lang.Thread.UncaughtExceptionHandler} of the created threads by 
-	 * logging the uncaught exceptions if the enclosing {@link net.viktorc.pp4j.impl.StandardProcessPool} 
+	 * logging the uncaught exceptions if the enclosing {@link net.viktorc.pp4j.impl.StandardProcessExecutorService} 
 	 * instance is verbose. It also attempts to shut down the enclosing pool if an exception is thrown in one of 
 	 * the threads it created.
 	 * 
@@ -774,7 +781,7 @@ public class StandardProcessPool implements ProcessPool {
 				@Override
 				public void uncaughtException(Thread t, Throwable e) {
 					logger.error(e.getMessage(), e);
-					StandardProcessPool.this.forceShutdown();
+					StandardProcessExecutorService.this.forceShutdown();
 				}
 			});
 			return t;
@@ -784,7 +791,7 @@ public class StandardProcessPool implements ProcessPool {
 	
 	/**
 	 * A sub-class of {@link java.util.concurrent.ThreadPoolExecutor} for the execution of 
-	 * {@link net.viktorc.pp4j.impl.StandardProcessPool.InternalProcessExecutor} instances. It utilizes an 
+	 * {@link net.viktorc.pp4j.impl.StandardProcessExecutorService.InternalProcessExecutor} instances. It utilizes an 
 	 * extension of the {@link java.util.concurrent.LinkedTransferQueue} and an implementation of the 
 	 * {@link java.util.concurrent.RejectedExecutionHandler} as per Robert Tupelo-Schneck's 
 	 * <a href="https://stackoverflow.com/a/24493856">answer</a> to a StackOverflow question to facilitate a 
@@ -798,7 +805,7 @@ public class StandardProcessPool implements ProcessPool {
 		
 		/**
 		 * Constructs thread pool for the execution of 
-		 * {@link net.viktorc.pp4j.impl.StandardProcessPool.InternalProcessExecutor} instances. If there are 
+		 * {@link net.viktorc.pp4j.impl.StandardProcessExecutorService.InternalProcessExecutor} instances. If there are 
 		 * more than <code>Math.max(minPoolSize, reserveSize)</code> idle threads in the pool, excess threads 
 		 * are evicted after <code>EVICT_TIME</code> milliseconds.
 		 */
@@ -814,7 +821,7 @@ public class StandardProcessPool implements ProcessPool {
 							 * else decline it and force the pool to create a new thread for running the runnablePart. */
 							return tryTransfer(r);
 						}
-					}, new CustomizedThreadFactory(StandardProcessPool.this + "-procExecThreadPool"),
+					}, new CustomizedThreadFactory(StandardProcessExecutorService.this + "-procExecThreadPool"),
 					new RejectedExecutionHandler() {
 						
 						@Override

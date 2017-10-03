@@ -6,7 +6,7 @@
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
  * @author Viktor Csomor
  *
  */
-public interface ProcessPool {
+public interface ProcessExecutorService extends ProcessExecutor {
 
 	/**
 	 * Returns the {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance responsible for creating instances 
@@ -47,6 +47,7 @@ public interface ProcessPool {
 	 * @param submission The submission to execute.
 	 * @param terminateProcessAfterwards Whether the process to which the submission is delegated should be 
 	 * terminated after the execution of the submission.
+	 * @param <T> The type variable of the submission.
 	 * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of 
 	 * the execution, the cancellation thereof, or the retrieval of its optional result.
 	 */
@@ -95,6 +96,7 @@ public interface ProcessPool {
 	 * set to <code>false</code>.
 	 * 
 	 * @param submission The submission to execute.
+	 * @param <T> The type variable of the submission.
 	 * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of 
 	 * the execution, the cancellation thereof, or the retrieval of its optional result.
 	 */

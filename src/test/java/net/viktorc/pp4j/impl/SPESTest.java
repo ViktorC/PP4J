@@ -13,7 +13,7 @@ import net.viktorc.pp4j.api.Submission;
 import net.viktorc.pp4j.impl.ProcessException;
 import net.viktorc.pp4j.impl.SimpleCommand;
 import net.viktorc.pp4j.impl.SimpleProcessManager;
-import net.viktorc.pp4j.impl.StandardProcessPool;
+import net.viktorc.pp4j.impl.StandardProcessExecutorService;
 import net.viktorc.pp4j.impl.SimpleSubmission;
 
 import java.io.File;
@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Viktor Csomor
  *
  */
-public class StandardProcessPoolTest {
+public class SPESTest {
 	
 	@Rule
 	public final ExpectedException exceptionRule = ExpectedException.none();
@@ -49,7 +49,7 @@ public class StandardProcessPoolTest {
 	 * 
 	 * @throws URISyntaxException If the path to the test program cannot be resolved.
 	 */
-	public StandardProcessPoolTest() throws URISyntaxException {
+	public SPESTest() throws URISyntaxException {
 		File programFile = TestUtils.getExecutable();
 		programFile.setExecutable(true);
 		programLocation = programFile.getAbsolutePath();
@@ -64,7 +64,7 @@ public class StandardProcessPoolTest {
 	 * @param verbose Whether the events relating to the management of the pool should be logged to the 
 	 * console.
 	 */
-	private void checkPool(StandardProcessPool pool, int minPoolSize, int maxPoolSize, int reserveSize,
+	private void checkPool(StandardProcessExecutorService pool, int minPoolSize, int maxPoolSize, int reserveSize,
 			boolean verbose) {
 		// Basic, implementation-specific pool state checks.
 		assert minPoolSize == pool.getMinSize() : "Different min pool sizes: " + minPoolSize + " and " +
@@ -97,12 +97,12 @@ public class StandardProcessPoolTest {
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads 
 	 * to start up.
 	 */
-	public StandardProcessPool getPool(int minPoolSize, int maxPoolSize, int reserveSize, 
+	public StandardProcessExecutorService getPool(int minPoolSize, int maxPoolSize, int reserveSize, 
 			long keepAliveTime, boolean verifyStartup, boolean manuallyTerminate, boolean verbose,
 			boolean throwStartupException) throws InterruptedException {
 		TestProcessManagerFactory managerFactory = new TestProcessManagerFactory(keepAliveTime,
 				verifyStartup, manuallyTerminate, throwStartupException);
-		StandardProcessPool pool = new StandardProcessPool(managerFactory, minPoolSize, maxPoolSize,
+		StandardProcessExecutorService pool = new StandardProcessExecutorService(managerFactory, minPoolSize, maxPoolSize,
 				reserveSize, verbose);
 		checkPool(pool, minPoolSize, maxPoolSize, reserveSize, verbose);
 		return pool;
@@ -133,7 +133,7 @@ public class StandardProcessPoolTest {
 	 * @return Whether the test passes.
 	 * @throws Exception If the process pool cannot be created.
 	 */
-	private boolean perfTest(StandardProcessPool processPool, boolean reuse, int[] procTimes,
+	private boolean perfTest(StandardProcessExecutorService processPool, boolean reuse, int[] procTimes,
 			int requests, long timeSpan, boolean throwExecutionException, long cancelTime,
 			boolean forcedCancel, boolean earlyClose, boolean forcedEarlyClose, long waitTimeout,
 			long lowerBound, long upperBound) throws Exception {
@@ -287,48 +287,48 @@ public class StandardProcessPoolTest {
 	public void test01() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 1");
 		exceptionRule.expect(IllegalArgumentException.class);
-		StandardProcessPool pool = getPool(-1, 5, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(-1, 5, 0, 0, false, false, false, false);
 		perfTest(pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
 	}
 	@Test
 	public void test02() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 2");
 		exceptionRule.expect(IllegalArgumentException.class);
-		StandardProcessPool pool = getPool(0, 0, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(0, 0, 0, 0, false, false, false, false);
 		pool.shutdown();
 	}
 	@Test
 	public void test03() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 3");
 		exceptionRule.expect(IllegalArgumentException.class);
-		StandardProcessPool pool = getPool(10, 5, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(10, 5, 0, 0, false, false, false, false);
 		pool.shutdown();
 	}
 	@Test
 	public void test04() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 4");
 		exceptionRule.expect(IllegalArgumentException.class);
-		StandardProcessPool pool = getPool(10, 12, -1, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(10, 12, -1, 0, false, false, false, false);
 		pool.shutdown();
 	}
 	@Test
 	public void test05() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 5");
 		exceptionRule.expect(IllegalArgumentException.class);
-		StandardProcessPool pool = getPool(10, 12, 15, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(10, 12, 15, 0, false, false, false, false);
 		pool.shutdown();
 	}
 	@Test
 	public void test06() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 6");
-		StandardProcessPool pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
 		exceptionRule.expect(IllegalArgumentException.class);
 		perfTest(pool, false, null, 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
 	}
 	@Test
 	public void test07() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 7");
-		StandardProcessPool pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
 		exceptionRule.expect(IllegalArgumentException.class);
 		perfTest(pool, false, new int[0], 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
 	}
@@ -336,84 +336,84 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test08() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 8");
-		StandardProcessPool pool = getPool(0, 100, 0, 0, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(0, 100, 0, 0, true, false, false, false);
 		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 10000, false, 0, false, false, false,
 				0, 4995, 6250));
 	}
 	@Test
 	public void test09() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 9");
-		StandardProcessPool pool = getPool(50, 150, 20, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(50, 150, 20, 0, false, false, false, false);
 		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 5000, false, 0, false, false, false,
 				0, 4995, 5100));
 	}
 	@Test
 	public void test10() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 10");
-		StandardProcessPool pool = getPool(10, 25, 5, 15000, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(10, 25, 5, 15000, true, false, false, false);
 		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 20, 10000, false, 0, false, false, false,
 				0, 4995, 5100));
 	}
 	@Test
 	public void test11() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 11");
-		StandardProcessPool pool = getPool(50, 150, 20, 0, false, true, false, false);
+		StandardProcessExecutorService pool = getPool(50, 150, 20, 0, false, true, false, false);
 		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 5000, false, 0, false, false, false,
 				0, 4995, 5100));
 	}
 	@Test
 	public void test12() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 12");
-		StandardProcessPool pool = getPool(10, 50, 5, 15000, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(10, 50, 5, 15000, true, false, false, false);
 		Assert.assertTrue(perfTest(pool, true, new int[] { 5, 3, 2 }, 50, 10000, false, 0, false, false,
 				false, 0, 9995, 10340));
 	}
 	@Test
 	public void test13() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 13");
-		StandardProcessPool pool = getPool(100, 250, 20, 0, true, true, false, false);
+		StandardProcessExecutorService pool = getPool(100, 250, 20, 0, true, true, false, false);
 		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 800, 20000, false, 0, false, false, false,
 				0, 4995, 6000));
 	}
 	@Test
 	public void test14() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 14");
-		StandardProcessPool pool = getPool(0, 100, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(0, 100, 0, 0, false, false, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, false,
 				0, 4995, 6850));
 	}
 	@Test
 	public void test15() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 15");
-		StandardProcessPool pool = getPool(50, 150, 10, 0, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(50, 150, 10, 0, true, false, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 5000, false, 0, false, false, false,
 				0, 4995, 5620));
 	}
 	@Test
 	public void test16() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 16");
-		StandardProcessPool pool = getPool(10, 25, 5, 15000, false, true, false, false);
+		StandardProcessExecutorService pool = getPool(10, 25, 5, 15000, false, true, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 10000, false, 0, false, false, false,
 				0, 4995, 5100));
 	}
 	@Test
 	public void test17() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 17");
-		StandardProcessPool pool = getPool(50, 150, 10, 0, true, true, false, false);
+		StandardProcessExecutorService pool = getPool(50, 150, 10, 0, true, true, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 5000, false, 0, false, false, false,
 				0, 4995, 5600));
 	}
 	@Test
 	public void test18() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 18");
-		StandardProcessPool pool = getPool(10, 50, 5, 15000, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(10, 50, 5, 15000, false, false, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5, 3, 2 }, 50, 10000, false, 0, false, false,
 				false, 0, 9995, 10350));
 	}
 	@Test
 	public void test19() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 19");
-		StandardProcessPool pool = getPool(50, 250, 20, 0, true, true, false, false);
+		StandardProcessExecutorService pool = getPool(50, 250, 20, 0, true, true, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 800, 20000, false, 0, false, false, false,
 				0, 4995, 6000));
 	}
@@ -421,7 +421,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test20() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 20");
-		StandardProcessPool pool = getPool(20, 40, 4, 250, true, true, true, false);
+		StandardProcessExecutorService pool = getPool(20, 40, 4, 250, true, true, true, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 50, 5000, false, 0, false, false, false,
 				0, 4995, 8200));
 	}
@@ -429,7 +429,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test21() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 21");
-		StandardProcessPool pool = getPool(10, 30, 5, 0, true, true, true, false);
+		StandardProcessExecutorService pool = getPool(10, 30, 5, 0, true, true, true, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 0, false, 2500, true, false, false,
 				0, 2495, 2520));
@@ -437,14 +437,14 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test22() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 22");
-		StandardProcessPool pool = getPool(20, 20, 0, 0, false, false, true, false);
+		StandardProcessExecutorService pool = getPool(20, 20, 0, 0, false, false, true, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 0, false, 2500, false, false, false,
 				0, 4995, 5120));
 	}
 	@Test
 	public void test23() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 23");
-		StandardProcessPool pool = getPool(10, 30, 5, 0, true, true, false, false);
+		StandardProcessExecutorService pool = getPool(10, 30, 5, 0, true, true, false, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5, 5, 3 }, 20, 0, false, 2500, true, false,
 				false, 0, 2495, 2520));
@@ -452,7 +452,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test24() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 24");
-		StandardProcessPool pool = getPool(20, 20, 0, 0, true, true, true, false);
+		StandardProcessExecutorService pool = getPool(20, 20, 0, 0, true, true, true, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5, 5, 3 }, 20, 0, false, 3000, false, false,
 				false, 0, 12995, 13120));
 	}
@@ -460,7 +460,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test25() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 25");
-		StandardProcessPool pool = getPool(100, 100, 0, 5000, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(100, 100, 0, 5000, true, false, false, false);
 		exceptionRule.expect(ExecutionException.class);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 0, false, 0, false, true, true,
 				0, 0, 0));
@@ -468,7 +468,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test26() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 26");
-		StandardProcessPool pool = getPool(100, 100, 0, 5000, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(100, 100, 0, 5000, true, false, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 0, false, 0, false, true, false,
 				0, 4995, 5100));
 		exceptionRule.expect(RejectedExecutionException.class);
@@ -479,7 +479,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test27() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 27");
-		StandardProcessPool pool = null;
+		StandardProcessExecutorService pool = null;
 		Thread thread = Thread.currentThread();
 		Timer timer = new Timer();
 		exceptionRule.expect(InterruptedException.class);
@@ -501,14 +501,14 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test28() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 28");
-		StandardProcessPool pool = getPool(1, 1, 0, 20000, true, true, false, false);
+		StandardProcessExecutorService pool = getPool(1, 1, 0, 20000, true, true, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 5, 30000, false, 0, false, false, false,
 				0, 4995, 5250));
 	}
 	@Test
 	public void test29() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 29");
-		StandardProcessPool pool = getPool(1, 1, 0, 0, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(1, 1, 0, 0, true, false, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 5, 20000, false, 0, false, false, false,
 				0, 4995, 13250));
 	}
@@ -516,14 +516,14 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test30() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 30");
-		StandardProcessPool pool = getPool(20, 20, 0, 0, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(20, 20, 0, 0, true, false, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 5000, false, 0, false, false, false,
 				0, 4995, 5200));
 	}
 	@Test
 	public void test31() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 31");
-		StandardProcessPool pool = getPool(20, 20, 0, 0, true, false, false, false);
+		StandardProcessExecutorService pool = getPool(20, 20, 0, 0, true, false, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 40, 10000, false, 0, false, false, false,
 				0, 4995, 6200));
 	}
@@ -531,7 +531,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test32() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 32");
-		StandardProcessPool pool = getPool(20, 50, 10, 0, true, true, false, false);
+		StandardProcessExecutorService pool = getPool(20, 50, 10, 0, true, true, false, false);
 		exceptionRule.expect(TimeoutException.class);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 40, 0, false, 0, false, false, false,
 				3000, 3000, 3000));
@@ -539,7 +539,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test33() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 33");
-		StandardProcessPool pool = getPool(20, 50, 0, 0, true, true, false, false);
+		StandardProcessExecutorService pool = getPool(20, 50, 0, 0, true, true, false, false);
 		exceptionRule.expect(TimeoutException.class);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5, 5 }, 40, 0, false, 0, false, false,
 				false, 5000, 5000, 5000));
@@ -548,7 +548,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test34() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 34");
-		StandardProcessPool pool = getPool(10, 30, 5, 0, true, true, false, false);
+		StandardProcessExecutorService pool = getPool(10, 30, 5, 0, true, true, false, false);
 		exceptionRule.expect(CancellationException.class);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 0, false, 2500, true, false,
 				false, 5000, 2495, 2520));
@@ -556,7 +556,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test35() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 35");
-		StandardProcessPool pool = getPool(20, 20, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(20, 20, 0, 0, false, false, false, false);
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 0, false, 2500, false, false,
 				false, 3000, 4995, 5120));
 	}
@@ -564,7 +564,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test36() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 36");
-		StandardProcessPool pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
 		exceptionRule.expect(ExecutionException.class);
 		exceptionRule.expectMessage("Test execution exception.");
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 4000, true, 0, false, false,
@@ -573,7 +573,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test37() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 37");
-		StandardProcessPool pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
+		StandardProcessExecutorService pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
 		exceptionRule.expect(ExecutionException.class);
 		exceptionRule.expectMessage("Test execution exception.");
 		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 20, 4000, true, 0, false, false,
@@ -583,7 +583,7 @@ public class StandardProcessPoolTest {
 	@Test
 	public void test38() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 38");
-		new StandardProcessPool(new TestProcessManagerFactory(0, false, false, true), 20, 20, 0, false);
+		new StandardProcessExecutorService(new TestProcessManagerFactory(0, false, false, true), 20, 20, 0, false);
 		Assert.assertTrue(true);
 	}
 	

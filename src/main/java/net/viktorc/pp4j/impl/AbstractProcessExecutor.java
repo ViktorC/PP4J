@@ -6,7 +6,7 @@
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -47,7 +47,7 @@ import net.viktorc.pp4j.api.Submission;
  * @author Viktor Csomor
  *
  */
-abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
+public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
 	
 	/**
 	 * If a process cannot be started or an exception occurs which would make it impossible to retrieve the 
@@ -270,10 +270,10 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
 			long lifeTime = 0;
 			long startupTime = 0;
 			try {
-				submissionLock.lock();
+				// Startup block.
 				boolean orderly = false;
+				submissionLock.lock();
 				try {
-					// Start the process
 					synchronized (execLock) {
 						if (stop)
 							return;

@@ -6,7 +6,7 @@
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.JavaProcessOptions;
-import net.viktorc.pp4j.api.JavaProcessPool;
+import net.viktorc.pp4j.api.JavaProcessExecutorService;
 import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
@@ -43,8 +43,8 @@ import net.viktorc.pp4j.api.JavaProcessOptions.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
 
 /**
- * A sub-class of {@link net.viktorc.pp4j.impl.StandardProcessPool} that implements the 
- * {@link net.viktorc.pp4j.api.JavaProcessPool} interface. It uses Java processes for the 
+ * A sub-class of {@link net.viktorc.pp4j.impl.StandardProcessExecutorService} that implements the 
+ * {@link net.viktorc.pp4j.api.JavaProcessExecutorService} interface. It uses Java processes for the 
  * implementation of multiprocessing. It communicates with the processes via their standard streams 
  * exchanging serialized and encoded objects. It can send {@link java.lang.Runnable} and 
  * {@link java.util.concurrent.Callable} instances to the processes; and it receives the result
@@ -53,7 +53,7 @@ import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
  * @author Viktor Csomor
  *
  */
-public class StandardJavaProcessPool extends StandardProcessPool implements JavaProcessPool {
+public class StandardJavaProcessExecutorService extends StandardProcessExecutorService implements JavaProcessExecutorService {
 	
 	/**
 	 * Constructs a Java process pool executor using the specified parameters.
@@ -72,7 +72,7 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	 * than 0, or the maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 
 	 * or greater than the maximum pool size.
 	 */
-	public StandardJavaProcessPool(JavaProcessOptions options, int minPoolSize, int maxPoolSize, int reserveSize,
+	public StandardJavaProcessExecutorService(JavaProcessOptions options, int minPoolSize, int maxPoolSize, int reserveSize,
 			boolean verbose) throws InterruptedException {
 		super(new JavaProcessManagerFactory(options), minPoolSize, maxPoolSize, reserveSize, verbose);
 	}
@@ -93,6 +93,8 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	 * @param task The runnablePart to execute.
 	 * @param terminateProcessAfterwards Whether the process that executes the runnablePart should be terminated 
 	 * afterwards.
+	 * @param <T> The serializable return type variable of the <code>Callable</code>
+	 * @param <S> A serializable <code>Callable</code> instance with the return type <T>.
 	 * @return A {@link java.util.concurrent.Future} instance associated with the return value of the 
 	 * runnablePart.
 	 * @throws IOException If the serialization fails.
@@ -232,7 +234,7 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	
 	/**
 	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} for the creation 
-	 * of {@link net.viktorc.pp4j.impl.StandardJavaProcessPool.JavaProcessManager} instances 
+	 * of {@link net.viktorc.pp4j.impl.StandardJavaProcessExecutorService.JavaProcessManager} instances 
 	 * using a single {@link java.lang.ProcessBuilder} instance.
 	 * 
 	 * @author Viktor Csomor
@@ -354,9 +356,8 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	 * 
 	 * @author Viktor Csomor
 	 *
-	 * @param <T> The return type of the runnablePart.
-	 * @param <S> An implementation of the {@link java.util.concurrent.Callable} and {@link java.io.Serializable} 
-	 * interfaces with the return type <code>T</code>
+	 * @param <T> The serializable return type variable of the <code>Callable</code>
+	 * @param <S> A serializable <code>Callable</code> instance with the return type <T>.
 	 */
 	private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable>
 			implements Submission<T> {
@@ -416,7 +417,7 @@ public class StandardJavaProcessPool extends StandardProcessPool implements Java
 	 * @author Viktor Csomor
 	 *
 	 * @param <T> The return type of the original <code>Future</code> instance.
-	 * @param <S> A subtype of <code>T</code>; the return type of the wrapper <code>Future</code> instance.
+	 * @param <S> A subtype of <T>; the return type of the wrapper <code>Future</code> instance.
 	 */
 	private static class CastFuture<T, S extends T> implements Future<T> {
 

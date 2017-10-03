@@ -15,31 +15,39 @@ import net.viktorc.pp4j.impl.StandardProcessExecutor;
  * @author Viktor
  *
  */
-public class StandardProcessExecutorTest {
+public class SPETest {
 
 	@Rule
 	public final ExpectedException exceptionRule = ExpectedException.none();
 	
 	@Test
 	public void test01() throws Exception {
-		try (StandardProcessExecutor executor = new StandardProcessExecutor(
-				TestUtils.createTestProcessManagerFactory().newProcessManager())) {
-			executor.start();
-			SimpleCommand command = new SimpleCommand("process 3",
-					(c, o) -> "ready".equals(o), (c, o) -> false);
-			executor.execute(new SimpleSubmission(command));
-			Assert.assertTrue("in progress\nin progress\nready"
-					.equals(command.getJointStandardOutLines()));
-		}
+		StandardProcessExecutor executor = new StandardProcessExecutor(
+				TestUtils.createTestProcessManagerFactory().newProcessManager());
+		SimpleCommand command = new SimpleCommand("process 3",
+				(c, o) -> "ready".equals(o), (c, o) -> false);
+		executor.start();
+		executor.execute(new SimpleSubmission(command));
+		Assert.assertTrue("in progress\nin progress\nready"
+				.equals(command.getJointStandardOutLines()));
 	}
 	@Test
 	public void test02() throws Exception {
-		try (StandardProcessExecutor executor = new StandardProcessExecutor(
-				TestUtils.createTestProcessManagerFactory().newProcessManager())) {
-			executor.start();
-			exceptionRule.expect(IllegalStateException.class);
-			executor.start();
-		}
+		StandardProcessExecutor executor = new StandardProcessExecutor(
+				TestUtils.createTestProcessManagerFactory().newProcessManager());
+		executor.start();
+		exceptionRule.expect(IllegalStateException.class);
+		executor.start();
+	}
+	@Test
+	public void test03() throws Exception {
+		StandardProcessExecutor executor = new StandardProcessExecutor(
+				TestUtils.createTestProcessManagerFactory().newProcessManager());
+		executor.start();
+		executor.stop(true);
+		Thread.sleep(500);
+		exceptionRule.expect(IllegalStateException.class);
+		executor.start();
 	}
 	
 }
