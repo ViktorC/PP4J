@@ -30,12 +30,8 @@ public interface ProcessExecutor {
 	 * {@link net.viktorc.pp4j.api.Submission#getResult()} method.
 	 * 
 	 * @param submission The submission to execute.
-	 * @return Whether the submission was successfully executed. If the executor is not running or is busy 
-	 * processing an other submission, it immediately returns false; otherwise the submission is executed and 
-	 * true is returned once it's successfully processed, or false is returned if the submission could not be 
-	 * processed.
 	 * @throws Exception If an unexpected error occurs.
 	 */
-	boolean execute(Submission<?> submission) throws Exception;
+	void execute(Submission<?> submission) throws Exception;
 
 }

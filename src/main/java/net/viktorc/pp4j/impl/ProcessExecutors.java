@@ -38,7 +38,7 @@ public class ProcessExecutors {
 	 * reserve size. This method blocks until the initial number of processes started up. The size of the pool is 
 	 * dynamically adjusted based on the pool parameters and the rate of incoming submissions. It is a convenience 
 	 * method for the constructor
-	 * {@link net.viktorc.pp4j.impl.StandardProcessExecutorService#StandardProcessPool(ProcessManagerFactory, int, int, int, boolean)} 
+	 * {@link net.viktorc.pp4j.impl.StandardProcessExecutorService#StandardProcessExecutorService(ProcessManagerFactory, int, int, int, boolean)} 
 	 * with <code>verbose</code> set to <code>false</code>.
 	 * 
 	 * @param managerFactory  A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to build 
@@ -103,7 +103,7 @@ public class ProcessExecutors {
 	 * minimum pool size and the reserve size. This method blocks until the initial number of processes started 
 	 * up. The size of the pool is dynamically adjusted based on the pool parameters and the rate of incoming 
 	 * submissions. It is a convenience method for the constructor
-	 * {@link net.viktorc.pp4j.impl.StandardJavaProcessExecutorService#StandardJavaProcessPool(JavaProcessOptions, int, int, int, boolean)} 
+	 * {@link net.viktorc.pp4j.impl.StandardJavaProcessExecutorService#StandardJavaProcessExecutorService(JavaProcessOptions, int, int, int, boolean)} 
 	 * with <code>verbose</code> set to <code>false</code>.
 	 * 
 	 * @param options The options for the "java" program used to create the new JVM.

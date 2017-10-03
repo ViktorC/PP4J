@@ -94,7 +94,7 @@ public class StandardJavaProcessExecutorService extends StandardProcessExecutorS
 	 * @param terminateProcessAfterwards Whether the process that executes the runnablePart should be terminated 
 	 * afterwards.
 	 * @param <T> The serializable return type variable of the <code>Callable</code>
-	 * @param <S> A serializable <code>Callable</code> instance with the return type <T>.
+	 * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
 	 * @return A {@link java.util.concurrent.Future} instance associated with the return value of the 
 	 * runnablePart.
 	 * @throws IOException If the serialization fails.
@@ -336,12 +336,12 @@ public class StandardJavaProcessExecutorService extends StandardProcessExecutorS
 		public boolean terminateGracefully(ProcessExecutor executor) {
 			try {
 				AtomicBoolean success = new AtomicBoolean(false);
-				if (executor.execute(new SimpleSubmission(new SimpleCommand(JavaProcess.STOP_REQUEST,
+				executor.execute(new SimpleSubmission(new SimpleCommand(JavaProcess.STOP_REQUEST,
 						(c, l) -> {
 							success.set(JavaProcess.STOP_SIGNAL.equals(l));
 							return true;
-						}, (c, l) -> true))))
-					return success.get();
+						}, (c, l) -> true)));
+				return success.get();
 			} catch (Exception e) { /* Nothing to do. */ }
 			return false;
 		}
@@ -357,7 +357,7 @@ public class StandardJavaProcessExecutorService extends StandardProcessExecutorS
 	 * @author Viktor Csomor
 	 *
 	 * @param <T> The serializable return type variable of the <code>Callable</code>
-	 * @param <S> A serializable <code>Callable</code> instance with the return type <T>.
+	 * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
 	 */
 	private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable>
 			implements Submission<T> {
@@ -417,7 +417,7 @@ public class StandardJavaProcessExecutorService extends StandardProcessExecutorS
 	 * @author Viktor Csomor
 	 *
 	 * @param <T> The return type of the original <code>Future</code> instance.
-	 * @param <S> A subtype of <T>; the return type of the wrapper <code>Future</code> instance.
+	 * @param <S> A subtype of <code>T</code>; the return type of the wrapper <code>Future</code> instance.
 	 */
 	private static class CastFuture<T, S extends T> implements Future<T> {
 

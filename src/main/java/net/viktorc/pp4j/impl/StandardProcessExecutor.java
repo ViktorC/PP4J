@@ -6,7 +6,7 @@
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
- *
+
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,10 +18,10 @@ package net.viktorc.pp4j.impl;
 import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.Submission;
 
@@ -35,11 +35,10 @@ import net.viktorc.pp4j.api.Submission;
  * @author Viktor Csomor
  *
  */
-public class StandardProcessExecutor extends AbstractProcessExecutor {
+public class StandardProcessExecutor extends AbstractProcessExecutor implements AutoCloseable {
 
 	private final Semaphore startupSemaphore;
 	private final Lock runLock;
-	private boolean started;
 	
 	/**
 	 * Constructs a process executor instance using the argument to manage the life-cycle of the process.
@@ -56,15 +55,12 @@ public class StandardProcessExecutor extends AbstractProcessExecutor {
 	 * 
 	 * @throws InterruptedException If the thread is interrupted while waiting for the startup to 
 	 * complete.
-	 * @throws IllegalStateException If this method has already been invoked on this instance before..
+	 * @throws IllegalStateException If the process is already running.
 	 */
 	public void start() throws InterruptedException {
 		if (runLock.tryLock()) {
-			if (started)
-				throw new IllegalStateException("The executor can only run once.");
 			try {
 				threadPool.submit(this);
-				started = true;
 			} finally {
 				runLock.unlock();
 			}
@@ -85,11 +81,37 @@ public class StandardProcessExecutor extends AbstractProcessExecutor {
 	public boolean stop(boolean forcibly) {
 		return super.stop(forcibly);
 	}
+	/**
+	 * Returns whether the underlying process is currently running.
+	 * 
+	 * @return Whether the process is running at the moment.
+	 */
+	public boolean isRunning() {
+		if (runLock.tryLock()) {
+			try {
+				return false;
+			} finally {
+				runLock.unlock();
+			}
+		} else
+			return true;
+	}
+	/**
+	 * It blocks the calling thread until the underlying process terminates. If the process is not 
+	 * running, it immediately returns.
+	 * 
+	 * @throws InterruptedException If the thread has been interrupted while waiting for the process 
+	 * to terminate.
+	 */
+	public void join() throws InterruptedException {
+		runLock.lockInterruptibly();;
+		runLock.unlock();
+	}
 	@Override
-	public boolean execute(Submission<?> submission) throws IOException, InterruptedException {
+	public void execute(Submission<?> submission) throws IOException, InterruptedException {
 		submissionLock.lock();
 		try {
-			return super.execute(submission);
+			super.execute(submission);
 		} finally {
 			submissionLock.unlock();
 		}
@@ -108,8 +130,12 @@ public class StandardProcessExecutor extends AbstractProcessExecutor {
 		startupSemaphore.release();
 	}
 	@Override
-	protected void onExecutorTermination() {
+	protected void onExecutorTermination() { }
+	@Override
+	public void close() throws Exception {
+		stop(true);
 		threadPool.shutdown();
+		threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 	}
 
 }

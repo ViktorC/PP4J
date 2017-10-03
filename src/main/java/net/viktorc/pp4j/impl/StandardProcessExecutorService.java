@@ -302,11 +302,8 @@ public class StandardProcessExecutorService implements ProcessExecutorService {
 		return procManagerFactory;
 	}
 	@Override
-	public boolean execute(Submission<?> submission) throws Exception {
-		InternalProcessExecutor executor = procExecObjectPool.borrowObject();
-		boolean success = executor.execute(submission);
-		procExecObjectPool.returnObject(executor);
-		return success;
+	public void execute(Submission<?> submission) throws Exception {
+		submit(submission).get();
 	}
 	@Override
 	public <T> Future<T> submit(Submission<T> submission, boolean terminateProcessAfterwards) {
@@ -695,7 +692,7 @@ public class StandardProcessExecutorService implements ProcessExecutorService {
 		}
 		@Override
 		public String toString() {
-			return String.format("%s-stdProcExecutor@%s", StandardProcessExecutorService.this,
+			return String.format("%s-intProcExecutor@%s", StandardProcessExecutorService.this,
 					Integer.toHexString(hashCode()));
 		}
 		

@@ -84,6 +84,12 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	 * required for listening to the out streams of the process and ensuring that the process is terminated once 
 	 * it times out if the {@link net.viktorc.pp4j.api.ProcessManager#getKeepAliveTime()} method of <code>
 	 * manager</code> returns a positive value.
+	 * 
+	 * @param manager The <code>ProcessManager</code> implementation instance to manage the life-cycle of the 
+	 * underlying process.
+	 * @param threadPool The thread pool to use for running the helper threads required for the running of 
+	 * the process and the execution of submissions; i.e.
+	 * @param verbose
 	 */
 	protected AbstractProcessExecutor(ProcessManager manager, ExecutorService threadPool, boolean verbose) {
 		this.manager = manager;
@@ -258,9 +264,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 		return false;
 	}
 	@Override
-	public boolean execute(Submission<?> submission)
+	public void execute(Submission<?> submission)
 			throws IOException, InterruptedException {
-		return execute(submission, false);
+		if (!execute(submission, false))
+			throw new ProcessException("The process is not available for submissions.");
 	}
 	@Override
 	public void run() {

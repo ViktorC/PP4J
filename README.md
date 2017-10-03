@@ -32,7 +32,7 @@ __PP4J__ (Process Pool for Java) is a library that provides a pool for maintaini
 						/* Attempt to exit the process in an orderly way, if it fails let 
 						 * it be terminated forcibly. */
 						AtomicBoolean success = new AtomicBoolean(true);
-						if (executor.execute(new SimpleSubmission(new SimpleCommand("stop",
+						executor.execute(new SimpleSubmission(new SimpleCommand("stop",
 								/* If the string "bye" is output to the standard out, the 
 								 * process is successfully terminated. */
 								(c, o) -> "bye".equals(o),
@@ -41,7 +41,7 @@ __PP4J__ (Process Pool for Java) is a library that provides a pool for maintaini
 								(c, o) -> {
 									success.set(false);
 									return true;
-								})))) {
+								})));
 							// If success is false, the process will be terminated forcibly
 							return success.get();
 						}
@@ -110,14 +110,14 @@ As demonstrated by the above code snippet, the *ProcessPools*, [*SimpleProcessMa
 
 Besides the process pool, __PP4J__ also provides a standard implementation of the [*ProcessExecutor*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/api/ProcessExecutor) interface, [*StandardProcessExecutor*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/impl/StandardProcessExecutor) for the running of single processes without pooling. This, as presented below, allows for the synchronous execution of submissions in a single separate process with ease. In fact, *StandardProcessExecutorService* is based on the concept of pooling instances of a similar implementation of the *ProcessExecutor* interface.
 
-	StandardProcessExecutor executor = new StandardProcessExecutor(
-			new SimpleProcessManager(new ProcessBuilder("cmd.exe")));
-	SimpleCommand command = new SimpleCommand("netstat & echo netstat done",
-			(c, o) -> "netstat done".equals(o), (c, o) -> false);
-	executor.start();
-	executor.execute(new SimpleSubmission(command));
-	System.out.println(command.getJointStandardOutLines());
-	executor.stop(true);
+	try (StandardProcessExecutor executor = new StandardProcessExecutor(
+			new SimpleProcessManager(new ProcessBuilder("cmd.exe")))) {
+		SimpleCommand command = new SimpleCommand("netstat & echo netstat done",
+				(c, o) -> "netstat done".equals(o), (c, o) -> false);
+		executor.start();
+		executor.execute(new SimpleSubmission(command));
+		System.out.println(command.getJointStandardOutLines());
+	}
 
 ## Java Process Pool
 Moreover, __PP4J__ includes a pure Java process pool implementation built on top of the *StandardProcessExecutorService*. The [*StandardJavaProcessExecutorService*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/impl/StandardJavaProcessExecutorService) implements both the *ProcessExecutorService* and [*ExecutorService*](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html) interfaces through the [*JavaProcessExecutorService*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/api/JavaProcessExecutorService) interface. This allows it to be used similarly to the standard Java thread pools. It relies on a simple class that is executed using the *java* program to instantiate processes. These JVM processes are sent tasks using serialization and Base64 encoding. The results and exceptions are sent to the process pool the same way. The below snippet presents a sample usage of this process pool.

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017 Viktor Csomor
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package net.viktorc.pp4j.impl;
 
 import org.junit.Assert;
@@ -586,7 +601,27 @@ public class SPESTest {
 		new StandardProcessExecutorService(new TestProcessManagerFactory(0, false, false, true), 20, 20, 0, false);
 		Assert.assertTrue(true);
 	}
-	
+	// Execute method testing.
+	@Test
+	public void test39() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 39");
+		StandardProcessExecutorService pool = getPool(1, 1, 0, 0, false, false, false, false);
+		try {
+			SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o), (c, o) -> true);
+			long start = System.currentTimeMillis();
+			pool.execute(new SimpleSubmission(command));
+			long dur = System.currentTimeMillis() - start;
+			boolean success = dur > 2995 && dur < 3020;
+			System.out.println("------------------------------" +
+					"---------------------------------------------" +
+					"---------------");
+			System.out.printf("Time: %.3f %s%n", ((float) dur)/1000, success ? "" : "FAIL");
+			Assert.assertTrue(success);
+		} finally {
+			pool.shutdown();
+			pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+		}
+	}
 	
 	/**
 	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface for testing purposes.
@@ -644,13 +679,13 @@ public class SPESTest {
 					if (manuallyTerminate) {
 						try {
 							AtomicBoolean success = new AtomicBoolean(true);
-							if (executor.execute(new SimpleSubmission(new SimpleCommand("stop",
+							executor.execute(new SimpleSubmission(new SimpleCommand("stop",
 									(c, o) -> "bye".equals(o),
 									(c, o) -> {
 										success.set(false);
 										return true;
-									}))))
-								return success.get();
+									})));
+							return success.get();
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
