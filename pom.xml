@@ -5,13 +5,13 @@
 	<artifactId>pp4j</artifactId>
 	<version>1.0</version>
 	<name>PP4J</name>
-	<description>A library that provides a pool for maintaining pre-started processes.</description>
-	<url>https://github.com/ViktorC</url>
+	<description>A multi-processing library that provides process executors and process pools.</description>
+	<url>https://github.com/ViktorC/PP4J</url>
 	<packaging>jar</packaging>
 	<licenses>
 		<license>
-			<name>GNU General Public License v2.0</name>
-			<url>https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html</url>
+			<name>Apache License Version 2.0</name>
+			<url>https://www.apache.org/licenses/LICENSE-2.0</url>
 		</license>
 	</licenses>
 	<developers>
