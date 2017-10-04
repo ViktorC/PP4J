@@ -10,18 +10,19 @@ __PP4J__ (Process Pool for Java) is a library that provides a pool for maintaini
 				}
 				@Override
 				public boolean isStartedUp(String output, boolean standard) {
-					// Once it has output "hi", it is ready to read from its standard in.
+					/* Once it has output "hi", it is ready to read from its 
+					 * standard in. */
 					return !standard || "hi".equals(output);
 				}
 				@Override
 				public void onStartup(ProcessExecutor executor) {
-					/* Execute the command "start" on every process of the pool before it  
-					 * is added to the list of available processes. Consider "start"  
-					 * processed once the string "ok" has been output to the process' 
-					 * standard out. */
+					/* Execute the command "start" on every process of the pool 
+					 * before it is added to the list of available processes. 
+					 * Consider "start" processed once the string "ok" has been 
+					 * output to the process' standard out. */
 					try {
-						executor.execute(new SimpleSubmission(new SimpleCommand("start",
-								(c, o) -> "ok".equals(o), (c, o) -> true)));
+						executor.execute(new SimpleSubmission(new SimpleCommand(
+								"start", (c, o) -> "ok".equals(o), (c, o) -> true)));
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -29,26 +30,29 @@ __PP4J__ (Process Pool for Java) is a library that provides a pool for maintaini
 				@Override
 				public boolean terminateGracefully(ProcessExecutor executor) {
 					try {
-						/* Attempt to exit the process in an orderly way, if it fails let 
-						 * it be terminated forcibly. */
+						/* Attempt to exit the process in an orderly way, if it 
+						 * fails let it be terminated forcibly. */
 						AtomicBoolean success = new AtomicBoolean(true);
-						executor.execute(new SimpleSubmission(new SimpleCommand("stop",
-								/* If the string "bye" is output to the standard out, the 
-								 * process is successfully terminated. */
+						executor.execute(new SimpleSubmission(new SimpleCommand(
+								"stop",
+								/* If the string "bye" is output to the standard 
+								 * out, the process is successfully terminated. */
 								(c, o) -> "bye".equals(o),
-								/* If a message is printed to the error out, let the process 
-								 * be killed forcibly. */
+								/* If a message is printed to the error out, let 
+								 * the process be killed forcibly. */
 								(c, o) -> {
 									success.set(false);
 									return true;
 								})));
-							// If success is false, the process will be terminated forcibly
+							/* If success is false, the process will be 
+							 * terminated forcibly. */
 							return success.get();
 						}
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
-					// If the something went wrong, the process is terminated forcibly.
+					/* If the something went wrong, the process is terminated 
+					 *  forcibly. */
 					return false;
 				}
 			}, 10, 50, 5, true);
@@ -63,18 +67,19 @@ In the example above, a *StandardProcessExecutorService* for a program called "t
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		futures.add(pool.submit(new SimpleSubmission(new SimpleCommand("process 5",
-				(s, o) -> {
-					/* If the response is "ready", print out everything written to the 
-					 * process' standard out in response to to the instruction. */
+		futures.add(pool.submit(new SimpleSubmission(new SimpleCommand(
+				"process 5", (s, o) -> {
+					/* If the response is "ready", print out everything 
+					 * written to the process' standard out in response 
+					 * to to the instruction. */
 					if ("ready".equals(o)) {
 						System.out.println(s.getJointStandardOutLines());
 						return true;
 					}
 					return false;
 				},
-				/* If the response is sent to the process' error out, print out everything 
-				 * written to its error out. */
+				/* If the response is sent to the process' error out, print 
+				 * out everything written to its error out. */
 				(s, o) -> {
 					System.out.println(s.getJointStandardErrLines());
 					return true;
@@ -123,8 +128,8 @@ Besides the process pool, __PP4J__ also provides a standard implementation of th
 Moreover, __PP4J__ includes a pure Java process pool implementation built on top of the *StandardProcessExecutorService*. The [*StandardJavaProcessExecutorService*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/impl/StandardJavaProcessExecutorService) implements both the *ProcessExecutorService* and [*ExecutorService*](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html) interfaces through the [*JavaProcessExecutorService*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/api/JavaProcessExecutorService) interface. This allows it to be used similarly to the standard Java thread pools. It relies on a simple class that is executed using the *java* program to instantiate processes. These JVM processes are sent tasks using serialization and Base64 encoding. The results and exceptions are sent to the process pool the same way. The below snippet presents a sample usage of this process pool.
 
 	JavaProcessExecutorService pool = new StandardJavaProcessExecutorService(
-			new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 8, 256,
-			60000), 10, 20, 2, false);
+			new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 8,
+			256, 60000), 10, 20, 2, false);
 	Random rand = new Random();
 	List<Future<Long>> results = new ArrayList<>();
 	for (int i = 0; i < 10; i++) {

@@ -89,7 +89,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	 * underlying process.
 	 * @param threadPool The thread pool to use for running the helper threads required for the running of 
 	 * the process and the execution of submissions; i.e.
-	 * @param verbose
+	 * @param verbose Whether events related to the life-cycle of the process should be logged.
 	 */
 	protected AbstractProcessExecutor(ProcessManager manager, ExecutorService threadPool, boolean verbose) {
 		this.manager = manager;
