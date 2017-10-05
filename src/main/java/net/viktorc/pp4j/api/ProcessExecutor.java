@@ -30,8 +30,7 @@ public interface ProcessExecutor {
 	 * {@link net.viktorc.pp4j.api.Submission#getResult()} method.
 	 * 
 	 * @param submission The submission to execute.
-	 * @throws Exception If an unexpected error occurs.
 	 */
-	void execute(Submission<?> submission) throws Exception;
+	void execute(Submission<?> submission);
 
 }

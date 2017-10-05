@@ -334,16 +334,13 @@ public class StandardJavaProcessExecutorService extends StandardProcessExecutorS
 		}
 		@Override
 		public boolean terminateGracefully(ProcessExecutor executor) {
-			try {
-				AtomicBoolean success = new AtomicBoolean(false);
-				executor.execute(new SimpleSubmission(new SimpleCommand(JavaProcess.STOP_REQUEST,
-						(c, l) -> {
-							success.set(JavaProcess.STOP_SIGNAL.equals(l));
-							return true;
-						}, (c, l) -> true)));
-				return success.get();
-			} catch (Exception e) { /* Nothing to do. */ }
-			return false;
+			AtomicBoolean success = new AtomicBoolean(false);
+			executor.execute(new SimpleSubmission(new SimpleCommand(JavaProcess.STOP_REQUEST,
+					(c, l) -> {
+						success.set(JavaProcess.STOP_SIGNAL.equals(l));
+						return true;
+					}, (c, l) -> true)));
+			return success.get();
 		}
 		
 	}

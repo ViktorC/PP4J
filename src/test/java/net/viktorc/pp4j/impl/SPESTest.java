@@ -297,105 +297,105 @@ public class SPESTest {
 		}
 	}
 	// Exception testing.
-//	@Test
-//	public void test01() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 1");
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		StandardProcessExecutorService pool = getPool(-1, 5, 0, 0, false, false, false, false);
-//		perfTest(pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
-//	}
-//	@Test
-//	public void test02() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 2");
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		StandardProcessExecutorService pool = getPool(0, 0, 0, 0, false, false, false, false);
-//		pool.shutdown();
-//	}
-//	@Test
-//	public void test03() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 3");
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		StandardProcessExecutorService pool = getPool(10, 5, 0, 0, false, false, false, false);
-//		pool.shutdown();
-//	}
-//	@Test
-//	public void test04() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 4");
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		StandardProcessExecutorService pool = getPool(10, 12, -1, 0, false, false, false, false);
-//		pool.shutdown();
-//	}
-//	@Test
-//	public void test05() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 5");
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		StandardProcessExecutorService pool = getPool(10, 12, 15, 0, false, false, false, false);
-//		pool.shutdown();
-//	}
-//	@Test
-//	public void test06() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 6");
-//		StandardProcessExecutorService pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		perfTest(pool, false, null, 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
-//	}
-//	@Test
-//	public void test07() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 7");
-//		StandardProcessExecutorService pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
-//		exceptionRule.expect(IllegalArgumentException.class);
-//		perfTest(pool, false, new int[0], 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
-//	}
-//	// Performance testing.
-//	@Test
-//	public void test08() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 8");
-//		StandardProcessExecutorService pool = getPool(0, 100, 0, 0, true, false, false, false);
-//		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 10000, false, 0, false, false, false,
-//				0, 4995, 6250));
-//	}
-//	@Test
-//	public void test09() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 9");
-//		StandardProcessExecutorService pool = getPool(50, 150, 20, 0, false, false, false, false);
-//		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 5000, false, 0, false, false, false,
-//				0, 4995, 5100));
-//	}
-//	@Test
-//	public void test10() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 10");
-//		StandardProcessExecutorService pool = getPool(10, 25, 5, 15000, true, false, false, false);
-//		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 20, 10000, false, 0, false, false, false,
-//				0, 4995, 5100));
-//	}
-//	@Test
-//	public void test11() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 11");
-//		StandardProcessExecutorService pool = getPool(50, 150, 20, 0, false, true, false, false);
-//		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 5000, false, 0, false, false, false,
-//				0, 4995, 5100));
-//	}
-//	@Test
-//	public void test12() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 12");
-//		StandardProcessExecutorService pool = getPool(10, 50, 5, 15000, true, false, false, false);
-//		Assert.assertTrue(perfTest(pool, true, new int[] { 5, 3, 2 }, 50, 10000, false, 0, false, false,
-//				false, 0, 9995, 10340));
-//	}
-//	@Test
-//	public void test13() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 13");
-//		StandardProcessExecutorService pool = getPool(100, 250, 20, 0, true, true, false, false);
-//		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 800, 20000, false, 0, false, false, false,
-//				0, 4995, 6000));
-//	}
-//	@Test
-//	public void test14() throws Exception {
-//		System.out.println(System.lineSeparator() + "Test 14");
-//		StandardProcessExecutorService pool = getPool(0, 100, 0, 0, false, false, false, false);
-//		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, false,
-//				0, 4995, 6850));
-//	}
+	@Test
+	public void test01() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 1");
+		exceptionRule.expect(IllegalArgumentException.class);
+		StandardProcessExecutorService pool = getPool(-1, 5, 0, 0, false, false, false, false);
+		perfTest(pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
+	}
+	@Test
+	public void test02() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 2");
+		exceptionRule.expect(IllegalArgumentException.class);
+		StandardProcessExecutorService pool = getPool(0, 0, 0, 0, false, false, false, false);
+		pool.shutdown();
+	}
+	@Test
+	public void test03() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 3");
+		exceptionRule.expect(IllegalArgumentException.class);
+		StandardProcessExecutorService pool = getPool(10, 5, 0, 0, false, false, false, false);
+		pool.shutdown();
+	}
+	@Test
+	public void test04() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 4");
+		exceptionRule.expect(IllegalArgumentException.class);
+		StandardProcessExecutorService pool = getPool(10, 12, -1, 0, false, false, false, false);
+		pool.shutdown();
+	}
+	@Test
+	public void test05() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 5");
+		exceptionRule.expect(IllegalArgumentException.class);
+		StandardProcessExecutorService pool = getPool(10, 12, 15, 0, false, false, false, false);
+		pool.shutdown();
+	}
+	@Test
+	public void test06() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 6");
+		StandardProcessExecutorService pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
+		exceptionRule.expect(IllegalArgumentException.class);
+		perfTest(pool, false, null, 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
+	}
+	@Test
+	public void test07() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 7");
+		StandardProcessExecutorService pool = getPool(0, Integer.MAX_VALUE, 0, 0, false, false, false, false);
+		exceptionRule.expect(IllegalArgumentException.class);
+		perfTest(pool, false, new int[0], 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
+	}
+	// Performance testing.
+	@Test
+	public void test08() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 8");
+		StandardProcessExecutorService pool = getPool(0, 100, 0, 0, true, false, false, false);
+		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 10000, false, 0, false, false, false,
+				0, 4995, 6250));
+	}
+	@Test
+	public void test09() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 9");
+		StandardProcessExecutorService pool = getPool(50, 150, 20, 0, false, false, false, false);
+		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 5000, false, 0, false, false, false,
+				0, 4995, 5100));
+	}
+	@Test
+	public void test10() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 10");
+		StandardProcessExecutorService pool = getPool(10, 25, 5, 15000, true, false, false, false);
+		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 20, 10000, false, 0, false, false, false,
+				0, 4995, 5100));
+	}
+	@Test
+	public void test11() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 11");
+		StandardProcessExecutorService pool = getPool(50, 150, 20, 0, false, true, false, false);
+		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 100, 5000, false, 0, false, false, false,
+				0, 4995, 5100));
+	}
+	@Test
+	public void test12() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 12");
+		StandardProcessExecutorService pool = getPool(10, 50, 5, 15000, true, false, false, false);
+		Assert.assertTrue(perfTest(pool, true, new int[] { 5, 3, 2 }, 50, 10000, false, 0, false, false,
+				false, 0, 9995, 10340));
+	}
+	@Test
+	public void test13() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 13");
+		StandardProcessExecutorService pool = getPool(100, 250, 20, 0, true, true, false, false);
+		Assert.assertTrue(perfTest(pool, true, new int[] { 5 }, 800, 20000, false, 0, false, false, false,
+				0, 4995, 6000));
+	}
+	@Test
+	public void test14() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 14");
+		StandardProcessExecutorService pool = getPool(0, 100, 0, 0, false, false, false, false);
+		Assert.assertTrue(perfTest(pool, false, new int[] { 5 }, 100, 10000, false, 0, false, false, false,
+				0, 4995, 6850));
+	}
 	@Test
 	public void test15() throws Exception {
 		System.out.println(System.lineSeparator() + "Test 15");
@@ -652,44 +652,37 @@ public class SPESTest {
 		}
 		@Override
 		public ProcessManager newProcessManager() {
-			return new AbstractProcessManager(new ProcessBuilder(programLocation), keepAliveTime) {
+			return new SimpleProcessManager(new ProcessBuilder(programLocation),
+					s -> s.execute(new SimpleSubmission(new SimpleCommand("start",
+									(c, o) -> "ok".equals(o), (c, o) -> true)))) {
 				
 				@Override
 				public boolean startsUpInstantly() {
 					if (throwStartupException)
 						throw new ProcessException("Test startup exception.");
-					return !verifyStartup;
+					return !verifyStartup && super.startsUpInstantly();
 				}
 				@Override
 				public boolean isStartedUp(String output, boolean standard) {
-					return !verifyStartup || (standard && "hi".equals(output));
-				}
-				@Override
-				public void onStartup(ProcessExecutor executor) {
-					try {
-						executor.execute(new SimpleSubmission(new SimpleCommand("start",
-								(c, o) -> "ok".equals(o), (c, o) -> true)));
-					} catch (Exception e) {
-						// Executor shut down. Ignore it.
-					}
+					return (super.isStartedUp(output, standard) && !verifyStartup) ||
+							(standard && "hi".equals(output));
 				}
 				@Override
 				public boolean terminateGracefully(ProcessExecutor executor) {
 					if (manuallyTerminate) {
-						try {
-							AtomicBoolean success = new AtomicBoolean(true);
-							executor.execute(new SimpleSubmission(new SimpleCommand("stop",
-									(c, o) -> "bye".equals(o),
-									(c, o) -> {
-										success.set(false);
-										return true;
-									})));
-							return success.get();
-						} catch (Exception e) {
-							// Executor shut down. Ignore it.
-						}
+						AtomicBoolean success = new AtomicBoolean(true);
+						executor.execute(new SimpleSubmission(new SimpleCommand("stop",
+								(c, o) -> "bye".equals(o), (c, o) -> {
+									success.set(false);
+									return true;
+								})));
+						return success.get();
 					}
 					return super.terminateGracefully(executor);
+				}
+				@Override
+				public long getKeepAliveTime() {
+					return keepAliveTime > 0 ? keepAliveTime : super.getKeepAliveTime();
 				}
 			};
 		}

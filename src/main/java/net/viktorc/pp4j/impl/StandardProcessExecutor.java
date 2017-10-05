@@ -15,7 +15,6 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -108,7 +107,7 @@ public class StandardProcessExecutor extends AbstractProcessExecutor implements 
 		runLock.unlock();
 	}
 	@Override
-	public void execute(Submission<?> submission) throws IOException, InterruptedException {
+	public void execute(Submission<?> submission) {
 		submissionLock.lock();
 		try {
 			super.execute(submission);

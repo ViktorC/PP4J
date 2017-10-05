@@ -75,7 +75,7 @@ public class SimpleProcessManager extends AbstractProcessManager {
 	 * @param builder The instance to build the processes with.
 	 */
 	public SimpleProcessManager(ProcessBuilder builder) {
-		this(builder, 0, null);
+		this(builder, 0);
 	}
 	@Override
 	public boolean startsUpInstantly() {

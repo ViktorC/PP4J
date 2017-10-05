@@ -302,8 +302,12 @@ public class StandardProcessExecutorService implements ProcessExecutorService {
 		return procManagerFactory;
 	}
 	@Override
-	public void execute(Submission<?> submission) throws Exception {
-		submit(submission).get();
+	public void execute(Submission<?> submission) {
+		try {
+			submit(submission).get();
+		} catch (InterruptedException | ExecutionException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	@Override
 	public <T> Future<T> submit(Submission<T> submission, boolean terminateProcessAfterwards) {

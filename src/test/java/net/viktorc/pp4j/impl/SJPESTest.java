@@ -63,8 +63,8 @@ public class SJPESTest {
 	public void test01() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 1);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				1, 1, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 1, 1, 0, false);
 		try {
 			long time = System.currentTimeMillis() - start;
 			boolean success = time < 1000;
@@ -113,8 +113,8 @@ public class SJPESTest {
 	public void test04() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 4);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				10, 15, 5, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 10, 15, 5, false);
 		try {
 			long time = System.currentTimeMillis() - start;
 			boolean success = time < 2000;
@@ -163,8 +163,8 @@ public class SJPESTest {
 	@Test
 	public void test07() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 7);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				5, 5, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 5, 5, 0, false);
 		try {
 			List<Future<?>> futures = new ArrayList<>();
 			AtomicInteger j = new AtomicInteger(2);
@@ -233,8 +233,8 @@ public class SJPESTest {
 	@Test
 	public void test09() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 9);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				1, 1, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 1, 1, 0, false);
 		int base = 13;
 		try {
 			Assert.assertTrue(exec.submit((Callable<Integer> & Serializable) () -> 4*base)
@@ -248,8 +248,8 @@ public class SJPESTest {
 	@Test
 	public void test10() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 10);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				2, 2, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			long start = System.currentTimeMillis();
 			exec.execute((Runnable & Serializable) () -> {
@@ -272,8 +272,8 @@ public class SJPESTest {
 	@Test
 	public void test11() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 11);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				2, 2, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Future<Integer>> results = new ArrayList<>();
@@ -302,8 +302,8 @@ public class SJPESTest {
 	@Test
 	public void test12() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 12);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				1, 1, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 1, 1, 0, false);
 		try {
 			int base = 13;
 			List<Future<Integer>> results = new ArrayList<>();
@@ -332,8 +332,8 @@ public class SJPESTest {
 	@Test
 	public void test13() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 13);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				2, 2, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Future<Integer>> results = new ArrayList<>();
@@ -363,8 +363,8 @@ public class SJPESTest {
 	@Test
 	public void test14() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 14);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				1, 1, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 1, 1, 0, false);
 		try {
 			int base = 13;
 			List<Future<Integer>> results = new ArrayList<>();
@@ -394,14 +394,17 @@ public class SJPESTest {
 	@Test
 	public void test15() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 15);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				2, 2, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Callable<Integer>> tasks = new ArrayList<>();
 			tasks.add((Callable<Integer> & Serializable) () -> {
 				Thread.sleep(2000);
 				return (int) Math.pow(base, 2);
+			});
+			tasks.add((Callable<Integer> & Serializable) () -> {
+				throw new RuntimeException();
 			});
 			tasks.add((Callable<Integer> & Serializable) () -> {
 				Thread.sleep(4000);
@@ -422,8 +425,8 @@ public class SJPESTest {
 	@Test
 	public void test16() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 16);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				2, 2, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Callable<Integer>> tasks = new ArrayList<>();
@@ -449,8 +452,8 @@ public class SJPESTest {
 	@Test
 	public void test17() throws InterruptedException, ExecutionException, TimeoutException {
 		System.out.printf(TEST_TITLE_FORMAT, 17);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				2, 2, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Callable<Integer>> tasks = new ArrayList<>();
@@ -477,8 +480,8 @@ public class SJPESTest {
 	@Test
 	public void test18() throws InterruptedException, ExecutionException, TimeoutException {
 		System.out.printf(TEST_TITLE_FORMAT, 18);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				2, 2, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
 			List<Callable<Integer>> tasks = new ArrayList<>();
@@ -501,8 +504,8 @@ public class SJPESTest {
 	@Test
 	public void test19() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 19);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
-				1, 1, 0, false);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 1, 1, 0, false);
 		try {
 			Runnable r1 = (Runnable & Serializable) () -> {
 				try {
@@ -600,8 +603,7 @@ public class SJPESTest {
 	public void test22() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 22);
 		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
-				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 500),
-				30, 80, 10, false);
+				new SimpleJavaProcessOptions(2, 4, 256, 500), 30, 80, 10, false);
 		try {
 			List<Future<AtomicInteger>> results = new ArrayList<>();
 			long start = System.currentTimeMillis();
@@ -627,7 +629,7 @@ public class SJPESTest {
 	@Test
 	public void test23() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 23);
-		SimpleJavaProcessOptions options = new SimpleJavaProcessOptions(2, 4, 256, 0);
+		SimpleJavaProcessOptions options = new SimpleJavaProcessOptions(0);
 		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(options,
 				5, 5, 0, false);
 		try {
@@ -659,6 +661,47 @@ public class SJPESTest {
 					.substring(JavaProcess.ERROR_PREFIX.length()))).getMessage()));
 			Assert.assertTrue(lines[3].startsWith(JavaProcess.ERROR_PREFIX));
 			Assert.assertTrue(JavaProcess.STOP_SIGNAL.equals(lines[4]));
+		}
+	}
+	// Not serializable task testing.
+	@Test
+	public void test25() throws InterruptedException, ExecutionException {
+		System.out.printf(TEST_TITLE_FORMAT, 23);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 0, 1, 0, false);
+		try {
+			exceptionRule.expect(IllegalArgumentException.class);
+			exec.submit(() -> 1);
+		} finally {
+			exec.shutdown();
+			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+		}
+	}
+	@Test
+	public void test26() throws InterruptedException, ExecutionException {
+		System.out.printf(TEST_TITLE_FORMAT, 23);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 0, 1, 0, false);
+		try {
+			exceptionRule.expect(IllegalArgumentException.class);
+			exec.submit(() -> System.gc());
+		} finally {
+			exec.shutdown();
+			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+		}
+	}
+	@Test
+	public void test27() throws InterruptedException, ExecutionException {
+		System.out.printf(TEST_TITLE_FORMAT, 23);
+		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+				new JavaProcessOptions() { }, 0, 1, 0, false);
+		try {
+			exceptionRule.expect(IllegalArgumentException.class);
+			AtomicInteger n = new AtomicInteger(0);
+			exec.submit(() -> n.set(1), n);
+		} finally {
+			exec.shutdown();
+			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
 	

@@ -264,10 +264,13 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 		return false;
 	}
 	@Override
-	public void execute(Submission<?> submission)
-			throws IOException, InterruptedException {
-		if (!execute(submission, false))
-			throw new ProcessException("The process is not available for submissions.");
+	public void execute(Submission<?> submission) {
+		try {
+			if (!execute(submission, false))
+				throw new ProcessException("The process is not available for submissions.");
+		} catch (IOException | InterruptedException e) {
+			throw new ProcessException(e);
+		}
 	}
 	@Override
 	public void run() {

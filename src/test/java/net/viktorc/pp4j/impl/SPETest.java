@@ -62,6 +62,7 @@ public class SPETest {
 	public void test03() throws Exception {
 		try (StandardProcessExecutor executor = new StandardProcessExecutor(
 				TestUtils.createTestProcessManagerFactory().newProcessManager())) {
+			Assert.assertFalse(executor.isRunning());
 			executor.start();
 			Assert.assertTrue(executor.isRunning());
 		}
