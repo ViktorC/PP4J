@@ -302,11 +302,12 @@ public class StandardProcessExecutorService implements ProcessExecutorService {
 		return procManagerFactory;
 	}
 	@Override
-	public void execute(Submission<?> submission) {
+	public boolean execute(Submission<?> submission) {
 		try {
 			submit(submission).get();
+			return true;
 		} catch (InterruptedException | ExecutionException e) {
-			throw new RuntimeException(e);
+			throw new ProcessException(e);
 		}
 	}
 	@Override

@@ -82,7 +82,8 @@ public interface ProcessManager {
 	 * activities such as the execution of commands. The <code>executor</code> should be available and ready 
 	 * for processing submissions within this call back, thus its 
 	 * {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} method should always return <code>true
-	 * </code>.
+	 * </code> unless the process is terminated before <code>executor</code> could finish processing the 
+	 * submission.
 	 * 
 	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process after the startup if needed.
@@ -90,10 +91,14 @@ public interface ProcessManager {
 	default void onStartup(ProcessExecutor executor) { }
 	/**
 	 * A method called to terminate the process. It allows for an opportunity to execute commands to 
-	 * close resources or to exit the process in an orderly way. The return value of the method denotes 
-	 * whether the process was successfully terminated. If orderly termination fails or for any other reason 
-	 * this method returns <code>false</code>, the process is killed forcibly. If the return value is <code>
-	 * true</code>, the process is considered successfully terminated. By default, it returns null.
+	 * close resources or to exit the process in an orderly way. The <code>executor</code> should be available 
+	 * and ready for processing submissions within this call back, thus its 
+	 * {@link net.viktorc.pp4j.api.ProcessExecutor#execute(Submission)} method should always return <code>true
+	 * </code> unless the process is terminated before <code>executor</code> could finish processing the 
+	 * submission.. The return value of the method denotes whether the process was successfully terminated. 
+	 * If orderly termination fails or for any other reason this method returns <code>false</code>, the 
+	 * process is killed forcibly. If the return value is <code>true</code>, the process is considered 
+	 * successfully terminated. By default, it returns <code>false</code>.
 	 * 
 	 * @param executor The {@link net.viktorc.pp4j.api.ProcessExecutor} instance in which the process is executed. 
 	 * It serves as a handle for sending commands to the underlying process to terminate it in an orderly 

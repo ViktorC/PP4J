@@ -621,6 +621,47 @@ public class SPESTest {
 			pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	// Process executor testing.
+	@Test
+	public void test40() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 40");
+		StandardProcessExecutorService pool = new StandardProcessExecutorService(() ->
+				new SimpleProcessManager(new ProcessBuilder(programLocation), e -> {
+					SimpleSubmission submission = new SimpleSubmission(new SimpleCommand("start",
+							(c, o) -> "ok".equals(o), (c, o) -> true));
+					Assert.assertTrue(e.execute(submission));
+					(new Thread(() -> Assert.assertFalse(e.execute(submission)))).start();
+				}), 1, 1, 0, false);
+		pool.shutdown();
+		pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+	}
+	@Test
+	public void test41() throws Exception {
+		System.out.println(System.lineSeparator() + "Test 41");
+		StandardProcessExecutorService pool = new StandardProcessExecutorService(() ->
+				new SimpleProcessManager(new ProcessBuilder(programLocation), e -> {
+					SimpleSubmission submission = new SimpleSubmission(new SimpleCommand("start",
+							(c, o) -> "ok".equals(o), (c, o) -> true));
+					Thread t = Thread.currentThread();
+					Timer timer = new Timer();
+					timer.schedule(new TimerTask() {
+						
+						@Override
+						public void run() {
+							t.interrupt();
+						}
+					}, 250);
+					boolean pass = false;
+					try {
+						e.execute(submission);
+					} catch (Exception e1) {
+						pass = true;
+					}
+					Assert.assertTrue(pass);
+				}), 1, 1, 0, false);
+		pool.shutdown();
+		pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+	}
 	
 	/**
 	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface for testing purposes.
@@ -653,7 +694,7 @@ public class SPESTest {
 		@Override
 		public ProcessManager newProcessManager() {
 			return new SimpleProcessManager(new ProcessBuilder(programLocation),
-					s -> s.execute(new SimpleSubmission(new SimpleCommand("start",
+					e -> e.execute(new SimpleSubmission(new SimpleCommand("start",
 									(c, o) -> "ok".equals(o), (c, o) -> true)))) {
 				
 				@Override

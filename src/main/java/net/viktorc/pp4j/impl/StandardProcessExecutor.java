@@ -107,10 +107,10 @@ public class StandardProcessExecutor extends AbstractProcessExecutor implements 
 		runLock.unlock();
 	}
 	@Override
-	public void execute(Submission<?> submission) {
+	public boolean execute(Submission<?> submission) {
 		submissionLock.lock();
 		try {
-			super.execute(submission);
+			return super.execute(submission);
 		} finally {
 			submissionLock.unlock();
 		}
