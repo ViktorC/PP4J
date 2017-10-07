@@ -82,8 +82,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	/**
 	 * Constructs an executor for the specified process using <code>threadPool</code> to provide the threads 
 	 * required for listening to the out streams of the process and ensuring that the process is terminated once 
-	 * it times out if the {@link net.viktorc.pp4j.api.ProcessManager#getKeepAliveTime()} method of <code>
-	 * manager</code> returns a positive value.
+	 * it times out if the {@link net.viktorc.pp4j.api.ProcessManager#getKeepAliveTime()} method of 
+	 * <code>manager</code> returns a positive value.
 	 * 
 	 * @param manager The <code>ProcessManager</code> implementation instance to manage the life-cycle of the 
 	 * underlying process.

@@ -25,8 +25,8 @@ package net.viktorc.pp4j.api;
 public interface JavaProcessOptions {
 
 	/**
-	 * Returns the architecture the JVM should use, i.e. 32-bit or 64-bit. If it returns <code>null
-	 * </code>, the option is not to be set. By default, it returns <code>null</code>.
+	 * Returns the architecture the JVM should use, i.e. 32-bit or 64-bit. If it returns 
+	 * <code>null</code>, the option is not to be set. By default, it returns <code>null</code>.
 	 * 
 	 * @return The architecture of the JVM.
 	 */
@@ -52,8 +52,8 @@ public interface JavaProcessOptions {
 		return 0;
 	}
 	/**
-	 * Returns the maximum heap size the JVM should use in megabytes. If it returns <code>0
-	 * </code>, the option is not to be set. By default, it returns <code>0</code>.
+	 * Returns the maximum heap size the JVM should use in megabytes. If it returns 
+	 * <code>0</code>, the option is not to be set. By default, it returns <code>0</code>.
 	 * 
 	 * @return The maximum heap size of the JVM in megabytes.
 	 */

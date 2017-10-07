@@ -590,8 +590,8 @@ public class StandardProcessExecutorService implements ProcessExecutorService {
 		Thread subThread;
 		
 		/**
-		 * Constructs an instances using a newly created <code>ProcessManager</code> and the <code>auxThreadPool
-		 * </code>.
+		 * Constructs an instances using a newly created process manager and the 
+		 * <code>auxThreadPool</code>.
 		 */
 		InternalProcessExecutor() {
 			super(procManagerFactory.newProcessManager(), auxThreadPool, verbose);

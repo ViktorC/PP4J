@@ -86,8 +86,7 @@ public class ProcessExecutors {
 	}
 	/**
 	 * Returns a fixed size pool holding a single process. It is a convenience method for calling the method
-	 * {@link #newFixedProcessPool(ProcessManagerFactory, int)} with <code>size</code> set to <code>1
-	 * </code>.
+	 * {@link #newFixedProcessPool(ProcessManagerFactory, int)} with <code>size</code> set to <code>1</code>.
 	 * 
 	 * @param managerFactory  A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to build 
 	 * {@link net.viktorc.pp4j.api.ProcessManager} instances that manage the processes' life cycle in the pool.
@@ -144,9 +143,9 @@ public class ProcessExecutors {
 	}
 	/**
 	 * Returns a pool of a fixed number of Java processes. It is a convenience method for calling
-	 * {@link #newCustomJavaProcessPool(JavaProcessOptions, int, int, int)} with <code>minPoolSize
-	 * </code> and <code>maxPoolSize</code> set to the value of <code>size</code> and <code>reserveSize</code> 
-	 * set to <code>0</code>. The number of executors in the pool is always kept at the specified value.
+	 * {@link #newCustomJavaProcessPool(JavaProcessOptions, int, int, int)} with <code>minPoolSize</code> and 
+	 * <code>maxPoolSize</code> set to the value of <code>size</code> and <code>reserveSize</code> set to 
+	 * <code>0</code>. The number of executors in the pool is always kept at the specified value.
 	 * 
 	 * @param options The options for the "java" program used to create the new JVM.
 	 * @param size The number of processes to maintain in the pool.
@@ -174,8 +173,8 @@ public class ProcessExecutors {
 	/**
 	 * Returns a pool of Java processes that grows in size as required.. It is a convenience method for calling
 	 * {@link #newCustomJavaProcessPool(JavaProcessOptions, int, int, int)} with <code>minPoolSize
-	 * </code> set to <code>0</code>, <code>maxPoolSize</code> set to <code>Integer.MAX_VALUE</code> and <code>
-	 * reserveSize</code> set to <code>0</code>.
+	 * </code> set to <code>0</code>, <code>maxPoolSize</code> set to <code>Integer.MAX_VALUE</code> and 
+	 * <code>reserveSize</code> set to <code>0</code>.
 	 * 
 	 * @param options The options for the "java" program used to create the new JVM.
 	 * @return A pool of Java processes that grows in size as required.
@@ -201,8 +200,7 @@ public class ProcessExecutors {
 	}
 	/**
 	 * Returns a fixed size pool holding a single Java process. It is a convenience method for calling the method
-	 * {@link #newFixedJavaProcessPool(JavaProcessOptions, int)} with <code>size</code> set to 
-	 * <code>1</code>.
+	 * {@link #newFixedJavaProcessPool(JavaProcessOptions, int)} with <code>size</code> set to <code>1</code>.
 	 * 
 	 * @return A pool maintaining a single Java process executor.
 	 * @param options The options for the "java" program used to create the new JVM.
@@ -215,8 +213,7 @@ public class ProcessExecutors {
 	}
 	/**
 	 * Returns a fixed size pool holding a single Java process. It is a convenience method for calling the method
-	 * {@link #newSingleJavaProcessPool(JavaProcessOptions)} with <code>options</code> set to 
-	 * <code>null</code>.
+	 * {@link #newSingleJavaProcessPool(JavaProcessOptions)} with <code>options</code> set to <code>null</code>.
 	 * 
 	 * @return A pool maintaining a single Java process executor.
 	 * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to 

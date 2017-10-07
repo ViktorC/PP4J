@@ -453,8 +453,8 @@ public class StandardJavaProcessExecutorService extends StandardProcessExecutorS
 	
 	/**
 	 * A wrapper class implementing the {@link java.util.concurrent.Callable} interface for turning a serializable 
-	 * <code>Callable</code> instance with a not explicitly serializable return type into a serializable <code>
-	 * Callable</code> instance with an explicitly serializable return type.
+	 * <code>Callable</code> instance with a not explicitly serializable return type into a serializable 
+	 * <code>Callable</code> instance with an explicitly serializable return type.
 	 * 
 	 * @author Viktor Csomor
 	 *

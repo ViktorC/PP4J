@@ -121,8 +121,7 @@ class JavaProcess {
 	}
 	
 	/**
-	 * A dummy implementation of {@link java.io.PrintStream} that does nothing on <code>
-	 * write</code>.
+	 * A dummy implementation of {@link java.io.PrintStream} that does nothing on <code>write</code>.
 	 * 
 	 * @author Viktor Csomor
 	 *
