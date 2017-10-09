@@ -42,7 +42,7 @@ import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
 import net.viktorc.pp4j.impl.Conversion;
 import net.viktorc.pp4j.impl.JavaProcess;
 import net.viktorc.pp4j.impl.SimpleJavaProcessOptions;
-import net.viktorc.pp4j.impl.StandardJavaProcessExecutorService;
+import net.viktorc.pp4j.impl.JavaProcessPoolExecutor;
 
 /**
  * A test class for the Java process based process pool executor implementation.
@@ -63,7 +63,7 @@ public class SJPESTest {
 	public void test01() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 1);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, false);
 		try {
 			long time = System.currentTimeMillis() - start;
@@ -79,7 +79,7 @@ public class SJPESTest {
 	public void test02() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 2);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
 				1, 1, 0, false);
 		try {
@@ -96,7 +96,7 @@ public class SJPESTest {
 	public void test03() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 3);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096,
 				5000), 1, 1, 0, false);
 		try {
@@ -113,7 +113,7 @@ public class SJPESTest {
 	public void test04() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 4);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 10, 15, 5, false);
 		try {
 			long time = System.currentTimeMillis() - start;
@@ -129,7 +129,7 @@ public class SJPESTest {
 	public void test05() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 5);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
 				10, 15, 5, false);
 		try {
@@ -146,7 +146,7 @@ public class SJPESTest {
 	public void test06() throws InterruptedException {
 		System.out.printf(TEST_TITLE_FORMAT, 6);
 		long start = System.currentTimeMillis();
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096,
 				5000), 10, 15, 5, false);
 		try {
@@ -163,7 +163,7 @@ public class SJPESTest {
 	@Test
 	public void test07() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 7);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 5, 5, 0, false);
 		try {
 			List<Future<?>> futures = new ArrayList<>();
@@ -198,7 +198,7 @@ public class SJPESTest {
 	@Test
 	public void test08() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 8);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
 				5, 5, 0, false);
 		try {
@@ -233,7 +233,7 @@ public class SJPESTest {
 	@Test
 	public void test09() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 9);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, false);
 		int base = 13;
 		try {
@@ -248,7 +248,7 @@ public class SJPESTest {
 	@Test
 	public void test10() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 10);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			long start = System.currentTimeMillis();
@@ -272,7 +272,7 @@ public class SJPESTest {
 	@Test
 	public void test11() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 11);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
@@ -302,7 +302,7 @@ public class SJPESTest {
 	@Test
 	public void test12() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 12);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, false);
 		try {
 			int base = 13;
@@ -332,7 +332,7 @@ public class SJPESTest {
 	@Test
 	public void test13() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 13);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
@@ -363,7 +363,7 @@ public class SJPESTest {
 	@Test
 	public void test14() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 14);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, false);
 		try {
 			int base = 13;
@@ -394,7 +394,7 @@ public class SJPESTest {
 	@Test
 	public void test15() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 15);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
@@ -425,7 +425,7 @@ public class SJPESTest {
 	@Test
 	public void test16() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 16);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
@@ -452,7 +452,7 @@ public class SJPESTest {
 	@Test
 	public void test17() throws InterruptedException, ExecutionException, TimeoutException {
 		System.out.printf(TEST_TITLE_FORMAT, 17);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
@@ -480,7 +480,7 @@ public class SJPESTest {
 	@Test
 	public void test18() throws InterruptedException, ExecutionException, TimeoutException {
 		System.out.printf(TEST_TITLE_FORMAT, 18);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, false);
 		try {
 			int base = 13;
@@ -504,7 +504,7 @@ public class SJPESTest {
 	@Test
 	public void test19() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 19);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, false);
 		try {
 			Runnable r1 = (Runnable & Serializable) () -> {
@@ -554,7 +554,7 @@ public class SJPESTest {
 	@Test
 	public void test20() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 20);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(new JavaProcessOptions() {},
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessOptions() {},
 				1, 1, 0, false);
 		try {
 			long start = System.currentTimeMillis();
@@ -575,7 +575,7 @@ public class SJPESTest {
 	@Test
 	public void test21() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 21);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
 				30, 80, 10, false);
 		try {
@@ -602,7 +602,7 @@ public class SJPESTest {
 	@Test
 	public void test22() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 22);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(2, 4, 256, 500), 30, 80, 10, false);
 		try {
 			List<Future<AtomicInteger>> results = new ArrayList<>();
@@ -630,7 +630,7 @@ public class SJPESTest {
 	public void test23() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 23);
 		SimpleJavaProcessOptions options = new SimpleJavaProcessOptions(0);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(options,
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(options,
 				5, 5, 0, false);
 		try {
 			Assert.assertTrue(exec.getJavaProcessOptions() == options);
@@ -667,7 +667,7 @@ public class SJPESTest {
 	@Test
 	public void test25() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 23);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, false);
 		try {
 			exceptionRule.expect(IllegalArgumentException.class);
@@ -680,7 +680,7 @@ public class SJPESTest {
 	@Test
 	public void test26() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 23);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, false);
 		try {
 			exceptionRule.expect(IllegalArgumentException.class);
@@ -693,7 +693,7 @@ public class SJPESTest {
 	@Test
 	public void test27() throws InterruptedException, ExecutionException {
 		System.out.printf(TEST_TITLE_FORMAT, 23);
-		StandardJavaProcessExecutorService exec = new StandardJavaProcessExecutorService(
+		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, false);
 		try {
 			exceptionRule.expect(IllegalArgumentException.class);

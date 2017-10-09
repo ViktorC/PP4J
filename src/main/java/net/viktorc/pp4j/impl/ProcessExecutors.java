@@ -102,7 +102,7 @@ public class ProcessExecutors {
 	 * minimum pool size and the reserve size. This method blocks until the initial number of processes started 
 	 * up. The size of the pool is dynamically adjusted based on the pool parameters and the rate of incoming 
 	 * submissions. It is a convenience method for the constructor
-	 * {@link net.viktorc.pp4j.impl.StandardJavaProcessExecutorService#StandardJavaProcessExecutorService(JavaProcessOptions, int, int, int, boolean)} 
+	 * {@link net.viktorc.pp4j.impl.JavaProcessPoolExecutor#StandardJavaProcessExecutorService(JavaProcessOptions, int, int, int, boolean)} 
 	 * with <code>verbose</code> set to <code>false</code>.
 	 * 
 	 * @param options The options for the "java" program used to create the new JVM.
@@ -118,7 +118,7 @@ public class ProcessExecutors {
 	 */
 	public static JavaProcessExecutorService newCustomJavaProcessPool(JavaProcessOptions options, int minPoolSize, int maxPoolSize,
 			int reserveSize) throws InterruptedException {
-		return new StandardJavaProcessExecutorService(options, minPoolSize, maxPoolSize, reserveSize, false);
+		return new JavaProcessPoolExecutor(options, minPoolSize, maxPoolSize, reserveSize, false);
 	}
 	/**
 	 * Returns a custom process pool using Java processes. The initial size of the pool is the greater of the 

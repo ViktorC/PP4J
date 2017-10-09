@@ -44,7 +44,20 @@ public class TestUtils {
 		// Support testing both on Linux and Windows.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
 		return new File(ClassLoader.getSystemClassLoader()
-				.getResource(windows ? "win/test.exe" : "linux/test")
+				.getResource(windows ? "win/testwrapper.exe" : "linux/testwrapper")
+				.toURI().getPath());
+	}
+	/**
+	 * Returns a {@link java.io.File} instance representing the test library.
+	 * 
+	 * @return A <code>File</code> pointing to the test library.
+	 * @throws URISyntaxException If the path to the executable cannot be resolved.
+	 */
+	public static File getLibrary() throws URISyntaxException {
+		// Support testing both on Linux and Windows.
+		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
+		return new File(ClassLoader.getSystemClassLoader()
+				.getResource(windows ? "win/test.dll" : "linux/libtest.so")
 				.toURI().getPath());
 	}
 	/**

@@ -55,16 +55,48 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	 */
 	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -1;
 	
+	/**
+	 * The manager of the underlying process' life-cycle.
+	 */
 	protected final ProcessManager manager;
+	/**
+	 * The thread pool providing the threads for executing background tasks required for the operation of 
+	 * the executor such as the listening of the process' out and error streams, and the timing of idle 
+	 * phases to recognize when a process times out.
+	 */
 	protected final ExecutorService threadPool;
+	/**
+	 * A lock used to ensure exclusive access to the {@link #run()} method.
+	 */
 	protected final Lock runLock;
+	/**
+	 * A lock used to ensure exclusive access to the {@link #stop(boolean)} method.
+	 */
 	protected final Lock stopLock;
+	/**
+	 * A lock used to ensure no more than one submission is being processed at a time. It guards the 
+	 * <code>execute</code> methods and the start-up block of the {@link #run()} method.
+	 */
 	protected final Lock submissionLock;
-	protected final Object execLock;
-	protected final Object processLock;
+	/**
+	 * A semaphore used to wait for all helper threads to terminate. All background tasks integral to the 
+	 * running of the process are expected to decrement its counter on termination.
+	 */
 	protected final Semaphore termSemaphore;
+	/**
+	 * The number of licenses to acquire from {@link #termSemaphore} when waiting for background operations 
+	 * to terminate. If an additional background operation is run using {@link #threadPool}, this number 
+	 * should be incremented so that the executor can wait for this operation to terminate before exiting 
+	 * the {@link #run()} method.
+	 */
 	protected final AtomicInteger threadsToWaitFor;
+	/**
+	 * The logger used to log events related to the life-cycle of the underlying process.
+	 */
 	protected final Logger logger;
+	
+	private final Object execLock;
+	private final Object processLock;
 	private Process process;
 	private KeepAliveTimer timer;
 	private BufferedReader stdOutReader;
@@ -76,8 +108,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	private boolean onWait;
 	private boolean commandCompleted;
 	private boolean startedUp;
-	protected volatile boolean running;
-	protected volatile boolean stop;
+	private volatile boolean running;
+	private volatile boolean stopped;
 	
 	/**
 	 * Constructs an executor for the specified process using <code>threadPool</code> to provide the threads 
@@ -144,6 +176,22 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 		}
 	}
 	/**
+	 * Returns whether the underlying process is running.
+	 * 
+	 * @return Whether the process is running.
+	 */
+	protected boolean isRunning() {
+		return running;
+	}
+	/**
+	 * Returns whether the termination of the underlying process has been initiated.
+	 * 
+	 * @return Whether the termination of the process has been initiated.
+	 */
+	protected boolean isStopped() {
+		return stopped;
+	}
+	/**
 	 * It prompts the currently running process, if there is one, to terminate. Once the process has been 
 	 * successfully terminated, subsequent calls are ignored and return true unless the process is started 
 	 * again.
@@ -157,7 +205,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	protected boolean stop(boolean forcibly) {
 		stopLock.lock();
 		try {
-			if (stop)
+			if (stopped)
 				return true;
 			synchronized (execLock) {
 				boolean success = true;
@@ -172,7 +220,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 					}
 				}
 				if (success) {
-					stop = true;
+					stopped = true;
 					execLock.notifyAll();
 				}
 				return success;
@@ -202,12 +250,12 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 				try {
 					/* If the process has terminated or the ProcessExecutor has been stopped while acquiring 
 					 * the execLock, return. */
-					if (!running || stop)
+					if (!running || stopped)
 						return success;
 					// Stop the timer as the process is not idle anymore.
 					if (doTime)
 						timer.stop();
-					if (stop)
+					if (stopped)
 						return success;
 					submission.onStartedProcessing();
 					List<Command> commands = submission.getCommands();
@@ -221,7 +269,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 						stdInWriter.write(command.getInstruction());
 						stdInWriter.newLine();
 						stdInWriter.flush();
-						while (running && !stop && !commandCompleted) {
+						while (running && !stopped && !commandCompleted) {
 							onWait = true;
 							execLock.wait();
 						}
@@ -236,7 +284,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 							processedCommands.add(command);
 					}
 					command = null;
-					if (running && !stop && terminateProcessAfterwards && stopLock.tryLock()) {
+					if (running && !stopped && terminateProcessAfterwards && stopLock.tryLock()) {
 						try {
 							if (!stop(false))
 								stop(true);
@@ -254,7 +302,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 						command = null;
 						onWait = false;
 						execLock.notifyAll();
-						if (running && !stop && doTime)
+						if (running && !stopped && doTime)
 							timer.start();
 						submissionLock.unlock();
 					}
@@ -284,7 +332,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 				submissionLock.lock();
 				try {
 					synchronized (execLock) {
-						if (stop)
+						if (stopped)
 							return;
 						running = true;
 						command = null;
@@ -308,11 +356,11 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 						threadPool.submit(() -> startListeningToProcess(stdErrReader, false));
 						while (!startedUp) {
 							execLock.wait();
-							if (stop)
+							if (stopped)
 								return;
 						}
 						manager.onStartup(this);
-						if (stop)
+						if (stopped)
 							return;
 						startupTime = System.currentTimeMillis() - startupTime;
 						logger.debug(String.format("Startup time in executor %s: %.3f", this,
@@ -409,7 +457,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 					manager.onTermination(rc, lifeTime);
 				} finally {
 					synchronized (execLock) {
-						stop = false;
+						stopped = false;
 					}
 				}
 			}
@@ -457,17 +505,17 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 		@Override
 		public synchronized void run() {
 			try {
-				while (running && !stop) {
+				while (running && !stopped) {
 					while (!go) {
 						wait();
-						if (!running || stop)
+						if (!running || stopped)
 							return;
 					}
 					long waitTime = keepAliveTime;
 					while (go && waitTime > 0) {
 						long start = System.currentTimeMillis();
 						wait(waitTime);
-						if (!running || stop)
+						if (!running || stopped)
 							return;
 						waitTime -= (System.currentTimeMillis() - start);
 					}

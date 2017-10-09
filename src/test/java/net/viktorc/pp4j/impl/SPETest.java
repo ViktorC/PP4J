@@ -22,10 +22,10 @@ import org.junit.rules.ExpectedException;
 
 import net.viktorc.pp4j.impl.SimpleCommand;
 import net.viktorc.pp4j.impl.SimpleSubmission;
-import net.viktorc.pp4j.impl.StandardProcessExecutor;
+import net.viktorc.pp4j.impl.ProcessPoolExecutor;
 
 /**
- * Test cases for the {@link net.viktorc.pp4j.impl.StandardProcessExecutor}.
+ * Test cases for the {@link net.viktorc.pp4j.impl.ProcessPoolExecutor}.
  * 
  * @author Viktor
  *
@@ -37,7 +37,7 @@ public class SPETest {
 	
 	@Test
 	public void test01() throws Exception {
-		try (StandardProcessExecutor executor = new StandardProcessExecutor(
+		try (ProcessPoolExecutor executor = new ProcessPoolExecutor(
 				TestUtils.createTestProcessManagerFactory().newProcessManager())) {
 			SimpleCommand command = new SimpleCommand("process 3",
 					(c, o) -> "ready".equals(o), (c, o) -> false);
@@ -51,7 +51,7 @@ public class SPETest {
 	}
 	@Test
 	public void test02() throws Exception {
-		try (StandardProcessExecutor executor = new StandardProcessExecutor(
+		try (ProcessPoolExecutor executor = new ProcessPoolExecutor(
 				TestUtils.createTestProcessManagerFactory().newProcessManager())) {
 			executor.start();
 			exceptionRule.expect(IllegalStateException.class);
@@ -60,7 +60,7 @@ public class SPETest {
 	}
 	@Test
 	public void test03() throws Exception {
-		try (StandardProcessExecutor executor = new StandardProcessExecutor(
+		try (ProcessPoolExecutor executor = new ProcessPoolExecutor(
 				TestUtils.createTestProcessManagerFactory().newProcessManager())) {
 			Assert.assertFalse(executor.isRunning());
 			executor.start();
@@ -70,7 +70,7 @@ public class SPETest {
 	@Test
 	public void test04() throws Exception {
 		Thread t = null;
-		try (StandardProcessExecutor executor = new StandardProcessExecutor(
+		try (ProcessPoolExecutor executor = new ProcessPoolExecutor(
 				TestUtils.createTestProcessManagerFactory().newProcessManager())) {
 			t = new Thread(() -> {
 				try {

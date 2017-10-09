@@ -53,7 +53,7 @@ import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
  * @author Viktor Csomor
  *
  */
-public class StandardJavaProcessExecutorService extends StandardProcessExecutorService implements JavaProcessExecutorService {
+public class JavaProcessPoolExecutor extends StandardProcessExecutorService implements JavaProcessExecutorService {
 	
 	/**
 	 * Constructs a Java process pool executor using the specified parameters.
@@ -72,7 +72,7 @@ public class StandardJavaProcessExecutorService extends StandardProcessExecutorS
 	 * than 0, or the maximum pool size is less than the minimum pool size or 1, or the reserve size is less than 0 
 	 * or greater than the maximum pool size.
 	 */
-	public StandardJavaProcessExecutorService(JavaProcessOptions options, int minPoolSize, int maxPoolSize, int reserveSize,
+	public JavaProcessPoolExecutor(JavaProcessOptions options, int minPoolSize, int maxPoolSize, int reserveSize,
 			boolean verbose) throws InterruptedException {
 		super(new JavaProcessManagerFactory(options), minPoolSize, maxPoolSize, reserveSize, verbose);
 	}
@@ -234,7 +234,7 @@ public class StandardJavaProcessExecutorService extends StandardProcessExecutorS
 	
 	/**
 	 * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} for the creation 
-	 * of {@link net.viktorc.pp4j.impl.StandardJavaProcessExecutorService.JavaProcessManager} instances 
+	 * of {@link net.viktorc.pp4j.impl.JavaProcessPoolExecutor.JavaProcessManager} instances 
 	 * using a single {@link java.lang.ProcessBuilder} instance.
 	 * 
 	 * @author Viktor Csomor

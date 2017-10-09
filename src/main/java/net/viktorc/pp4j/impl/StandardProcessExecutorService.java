@@ -605,7 +605,7 @@ public class StandardProcessExecutorService implements ProcessExecutorService {
 				subThread = Thread.currentThread();
 			}
 			try {
-				while (running && !stop) {
+				while (isRunning() && !isStopped()) {
 					InternalSubmission<?> submission = null;
 					boolean submissionRetrieved = false;
 					boolean completed = false;
