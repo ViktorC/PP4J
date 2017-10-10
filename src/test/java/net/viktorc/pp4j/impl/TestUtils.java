@@ -30,6 +30,9 @@ import net.viktorc.pp4j.impl.SimpleProcessManager;
  */
 public class TestUtils {
 
+	public static final String TEST_TITLE_FORMAT = "%nTest %d%n" +
+			"-------------------------------------------------%n";
+	
 	/**
 	 * Not initializable.
 	 */
@@ -38,27 +41,33 @@ public class TestUtils {
 	 * Returns a {@link java.io.File} instance representing the test executable.
 	 * 
 	 * @return A <code>File</code> pointing to the test executable.
-	 * @throws URISyntaxException If the path to the executable cannot be resolved.
 	 */
-	public static File getExecutable() throws URISyntaxException {
+	public static File getExecutable() {
 		// Support testing both on Linux and Windows.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-		return new File(ClassLoader.getSystemClassLoader()
-				.getResource(windows ? "win/testwrapper.exe" : "linux/testwrapper")
-				.toURI().getPath());
+		try {
+			return new File(ClassLoader.getSystemClassLoader()
+					.getResource(windows ? "win/testwrapper.exe" : "linux/testwrapper")
+					.toURI().getPath());
+		} catch (URISyntaxException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	/**
 	 * Returns a {@link java.io.File} instance representing the test library.
 	 * 
 	 * @return A <code>File</code> pointing to the test library.
-	 * @throws URISyntaxException If the path to the executable cannot be resolved.
 	 */
-	public static File getLibrary() throws URISyntaxException {
+	public static File getLibrary() {
 		// Support testing both on Linux and Windows.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-		return new File(ClassLoader.getSystemClassLoader()
-				.getResource(windows ? "win/test.dll" : "linux/libtest.so")
-				.toURI().getPath());
+		try {
+			return new File(ClassLoader.getSystemClassLoader()
+					.getResource(windows ? "win/test.dll" : "linux/libtest.so")
+					.toURI().getPath());
+		} catch (URISyntaxException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	/**
 	 * Returns a test {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance.

@@ -101,9 +101,9 @@ Once the pool is initialized, it is sent 30 instructions within 3 seconds. The i
 
 As demonstrated by the above code snippet, the *ProcessPools*, [*SimpleProcessManager*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/api/SimpleProcessManager), [*SimpleSubmission*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/impl/SimpleSubmission), and [*SimpleCommand*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/api/SimpleCommand) convenience classes allow for the concise definition of process pools and tasks to benefit from multiprocessing.
 
-Besides the process pool, __PP4J__ also provides a standard implementation of the [*ProcessExecutor*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/api/ProcessExecutor) interface, [*StandardProcessExecutor*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/impl/StandardProcessExecutor) for the running of single processes without pooling. This, as presented below, allows for the synchronous execution of submissions in a single separate process with ease. In fact, *StandardProcessExecutorService* is based on the concept of pooling instances of a similar implementation of the *ProcessExecutor* interface.
+Besides the process pool, __PP4J__ also provides a standard implementation of the [*ProcessExecutor*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/api/ProcessExecutor) interface, [*SimpleProcessExecutor*](https://viktorc.github.io/PP4J/net/viktorc/pp4j/impl/SimpleProcessExecutor) for the running of single processes without pooling. This, as presented below, allows for the synchronous execution of submissions in a single separate process with ease. In fact, *ProcessPoolExecutor* is based on the concept of pooling instances of a similar implementation of the *ProcessExecutor* interface.
 
-	try (StandardProcessExecutor executor = new StandardProcessExecutor(
+	try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
 			new SimpleProcessManager(new ProcessBuilder("cmd.exe")))) {
 		SimpleCommand command = new SimpleCommand("netstat & echo netstat done",
 				(c, o) -> "netstat done".equals(o), (c, o) -> false);

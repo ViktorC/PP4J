@@ -524,7 +524,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 					 * the timer thread. However, if the execute method acquires the submissionLock right after the 
 					 * timer's wait time elapses, it will not be able to disable the timer until it enters 
 					 * the wait method in the next cycle and gives up its intrinsic lock. Therefore, the 
-					 * first call of the stop method of the StandardProcessExecutor would fail due to the 
+					 * first call of the stop method of the AbstractProcessExecutor would fail due to the 
 					 * lock held by the thread running the execute method, triggering the forcible shutdown 
 					 * of the process even though it is not idle. To avoid this behavior, first the submissionLock 
 					 * is attempted to be acquired to ensure that the process is indeed idle. */

@@ -50,10 +50,7 @@ import net.viktorc.pp4j.impl.JavaProcessPoolExecutor;
  * @author Viktor Csomor
  *
  */
-public class SJPESTest {
-
-	private static final String TEST_TITLE_FORMAT = "%nTest %d%n" +
-			"-------------------------------------------------%n";
+public class JPPETest {
 	
 	@Rule
 	public final ExpectedException exceptionRule = ExpectedException.none();
@@ -61,7 +58,7 @@ public class SJPESTest {
 	// Startup testing
 	@Test
 	public void test01() throws InterruptedException {
-		System.out.printf(TEST_TITLE_FORMAT, 1);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 1);
 		long start = System.currentTimeMillis();
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, null, false);
@@ -77,7 +74,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test02() throws InterruptedException {
-		System.out.printf(TEST_TITLE_FORMAT, 2);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 2);
 		long start = System.currentTimeMillis();
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
@@ -94,7 +91,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test03() throws InterruptedException {
-		System.out.printf(TEST_TITLE_FORMAT, 3);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 3);
 		long start = System.currentTimeMillis();
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096,
@@ -111,7 +108,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test04() throws InterruptedException {
-		System.out.printf(TEST_TITLE_FORMAT, 4);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 4);
 		long start = System.currentTimeMillis();
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 10, 15, 5, null, false);
@@ -127,7 +124,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test05() throws InterruptedException {
-		System.out.printf(TEST_TITLE_FORMAT, 5);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 5);
 		long start = System.currentTimeMillis();
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
@@ -144,7 +141,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test06() throws InterruptedException {
-		System.out.printf(TEST_TITLE_FORMAT, 6);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 6);
 		long start = System.currentTimeMillis();
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096,
@@ -162,7 +159,7 @@ public class SJPESTest {
 	// Submission testing.
 	@Test
 	public void test07() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 7);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 7);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 5, 5, 0, null, false);
 		try {
@@ -197,7 +194,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test08() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 8);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 8);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
 				5, 5, 0, null, false);
@@ -232,7 +229,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test09() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 9);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 9);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, null, false);
 		int base = 13;
@@ -247,7 +244,7 @@ public class SJPESTest {
 	// Synchronous execution testing.
 	@Test
 	public void test10() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 10);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 10);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, null, false);
 		try {
@@ -271,7 +268,7 @@ public class SJPESTest {
 	// Invocation testing.
 	@Test
 	public void test11() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 11);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 11);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, null, false);
 		try {
@@ -301,7 +298,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test12() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 12);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 12);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, null, false);
 		try {
@@ -331,7 +328,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test13() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 13);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 13);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, null, false);
 		try {
@@ -362,7 +359,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test14() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 14);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 14);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, null, false);
 		try {
@@ -393,7 +390,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test15() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 15);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 15);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, null, false);
 		try {
@@ -424,7 +421,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test16() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 16);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 16);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, null, false);
 		try {
@@ -451,7 +448,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test17() throws InterruptedException, ExecutionException, TimeoutException {
-		System.out.printf(TEST_TITLE_FORMAT, 17);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 17);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, null, false);
 		try {
@@ -479,7 +476,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test18() throws InterruptedException, ExecutionException, TimeoutException {
-		System.out.printf(TEST_TITLE_FORMAT, 18);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 18);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, null, false);
 		try {
@@ -503,7 +500,7 @@ public class SJPESTest {
 	// Test of shutdownNow.
 	@Test
 	public void test19() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 19);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 19);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, null, false);
 		try {
@@ -553,7 +550,7 @@ public class SJPESTest {
 	// Task and result exchange performance testing.
 	@Test
 	public void test20() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 20);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 20);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessOptions() {},
 				1, 1, 0, null, false);
 		try {
@@ -574,7 +571,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test21() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 21);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 21);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
 				30, 80, 10, null, false);
@@ -601,7 +598,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test22() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 22);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 22);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(2, 4, 256, 500), 30, 80, 10, null, false);
 		try {
@@ -628,7 +625,7 @@ public class SJPESTest {
 	// Java process options testing.
 	@Test
 	public void test23() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 23);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 23);
 		SimpleJavaProcessOptions options = new SimpleJavaProcessOptions(0);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(options,
 				5, 5, 0, null, false);
@@ -642,7 +639,7 @@ public class SJPESTest {
 	// Java process testing.
 	@Test
 	public void test24() throws IOException, InterruptedException, ClassNotFoundException {
-		System.out.printf(TEST_TITLE_FORMAT, 24);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 24);
 		PrintStream origOutStream = System.out;
 		String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n", "", Conversion.toString("test"),
 				Conversion.toString((Callable<Long> & Serializable) () -> Math.round(Math.E)),
@@ -670,7 +667,7 @@ public class SJPESTest {
 	// Not serializable task testing.
 	@Test
 	public void test25() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 25);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 25);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, null, false);
 		try {
@@ -683,7 +680,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test26() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 26);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 26);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, null, false);
 		try {
@@ -696,7 +693,7 @@ public class SJPESTest {
 	}
 	@Test
 	public void test27() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 27);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 27);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, null, false);
 		try {
@@ -711,7 +708,7 @@ public class SJPESTest {
 	// Startup task testing.
 	@Test
 	public void test28() throws InterruptedException, ExecutionException {
-		System.out.printf(TEST_TITLE_FORMAT, 28);
+		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 28);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, (Runnable & Serializable) () -> {
 					for (int i = 0; i < 10; i++)

@@ -105,7 +105,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 	 * @throws NotSerializableException If some object to be serialized does not implement the 
 	 * {@link java.io.Serializable} interface.
 	 */
-	public <T extends Serializable, S extends Callable<T> & Serializable> Future<T> submit(S task,
+	public <T extends Serializable, S extends Callable<T> & Serializable> Future<T> submitExplicitly(S task,
 			boolean terminateProcessAfterwards) throws IOException {
 		return submit(new JavaSubmission<>(task), terminateProcessAfterwards);
 	}
@@ -118,30 +118,30 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 		}
 	}
 	@Override
-	public <T> Future<T> submit(Callable<T> task) {
+	public <T> Future<T> submit(Callable<T> task, boolean terminateProcessAfterwards) {
 		try {
-			return new CastFuture<>(submit(new SerializableCallable<>((Callable<T> & Serializable) task),
-					false));
+			return new CastFuture<>(submitExplicitly(new SerializableCallable<>((Callable<T> & Serializable) task),
+					terminateProcessAfterwards));
 		} catch (Exception e) {
 			throw new IllegalArgumentException("The task is not serializable.", e);
 		}
 	}
 	@Override
-	public <T> Future<T> submit(Runnable task, T result) {
+	public <T> Future<T> submit(Runnable task, T result, boolean terminateProcessAfterwards) {
 		try {
 			return new CastFuture<>(submit(new SerializableCallable<>((Callable<T> & Serializable)
 					() -> {
 						task.run();
 						return result;
-					}, task), false));
+					}, task), terminateProcessAfterwards));
 		} catch (Exception e) {
 			throw new IllegalArgumentException("The task is not serializable.", e);
 		}
 	}
 	@Override
-	public Future<?> submit(Runnable task) {
+	public Future<?> submit(Runnable task, boolean terminateProcessAfterwards) {
 		try {
-			return submit((Runnable & Serializable) task, null);
+			return submit((Runnable & Serializable) task, null, terminateProcessAfterwards);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("The task is not serializable.", e);
 		}

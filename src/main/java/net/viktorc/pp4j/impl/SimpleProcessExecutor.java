@@ -34,7 +34,7 @@ import net.viktorc.pp4j.api.Submission;
  * @author Viktor Csomor
  *
  */
-public class StandardProcessExecutor extends AbstractProcessExecutor implements AutoCloseable {
+public class SimpleProcessExecutor extends AbstractProcessExecutor implements AutoCloseable {
 
 	private final Semaphore startupSemaphore;
 	private final Lock runLock;
@@ -44,7 +44,7 @@ public class StandardProcessExecutor extends AbstractProcessExecutor implements 
 	 * 
 	 * @param manager The manager of the underlying process.
 	 */
-	public StandardProcessExecutor(ProcessManager manager) {
+	public SimpleProcessExecutor(ProcessManager manager) {
 		super(manager, Executors.newCachedThreadPool(), false);
 		startupSemaphore = new Semaphore(0);
 		runLock = new ReentrantLock();

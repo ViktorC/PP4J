@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Viktor Csomor
  *
  */
-public class SPESTest {
+public class PPETest {
 	
 	@Rule
 	public final ExpectedException exceptionRule = ExpectedException.none();
@@ -63,7 +63,7 @@ public class SPESTest {
 	 * 
 	 * @throws URISyntaxException If the path to the test program cannot be resolved.
 	 */
-	public SPESTest() throws URISyntaxException {
+	public PPETest() throws URISyntaxException {
 		File programFile = TestUtils.getExecutable();
 		programFile.setExecutable(true);
 		programLocation = programFile.getAbsolutePath();

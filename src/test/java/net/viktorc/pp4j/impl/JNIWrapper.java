@@ -1,7 +1,5 @@
 package net.viktorc.pp4j.impl;
 
-import java.net.URISyntaxException;
-
 /**
  * A simple native wrapper class for testing JNI performance.
  * 
@@ -12,14 +10,9 @@ public class JNIWrapper {
 
 	// Load the library.
 	static {
-		try {
-			System.load(TestUtils.getLibrary().getAbsolutePath());
-		} catch (URISyntaxException e) {
-			e.printStackTrace();
-			System.exit(-1);
-		}
+		System.load(TestUtils.getLibrary().getAbsolutePath());
 	}
 	
-	private native void doStuff(int seconds);
+	public native void doStuff(int seconds);
 	
 }
