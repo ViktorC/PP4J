@@ -117,7 +117,7 @@ Moreover, __PP4J__ includes a pure Java process pool implementation built on top
 
 	JavaProcessExecutorService pool = new JavaProcessPoolExecutor(
 			new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 8,
-			256, 60000), 10, 20, 2, false);
+			256, 60000), 10, 20, 2, null, false);
 	Random rand = new Random();
 	List<Future<Long>> results = new ArrayList<>();
 	for (int i = 0; i < 10; i++) {

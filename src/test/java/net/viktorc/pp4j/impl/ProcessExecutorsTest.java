@@ -24,7 +24,7 @@ import org.junit.Test;
 import net.viktorc.pp4j.api.JavaProcessExecutorService;
 import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessExecutorService;
-import net.viktorc.pp4j.impl.StandardProcessExecutorService;
+import net.viktorc.pp4j.impl.ProcessPoolExecutor;
 
 /**
  * A simple test class for the {@link net.viktorc.pp4j.impl.ProcessExecutors} class.
@@ -46,8 +46,8 @@ public class ProcessExecutorsTest {
 	 */
 	private boolean test(ProcessExecutor executor, int minSize, int maxSize, int reserveSize,
 			boolean verbose) {
-		if (executor instanceof StandardProcessExecutorService) {
-			StandardProcessExecutorService stdPool = (StandardProcessExecutorService) executor;
+		if (executor instanceof ProcessPoolExecutor) {
+			ProcessPoolExecutor stdPool = (ProcessPoolExecutor) executor;
 			return stdPool.getMinSize() == minSize && stdPool.getMaxSize() == maxSize &&
 					stdPool.getReserveSize() == reserveSize && stdPool.isVerbose() == verbose;
 		}

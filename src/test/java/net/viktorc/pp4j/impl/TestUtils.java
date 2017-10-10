@@ -93,7 +93,17 @@ public class TestUtils {
 		}
 		@Override
 		public ProcessManager newProcessManager() {
-			return new SimpleProcessManager(builder);
+			return new SimpleProcessManager(builder) {
+					
+					@Override
+					public boolean startsUpInstantly() {
+						return false;
+					}
+					@Override
+					public boolean isStartedUp(String outputLine, boolean standard) {
+						return standard && "hi".equals(outputLine);
+					}
+				};
 		}
 		
 	}

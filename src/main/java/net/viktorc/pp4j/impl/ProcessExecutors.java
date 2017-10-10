@@ -38,7 +38,7 @@ public class ProcessExecutors {
 	 * reserve size. This method blocks until the initial number of processes started up. The size of the pool is 
 	 * dynamically adjusted based on the pool parameters and the rate of incoming submissions. It is a convenience 
 	 * method for the constructor
-	 * {@link net.viktorc.pp4j.impl.StandardProcessExecutorService#StandardProcessExecutorService(ProcessManagerFactory, int, int, int, boolean)} 
+	 * {@link net.viktorc.pp4j.impl.ProcessPoolExecutor#ProcessPoolExecutor(ProcessManagerFactory, int, int, int, boolean)} 
 	 * with <code>verbose</code> set to <code>false</code>.
 	 * 
 	 * @param managerFactory  A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to build 
@@ -51,7 +51,7 @@ public class ProcessExecutors {
 	 */
 	public static ProcessExecutorService newCustomProcessPool(ProcessManagerFactory managerFactory, int minPoolSize, 
 			int maxPoolSize, int reserveSize) throws InterruptedException {
-		return new StandardProcessExecutorService(managerFactory, minPoolSize, maxPoolSize, reserveSize, false);
+		return new ProcessPoolExecutor(managerFactory, minPoolSize, maxPoolSize, reserveSize, false);
 	}
 	/**
 	 * Returns a pool of a fixed number of processes. It is a convenience method for calling
@@ -102,8 +102,8 @@ public class ProcessExecutors {
 	 * minimum pool size and the reserve size. This method blocks until the initial number of processes started 
 	 * up. The size of the pool is dynamically adjusted based on the pool parameters and the rate of incoming 
 	 * submissions. It is a convenience method for the constructor
-	 * {@link net.viktorc.pp4j.impl.JavaProcessPoolExecutor#StandardJavaProcessExecutorService(JavaProcessOptions, int, int, int, boolean)} 
-	 * with <code>verbose</code> set to <code>false</code>.
+	 * {@link net.viktorc.pp4j.impl.JavaProcessPoolExecutor#JavaProcessPoolExecutor(JavaProcessOptions, int, int, int, java.util.function.Supplier, boolean)} 
+	 * with <code>startupTask</code> set to <code>null</code> and <code>verbose</code> set to <code>false</code>.
 	 * 
 	 * @param options The options for the "java" program used to create the new JVM.
 	 * @param minPoolSize The minimum size of the process pool.
@@ -118,7 +118,7 @@ public class ProcessExecutors {
 	 */
 	public static JavaProcessExecutorService newCustomJavaProcessPool(JavaProcessOptions options, int minPoolSize, int maxPoolSize,
 			int reserveSize) throws InterruptedException {
-		return new JavaProcessPoolExecutor(options, minPoolSize, maxPoolSize, reserveSize, false);
+		return new JavaProcessPoolExecutor(options, minPoolSize, maxPoolSize, reserveSize, null, false);
 	}
 	/**
 	 * Returns a custom process pool using Java processes. The initial size of the pool is the greater of the 
