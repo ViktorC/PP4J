@@ -48,9 +48,9 @@ public class PPEVsJPPEJNITest {
 		nativePool.shutdown();
 		nativePool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512, 0),
-				minSize, maxSize, reserveSize, reuse ? (Runnable & Serializable) () -> new JNIWrapper() :
+				minSize, maxSize, reserveSize, reuse ? (Runnable & Serializable) () -> new WrapperJNI() :
 				null, false);
-		Runnable javaTask = (Runnable & Serializable) () -> (new JNIWrapper()).doStuff(taskTime);
+		Runnable javaTask = (Runnable & Serializable) () -> (new WrapperJNI()).doStuff(taskTime);
 		for (int i = 0; i < 5; i++)
 			javaPool.submit(javaTask).get();
 		futures = new ArrayList<>();

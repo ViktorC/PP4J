@@ -6,7 +6,7 @@ package net.viktorc.pp4j.impl;
  * @author Viktor Csomor
  *
  */
-public class JNIWrapper {
+public class WrapperJNI {
 
 	// Load the library.
 	static {

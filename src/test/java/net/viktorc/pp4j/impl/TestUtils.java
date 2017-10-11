@@ -46,9 +46,11 @@ public class TestUtils {
 		// Support testing both on Linux and Windows.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
 		try {
-			return new File(ClassLoader.getSystemClassLoader()
+			File file = new File(ClassLoader.getSystemClassLoader()
 					.getResource(windows ? "win/testwrapper.exe" : "linux/testwrapper")
 					.toURI().getPath());
+			file.setExecutable(true);
+			return file;
 		} catch (URISyntaxException e) {
 			throw new RuntimeException(e);
 		}
@@ -62,9 +64,11 @@ public class TestUtils {
 		// Support testing both on Linux and Windows.
 		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
 		try {
-			return new File(ClassLoader.getSystemClassLoader()
+			File file = new File(ClassLoader.getSystemClassLoader()
 					.getResource(windows ? "win/test.dll" : "linux/libtest.so")
 					.toURI().getPath());
+			file.setExecutable(true);
+			return file;
 		} catch (URISyntaxException e) {
 			throw new RuntimeException(e);
 		}
@@ -96,9 +100,7 @@ public class TestUtils {
 		 * @throws URISyntaxException If the path to the test executable cannot be resolved.
 		 */
 		TestProcessManagerFactory() throws URISyntaxException {
-			File programFile = getExecutable();
-			programFile.setExecutable(true);
-			builder = new ProcessBuilder(programFile.getAbsolutePath());
+			builder = new ProcessBuilder(getExecutable().getAbsolutePath());
 		}
 		@Override
 		public ProcessManager newProcessManager() {
@@ -110,7 +112,7 @@ public class TestUtils {
 					}
 					@Override
 					public boolean isStartedUp(String outputLine, boolean standard) {
-						return standard && "hi".equals(outputLine);
+						return true;
 					}
 				};
 		}

@@ -6,10 +6,10 @@
  */
 
 #include "jni.h"
-#include "net_viktorc_pp4j_impl_JNIWrapper.h"
+#include "net_viktorc_pp4j_impl_WrapperJNI.h"
 #include "test.h"
 
-JNIEXPORT void JNICALL Java_net_viktorc_pp4j_impl_JNIWrapper_doStuff(JNIEnv * env,
+JNIEXPORT void JNICALL Java_net_viktorc_pp4j_impl_WrapperJNI_doStuff(JNIEnv * env,
 		jclass clazz, jint seconds) {
 	doStuff(seconds);
 	return;

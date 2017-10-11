@@ -9,9 +9,9 @@ import com.sun.jna.Native;
  * @author Viktor Csomor
  *
  */
-public interface JNAWrapper extends Library {
+public interface WrapperJNA extends Library {
 
-	JNAWrapper INSTANCE = (JNAWrapper) Native.loadLibrary(TestUtils.getLibrary().getAbsolutePath(), JNAWrapper.class);
+	WrapperJNA INSTANCE = (WrapperJNA) Native.loadLibrary(TestUtils.getLibrary().getAbsolutePath(), WrapperJNA.class);
 	
 	void doStuff(int seconds);
 	

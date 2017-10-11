@@ -44,6 +44,7 @@ public interface JavaProcessExecutorService extends ProcessExecutorService, Exec
 	 * @param result The object representing the result of the operation.
 	 * @param terminateProcessAfterwards Whether the process is to be terminated after the execution of the 
 	 * task.
+	 * @param <T> The type of the result.
 	 * @return A <code>Future</code> instance to allow for waiting for the task to be executed, to cancel it, 
 	 * or to retrieve the value of the result of the operation.
 	 */
@@ -54,6 +55,7 @@ public interface JavaProcessExecutorService extends ProcessExecutorService, Exec
 	 * @param task The task to execute.
 	 * @param terminateProcessAfterwards Whether the process is to be terminated after the execution of the 
 	 * task.
+	 * @param <T> The type of the result.
 	 * @return A <code>Future</code> instance to allow for waiting for the task to be executed, to cancel it, 
 	 * or to retrieve the value of the result of the operation.
 	 */

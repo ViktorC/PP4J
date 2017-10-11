@@ -47,6 +47,8 @@ public class SPETest {
 			Assert.assertTrue(executor.stop(true));
 			Assert.assertTrue(command.getJointStandardOutLines()
 					.contains("in progress\nin progress\nready"));
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 	@Test

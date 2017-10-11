@@ -18,8 +18,6 @@ package net.viktorc.pp4j.impl;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.Submission;
@@ -37,7 +35,6 @@ import net.viktorc.pp4j.api.Submission;
 public class SimpleProcessExecutor extends AbstractProcessExecutor implements AutoCloseable {
 
 	private final Semaphore startupSemaphore;
-	private final Lock runLock;
 	
 	/**
 	 * Constructs a process executor instance using the argument to manage the life-cycle of the process.
@@ -47,7 +44,6 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
 	public SimpleProcessExecutor(ProcessManager manager) {
 		super(manager, Executors.newCachedThreadPool(), false);
 		startupSemaphore = new Semaphore(0);
-		runLock = new ReentrantLock();
 	}
 	/**
 	 * It launches the underlying process and blocks until it is ready for the execution of submissions.
@@ -103,8 +99,11 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
 	 * to terminate.
 	 */
 	public void join() throws InterruptedException {
-		runLock.lockInterruptibly();;
-		runLock.unlock();
+		try {
+			runLock.lockInterruptibly();
+		} finally {
+			runLock.unlock();
+		}
 	}
 	@Override
 	public boolean execute(Submission<?> submission) {
@@ -113,15 +112,6 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
 			return super.execute(submission);
 		} finally {
 			submissionLock.unlock();
-		}
-	}
-	@Override
-	public void run() {
-		runLock.lock();
-		try {
-			super.run();
-		} finally {
-			runLock.unlock();
 		}
 	}
 	@Override

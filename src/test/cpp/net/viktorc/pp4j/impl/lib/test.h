@@ -7,11 +7,11 @@
 
 #ifndef TEST_H
 #define TEST_H
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-void doStuff(int seconds);
+
+__declspec(dllexport) void doStuff(int seconds);
 
 #ifdef __cplusplus
 }

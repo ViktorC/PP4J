@@ -2,17 +2,17 @@
 #include "jni.h"
 /* Header for class JNIWrapper */
 
-#ifndef _Included_JNIWrapper
-#define _Included_JNIWrapper
+#ifndef _Included_WrapperJNI
+#define _Included_WrapperJNI
 #ifdef __cplusplus
 extern "C" {
 #endif
 /*
- * Class:     JNIWrapper
- * Method:    wait
+ * Class:     WrapperJNI
+ * Method:    doStuff
  * Signature: (I)V
  */
-JNIEXPORT void JNICALL Java_net_viktorc_pp4j_impl_JNIWrapper_doStuff
+JNIEXPORT void JNICALL Java_net_viktorc_pp4j_impl_WrapperJNI_doStuff
   (JNIEnv *, jclass, jint);
 
 #ifdef __cplusplus

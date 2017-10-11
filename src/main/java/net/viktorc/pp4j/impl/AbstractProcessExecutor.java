@@ -321,7 +321,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 	}
 	@Override
 	public void run() {
-		synchronized (runLock) {
+		runLock.lock();
+		try {
 			termSemaphore.drainPermits();
 			int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
 			long lifeTime = 0;
@@ -461,6 +462,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 					}
 				}
 			}
+		} finally {
+			runLock.unlock();
 		}
 	}
 	/**

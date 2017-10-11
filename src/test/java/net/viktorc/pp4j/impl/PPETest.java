@@ -30,7 +30,6 @@ import net.viktorc.pp4j.impl.SimpleCommand;
 import net.viktorc.pp4j.impl.ProcessPoolExecutor;
 import net.viktorc.pp4j.impl.SimpleSubmission;
 
-import java.io.File;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,9 +63,7 @@ public class PPETest {
 	 * @throws URISyntaxException If the path to the test program cannot be resolved.
 	 */
 	public PPETest() throws URISyntaxException {
-		File programFile = TestUtils.getExecutable();
-		programFile.setExecutable(true);
-		programLocation = programFile.getAbsolutePath();
+		programLocation = TestUtils.getExecutable().getAbsolutePath();
 	}
 	/**
 	 * Performs some basic checks on the pool concerning its size and other parameters.
