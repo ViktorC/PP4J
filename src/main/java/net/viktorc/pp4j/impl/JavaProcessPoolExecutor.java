@@ -19,6 +19,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.Serializable;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -129,7 +131,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 	@Override
 	public <T> Future<T> submit(Runnable task, T result, boolean terminateProcessAfterwards) {
 		try {
-			return new CastFuture<>(submit(new SerializableCallable<>((Callable<T> & Serializable)
+			return new CastFuture<>(submitExplicitly(new SerializableCallable<>((Callable<T> & Serializable)
 					() -> {
 						task.run();
 						return result;
@@ -346,9 +348,6 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 						startupTask.run();
 						return null;
 					}));
-				else // Warm up the JVM by ensuring that the most relevant classes are loaded.
-					executor.execute(new JavaSubmission<>(new SerializableCallable<>((Callable<Long> &
-							Serializable) () -> Math.round(Math.E), (Runnable & Serializable) () -> {})));
 			} catch (Exception e) {
 				return;
 			}
@@ -362,6 +361,10 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 						return true;
 					}, (c, l) -> true)));
 			return success.get();
+		}
+		@Override
+		public Charset getEncoding() {
+			return StandardCharsets.UTF_8;
 		}
 		
 	}
@@ -406,8 +409,11 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 							if (l.startsWith(JavaProcess.ERROR_PREFIX))
 								error = (Throwable) Conversion.toObject(l.substring(
 										JavaProcess.ERROR_PREFIX.length()));
+							else if (l.startsWith(JavaProcess.RESULT_PREFIX))
+								result = (T) Conversion.toObject(l.substring(
+										JavaProcess.RESULT_PREFIX.length()));
 							else
-								result = (T) Conversion.toObject(l);
+								return false;
 							return true;
 						} catch (Exception e) {
 							throw new ProcessException(e);
@@ -487,8 +493,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
 		static final long serialVersionUID = -5418713087898561239L;
 		
-		Callable<T> callable;
-		Runnable runnablePart;
+		final Callable<T> callable;
+		final Runnable runnablePart;
 		
 		/**
 		 * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the 

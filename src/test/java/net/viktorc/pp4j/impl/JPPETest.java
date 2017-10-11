@@ -505,26 +505,26 @@ public class JPPETest {
 				new JavaProcessOptions() { }, 1, 1, 0, null, false);
 		try {
 			Runnable r1 = (Runnable & Serializable) () -> {
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			};
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					};
 			Runnable r2 = (Runnable & Serializable) () -> {
-				try {
-					Thread.sleep(2000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			};
+						try {
+							Thread.sleep(2000);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					};
 			exec.submit((Runnable & Serializable) () -> {
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			});
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					});
 			exec.submit(r1);
 			exec.submit(r2);
 			long start = System.currentTimeMillis();

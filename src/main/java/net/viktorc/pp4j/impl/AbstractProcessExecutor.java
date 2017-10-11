@@ -47,13 +47,13 @@ import net.viktorc.pp4j.api.Submission;
  * @author Viktor Csomor
  *
  */
-public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
+abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
 	
 	/**
 	 * If a process cannot be started or an exception occurs which would make it impossible to retrieve the 
 	 * actual return code of the process.
 	 */
-	public static final int UNEXPECTED_TERMINATION_RESULT_CODE = -1;
+	static final int UNEXPECTED_TERMINATION_RESULT_CODE = -1;
 	
 	/**
 	 * The manager of the underlying process' life-cycle.

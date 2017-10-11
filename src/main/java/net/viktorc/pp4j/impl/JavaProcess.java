@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
 
 /**
@@ -33,22 +34,29 @@ class JavaProcess {
 	
 	/**
 	 * A string for signaling the startup of the Java process; it contains characters that cannot 
-	 * ever appear in Base64 encoded messages.
+	 * ever appear in Base64 encoded messages and are extremely likely to be contained in any kind 
+	 * of output.
 	 */
-	static final String STARTUP_SIGNAL = "--READY--";
+	static final String STARTUP_SIGNAL = "-<._r34Dy_.>-";
+	/**
+	 * A prefix denoting that the response contains the result of the task in serialized form.
+	 */
+	static final String RESULT_PREFIX = "-<._r3ZvLt_.>-";
 	/**
 	 * A prefix denoting that the response contains a serialized <code>Throwable<code> instance 
 	 * that was thrown during the execution of the runnablePart.
 	 */
-	static final String ERROR_PREFIX = "--ERROR--";
+	static final String ERROR_PREFIX = "-<._3nR0n_.>-";
 	/**
 	 * The request for the termination of the program.
 	 */
-	static final String STOP_REQUEST = "--STOP--";
+	static final String STOP_REQUEST = "-<._zT0b_.>-";
 	/**
 	 * The response to a termination request.
 	 */
-	static final String STOP_SIGNAL = "--STOPPED--";
+	static final String STOP_SIGNAL = "-<._zT0bP3d_.>-";
+	
+	private static final String CHARSET = StandardCharsets.UTF_8.name();
 	
 	/**
 	 * The method executed as a separate process. It listens to its standard in for 
@@ -61,10 +69,9 @@ class JavaProcess {
 	 * @param args They are ignored for now.
 	 */
 	public static void main(String[] args) {
-		try (BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+		try (BufferedReader in = new BufferedReader(new InputStreamReader(System.in, CHARSET));
 				DummyPrintStream dummyOut = new DummyPrintStream();
 				DummyPrintStream dummyErr = new DummyPrintStream()) {
-			boolean stop = false;
 			/* As the process' stderr is redirected to the stdout, there is no need for a 
 			 * reference to this stream; neither should the submissions be able to print to 
 			 * stdout through the System.err stream. */
@@ -75,9 +82,12 @@ class JavaProcess {
 			// Send the startup signal.
 			System.out.println(STARTUP_SIGNAL);
 			try {
-				while (!stop) {
+				for (;;) {
 					try {
-						String line = in.readLine().trim();
+						String line = in.readLine();
+						if (line == null)
+							return;
+						line = line.trim();
 						if (line.isEmpty())
 							continue;
 						if (STOP_REQUEST.equals(line)) {
@@ -97,7 +107,7 @@ class JavaProcess {
 							try {
 								System.setOut(out);
 							} catch (SecurityException e) { /* Ignore it. */ }
-							System.out.println(Conversion.toString(output));
+							System.out.println(RESULT_PREFIX + Conversion.toString(output));
 						} else
 							continue;
 					} catch (Throwable e) {
