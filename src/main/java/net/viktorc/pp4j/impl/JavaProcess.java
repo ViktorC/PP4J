@@ -41,20 +41,20 @@ class JavaProcess {
 	/**
 	 * A prefix denoting that the response contains the result of the task in serialized form.
 	 */
-	static final String RESULT_PREFIX = "-<._r3ZvLt_.>-";
+	static final String RESULT_PREFIX = "-<._r3ZuLt_.>-";
 	/**
 	 * A prefix denoting that the response contains a serialized <code>Throwable<code> instance 
 	 * that was thrown during the execution of the runnablePart.
 	 */
-	static final String ERROR_PREFIX = "-<._3nR0n_.>-";
+	static final String ERROR_PREFIX = "-<._3rR0r_.>-";
 	/**
 	 * The request for the termination of the program.
 	 */
-	static final String STOP_REQUEST = "-<._zT0b_.>-";
+	static final String STOP_REQUEST = "-<._st0p_.>-";
 	/**
 	 * The response to a termination request.
 	 */
-	static final String STOP_SIGNAL = "-<._zT0bP3d_.>-";
+	static final String STOP_SIGNAL = "-<._st0pP3d_.>-";
 	
 	private static final String CHARSET = StandardCharsets.UTF_8.name();
 	

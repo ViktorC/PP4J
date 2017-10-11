@@ -654,7 +654,9 @@ public class JPPETest {
 			String[] lines = out.toString().split(System.lineSeparator());
 			Assert.assertTrue(lines.length == 5);
 			Assert.assertTrue(JavaProcess.STARTUP_SIGNAL.equals(lines[0]));
-			Assert.assertTrue(((Long) Conversion.toObject(lines[1])) == 3);
+			Assert.assertTrue(lines[1].startsWith(JavaProcess.RESULT_PREFIX));
+			Assert.assertTrue((3 == (Long) Conversion.toObject(lines[1]
+					.substring(JavaProcess.RESULT_PREFIX.length()))));
 			Assert.assertTrue(lines[2].startsWith(JavaProcess.ERROR_PREFIX));
 			Assert.assertTrue("test".equals(((Exception) Conversion.toObject(lines[2]
 					.substring(JavaProcess.ERROR_PREFIX.length()))).getMessage()));
