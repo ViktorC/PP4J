@@ -18,7 +18,7 @@ package net.viktorc.pp4j.impl;
 import java.util.function.BiPredicate;
 
 /**
- * A simplified sub-class of the {@link net.viktorc.pp4j.impl.AbstractCommand} abstract class that relies on lambda 
+ * A simple sub-class of the {@link net.viktorc.pp4j.impl.AbstractCommand} abstract class that relies on lambda 
  * functions to implement the {@link net.viktorc.pp4j.impl.AbstractCommand#onOutput(String, boolean) onOutput} 
  * method and assumes that the command should always be executed and that the process generates an output in 
  * response to the command.

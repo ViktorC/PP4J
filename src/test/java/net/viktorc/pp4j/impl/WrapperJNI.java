@@ -16,7 +16,7 @@
 package net.viktorc.pp4j.impl;
 
 /**
- * A simple native wrapper class for testing JNI performance.
+ * A simple native code wrapper class for testing JNI performance.
  * 
  * @author Viktor Csomor
  *

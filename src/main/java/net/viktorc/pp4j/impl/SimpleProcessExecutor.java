@@ -27,7 +27,7 @@ import net.viktorc.pp4j.api.Submission;
  * running and management of a process based on a {@link net.viktorc.pp4j.api.ProcessManager} instance 
  * to enable the execution of submissions in this process. The process may be launched by invoking the 
  * {@link #start()} method and submissions may be executed in the process using the 
- * {@link #execute(Submission)} method
+ * {@link #execute(Submission)} method.
  * 
  * @author Viktor Csomor
  *
@@ -64,13 +64,13 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
 			throw new IllegalStateException("The executor is already running.");
 	}
 	/**
-	 * It prompts the currently running process, if there is one, to terminate. Once the process has been 
+	 * It prompts the currently running process, if there is one, to terminate. Once the process has  
 	 * successfully terminated, subsequent calls are ignored and return true.
 	 * 
 	 * @param forcibly Whether the process should be killed forcibly or using the 
 	 * {@link net.viktorc.pp4j.api.ProcessManager#terminateGracefully(ProcessExecutor)} method of the 
 	 * <code>ProcessManager</code> instance assigned to the executor. The latter might be ineffective if 
-	 * the process is currently executing a command or has not started up.
+	 * the process is currently executing a submission or has not started up yet.
 	 * @return Whether the process was successfully terminated.
 	 */
 	public boolean stop(boolean forcibly) {

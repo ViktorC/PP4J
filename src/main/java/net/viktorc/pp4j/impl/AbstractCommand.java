@@ -44,8 +44,8 @@ public abstract class AbstractCommand implements Command {
 		stdErrLines = new ArrayList<>();
 	}
 	/**
-	 * Returns a list of lines output to the standard out of the underlying process after the instruction has been 
-	 * written to the standard in of the process.
+	 * Returns a list of lines output to the standard out of the underlying process after the instruction 
+	 * has been written to the standard in of the process.
 	 * 
 	 * @return A list of lines output to the standard out of the underlying process.
 	 */
@@ -53,8 +53,8 @@ public abstract class AbstractCommand implements Command {
 		return new ArrayList<>(stdOutLines);
 	}
 	/**
-	 * Returns a list of lines output to the standard out of the underlying process after the instruction has been 
-	 * written to the standard in of the process.
+	 * Returns a list of lines output to the standard error of the underlying process after the instruction 
+	 * has been written to the standard in of the process.
 	 * 
 	 * @return A list of lines output to the standard error stream of the underlying process.
 	 */
@@ -80,8 +80,8 @@ public abstract class AbstractCommand implements Command {
 		return String.join("\n", stdErrLines);
 	}
 	/**
-	 * Clears the lists holding the lines output to the out streams of the underlying process. Recommended in case 
-	 * the {@link net.viktorc.pp4j.api.Command} instance is reused.
+	 * Clears the lists holding the lines output to the standard out and standard error streams of the underlying 
+	 * process. Recommended in case the {@link net.viktorc.pp4j.api.Command} instance is reused.
 	 */
 	public void reset() {
 		stdOutLines.clear();
@@ -101,7 +101,8 @@ public abstract class AbstractCommand implements Command {
 		return processed;
 	}
 	/**
-	 * It stores the output line before calling and returning the result of {@link #isProcessed(String, boolean)}.
+	 * It allows for the processing of the output and is responsible for determining whether the output line 
+	 * denotes the completion of the execution of the command.
 	 * 
 	 * @param outputLine The new line of output printed to the standard out of the process.
 	 * @param standard Whether this line has been output to the standard out or to the standard error stream.

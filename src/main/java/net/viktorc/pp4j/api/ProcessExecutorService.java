@@ -22,9 +22,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * An interface that outlines an executing mechanism for {@link net.viktorc.pp4j.api.Submission} instances in 
  * separate processes and allows for the tracking of the progress of the execution via 
- * {@link java.util.concurrent.Future} instances. The interface also defines a method for shutting down the 
- * process pool and releasing the associated resources. It defines the same shutdown-related methods as the 
- * {@link java.util.concurrent.ExecutorService} interface to conform to its shutdown behaviour.
+ * {@link java.util.concurrent.Future} instances. It also defines the same shutdown-related methods as the 
+ * {@link java.util.concurrent.ExecutorService} interface to conform to its behaviour specifications.
  * 
  * @author Viktor Csomor
  *
@@ -42,7 +41,7 @@ public interface ProcessExecutorService extends ProcessExecutor {
 	/**
 	 * Submits the specified submission for execution and returns a {@link java.util.concurrent.Future} instance 
 	 * which allows for the cancellation of the submission. It does not block until the submission is processed. 
-	 * The termination of the executing process may be requested.
+	 * The termination of the executing process after the execution may be requested.
 	 * 
 	 * @param submission The submission to execute.
 	 * @param terminateProcessAfterwards Whether the process to which the submission is delegated should be 
@@ -58,11 +57,10 @@ public interface ProcessExecutorService extends ProcessExecutor {
 	 */
 	void shutdown();
 	/**
-	 * Kills all the processes, blocks until the pool is shutdown, and returns a list of the submissions that 
-	 * have been submitted but never processed. It does not block until the processes terminate. See 
-	 * {@link java.util.concurrent.ExecutorService#shutdownNow()}.
+	 * Kills all the and returns a list of the submissions that have been submitted but never processed. It does 
+	 * not block until the processes terminate. See {@link java.util.concurrent.ExecutorService#shutdownNow()}.
 	 * 
-	 * @return A list of the submissions that were waiting execution.
+	 * @return A list of the submissions that were awaiting execution.
 	 */
 	List<Submission<?>> forceShutdown();
 	/**
@@ -76,7 +74,7 @@ public interface ProcessExecutorService extends ProcessExecutor {
 	 * Returns whether the process pool has successfully been shut down with all its processes terminated.
 	 * See {@link java.util.concurrent.ExecutorService#isTerminated()}.
 	 * 
-	 * @return Whether the process pool has successfully been shut down with all its processes terminated.
+	 * @return Whether all the processes of the pool have terminated.
 	 */
 	boolean isTerminated();
 	/**

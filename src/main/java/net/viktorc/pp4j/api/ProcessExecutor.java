@@ -32,7 +32,7 @@ public interface ProcessExecutor {
 	 * @param submission The submission to execute.
 	 * @return Whether the submission was executed. If the executor is not running, busy processing an other 
 	 * submission, or stopped before it could complete the execution of the submission, <code>false</code> is returned; 
-	 * otherwise the submission is executed and <code>true</code> is returned once it's successfully processed.
+	 * otherwise the submission is processed and <code>true</code> is returned once it's successfully executed.
 	 */
 	boolean execute(Submission<?> submission);
 

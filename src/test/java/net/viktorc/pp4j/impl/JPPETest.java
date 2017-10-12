@@ -159,7 +159,7 @@ public class JPPETest {
 	// Submission testing.
 	@Test
 	public void test07() throws InterruptedException, ExecutionException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 7);
+		System.out.println(System.lineSeparator() + "Test 7");
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 5, 5, 0, null, false);
 		try {
@@ -194,7 +194,7 @@ public class JPPETest {
 	}
 	@Test
 	public void test08() throws InterruptedException, ExecutionException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 8);
+		System.out.println(System.lineSeparator() + "Test 8");
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256, 0),
 				5, 5, 0, null, false);
@@ -229,7 +229,7 @@ public class JPPETest {
 	}
 	@Test
 	public void test09() throws InterruptedException, ExecutionException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 9);
+		System.out.println(System.lineSeparator() + "Test 9");
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 1, 1, 0, null, false);
 		int base = 13;
@@ -476,7 +476,7 @@ public class JPPETest {
 	}
 	@Test
 	public void test18() throws InterruptedException, ExecutionException, TimeoutException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 18);
+		System.out.println(System.lineSeparator() + "Test 18");
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 2, 2, 0, null, false);
 		try {
@@ -625,7 +625,7 @@ public class JPPETest {
 	// Java process options testing.
 	@Test
 	public void test23() throws InterruptedException, ExecutionException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 23);
+		System.out.println(System.lineSeparator() + "Test 23");
 		SimpleJavaProcessOptions options = new SimpleJavaProcessOptions(0);
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(options,
 				5, 5, 0, null, false);
@@ -639,7 +639,7 @@ public class JPPETest {
 	// Java process testing.
 	@Test
 	public void test24() throws IOException, InterruptedException, ClassNotFoundException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 24);
+		System.out.println(System.lineSeparator() + "Test 24");
 		PrintStream origOutStream = System.out;
 		String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n", "", Conversion.toString("test"),
 				Conversion.toString((Callable<Long> & Serializable) () -> Math.round(Math.E)),
@@ -669,7 +669,7 @@ public class JPPETest {
 	// Not serializable task testing.
 	@Test
 	public void test25() throws InterruptedException, ExecutionException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 25);
+		System.out.println(System.lineSeparator() + "Test 25");
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, null, false);
 		try {
@@ -682,7 +682,7 @@ public class JPPETest {
 	}
 	@Test
 	public void test26() throws InterruptedException, ExecutionException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 26);
+		System.out.println(System.lineSeparator() + "Test 26");
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, null, false);
 		try {
@@ -695,7 +695,7 @@ public class JPPETest {
 	}
 	@Test
 	public void test27() throws InterruptedException, ExecutionException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 27);
+		System.out.println(System.lineSeparator() + "Test 27");
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, null, false);
 		try {
@@ -710,7 +710,7 @@ public class JPPETest {
 	// Startup task testing.
 	@Test
 	public void test28() throws InterruptedException, ExecutionException {
-		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 28);
+		System.out.println(System.lineSeparator() + "Test 28");
 		JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
 				new JavaProcessOptions() { }, 0, 1, 0, (Runnable & Serializable) () -> {
 					for (int i = 0; i < 10; i++)

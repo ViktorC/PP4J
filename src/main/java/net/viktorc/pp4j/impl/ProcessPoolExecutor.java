@@ -58,12 +58,12 @@ import net.viktorc.pp4j.api.Submission;
  * {@link net.viktorc.pp4j.api.ProcessExecutor} implementation. Each executor is assigned an instance of an 
  * implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface using an implementation of the 
  * {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface. The pool accepts submissions in the form of 
- * {@link net.viktorc.pp4j.api.Submission} implementations which are executed on any one of the available active 
+ * {@link net.viktorc.pp4j.api.Submission} implementations which are executed in any one of the available active 
  * process executors maintained by the pool. While executing a submission, the executor cannot accept further 
  * submissions. The submissions are queued and executed as soon as there is an available executor. The size of the 
  * pool is always kept between the minimum pool size and the maximum pool size (both inclusive). The reserve size 
  * specifies the minimum number of processes that should always be available (there are no guarantees that there 
- * actually will be this many available executors at any given time). It uses 
+ * actually will be this many available executors at any given time). This class uses 
  * <a href="https://www.slf4j.org/">SLF4J</a> for logging.
  * 
  * @author Viktor Csomor
