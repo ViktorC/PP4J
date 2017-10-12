@@ -58,42 +58,42 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
 	/**
 	 * The manager of the underlying process' life-cycle.
 	 */
-	protected final ProcessManager manager;
+	final ProcessManager manager;
 	/**
 	 * The thread pool providing the threads for executing background tasks required for the operation of 
 	 * the executor such as the listening of the process' out and error streams, and the timing of idle 
 	 * phases to recognize when a process times out.
 	 */
-	protected final ExecutorService threadPool;
+	final ExecutorService threadPool;
 	/**
 	 * A lock used to ensure exclusive access to the {@link #run()} method.
 	 */
-	protected final Lock runLock;
+	final Lock runLock;
 	/**
 	 * A lock used to ensure exclusive access to the {@link #stop(boolean)} method.
 	 */
-	protected final Lock stopLock;
+	final Lock stopLock;
 	/**
 	 * A lock used to ensure no more than one submission is being processed at a time. It guards the 
 	 * <code>execute</code> methods and the start-up block of the {@link #run()} method.
 	 */
-	protected final Lock submissionLock;
+	final Lock submissionLock;
 	/**
 	 * A semaphore used to wait for all helper threads to terminate. All background tasks integral to the 
 	 * running of the process are expected to decrement its counter on termination.
 	 */
-	protected final Semaphore termSemaphore;
+	final Semaphore termSemaphore;
 	/**
 	 * The number of licenses to acquire from {@link #termSemaphore} when waiting for background operations 
 	 * to terminate. If an additional background operation is run using {@link #threadPool}, this number 
 	 * should be incremented so that the executor can wait for this operation to terminate before exiting 
 	 * the {@link #run()} method.
 	 */
-	protected final AtomicInteger threadsToWaitFor;
+	final AtomicInteger threadsToWaitFor;
 	/**
 	 * The logger used to log events related to the life-cycle of the underlying process.
 	 */
-	protected final Logger logger;
+	final Logger logger;
 	
 	private final Object execLock;
 	private final Object processLock;

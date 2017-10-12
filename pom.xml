@@ -3,9 +3,9 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.viktorc</groupId>
 	<artifactId>pp4j</artifactId>
-	<version>1.0</version>
+	<version>2.0</version>
 	<name>PP4J</name>
-	<description>A multiprocessing library that provides process executors and process pools.</description>
+	<description>A multiprocessing library for Java.</description>
 	<url>https://github.com/ViktorC/PP4J</url>
 	<packaging>jar</packaging>
 	<licenses>
