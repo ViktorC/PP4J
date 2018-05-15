@@ -227,6 +227,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test09() throws InterruptedException, ExecutionException {
 		System.out.println(System.lineSeparator() + "Test 9");
@@ -266,6 +267,7 @@ public class JPPETest {
 		}
 	}
 	// Invocation testing.
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test11() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 11);
@@ -296,6 +298,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test12() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 12);
@@ -326,6 +329,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test13() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 13);
@@ -357,6 +361,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test14() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 14);
@@ -388,6 +393,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test15() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 15);
@@ -419,6 +425,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test16() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 16);
@@ -446,6 +453,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test17() throws InterruptedException, ExecutionException, TimeoutException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 17);
@@ -474,6 +482,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test18() throws InterruptedException, ExecutionException, TimeoutException {
 		System.out.println(System.lineSeparator() + "Test 18");
@@ -548,6 +557,7 @@ public class JPPETest {
 		}
 	}
 	// Task and result exchange performance testing.
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test20() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 20);
@@ -569,6 +579,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test21() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 21);
@@ -596,6 +607,7 @@ public class JPPETest {
 			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test22() throws InterruptedException, ExecutionException {
 		System.out.printf(TestUtils.TEST_TITLE_FORMAT, 22);
@@ -637,6 +649,7 @@ public class JPPETest {
 		}
 	}
 	// Java process testing.
+	@SuppressWarnings("unchecked")
 	@Test
 	public void test24() throws IOException, InterruptedException, ClassNotFoundException {
 		System.out.println(System.lineSeparator() + "Test 24");

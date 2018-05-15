@@ -19,12 +19,18 @@ import java.io.File;
 import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.Serializable;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -128,6 +134,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 			throw new IllegalArgumentException("The task is not serializable.", e);
 		}
 	}
+	@SuppressWarnings("unchecked")
 	@Override
 	public <T> Future<T> submit(Runnable task, T result, boolean terminateProcessAfterwards) {
 		try {
@@ -273,6 +280,20 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 			String javaPath = System.getProperty("java.home") + File.separator + "bin" +
 					File.separator + "java";
 			String classPath = System.getProperty("java.class.path");
+			ClassLoader classLoader = this.getClass().getClassLoader();
+			if (classLoader instanceof URLClassLoader) {
+				@SuppressWarnings("resource")
+				URLClassLoader urlClassLoader = (URLClassLoader) classLoader;
+				Set<String> classPathEntries = new HashSet<>(Arrays.asList(classPath.split(File.pathSeparator)));
+				for (URL url : urlClassLoader.getURLs()) {
+					try {
+						classPathEntries.add(Paths.get(url.toURI()).toAbsolutePath().toString());
+					} catch (URISyntaxException e) {
+						continue;
+					}
+				}
+				classPath = String.join(File.pathSeparator, classPathEntries);
+			}
 			String className = JavaProcess.class.getCanonicalName();
 			long keepAliveTime = 0;
 			List<String> javaOptions = new ArrayList<>();
@@ -339,6 +360,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 		public boolean isStartedUp(String outputLine, boolean standard) {
 			return standard && JavaProcess.STARTUP_SIGNAL.equals(outputLine);
 		}
+		@SuppressWarnings("unchecked")
 		@Override
 		public void onStartup(ProcessExecutor executor) {
 			try {
