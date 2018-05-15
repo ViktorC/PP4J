@@ -599,7 +599,7 @@ public class JPPETest {
 			for (Future<AtomicInteger> res : results)
 				res.get();
 			long time = System.currentTimeMillis() - start;
-			boolean success = time < 12000 && time > 7495;
+			boolean success = time < 13500 && time > 7495;
 			System.out.printf("Time: %.3f %s%n", ((double) time)/1000, success ? "" : "FAIL");
 			Assert.assertTrue(success);
 		} finally {
