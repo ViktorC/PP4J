@@ -24,6 +24,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -288,6 +289,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 				for (URL url : urlClassLoader.getURLs()) {
 					try {
 						classPathEntries.add(Paths.get(url.toURI()).toAbsolutePath().toString());
+					} catch (FileSystemNotFoundException e){
+						continue;
 					} catch (URISyntaxException e) {
 						continue;
 					}
