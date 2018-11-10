@@ -306,7 +306,10 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
 		try {
 			submit(submission).get();
 			return true;
-		} catch (InterruptedException | ExecutionException e) {
+		} catch (ExecutionException e) {
+			throw new ProcessException(e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 			throw new ProcessException(e);
 		}
 	}

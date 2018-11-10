@@ -169,7 +169,10 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
 					}
 				}
 			}
-		} catch (IOException | InterruptedException e) {
+		} catch (IOException e) {
+			throw new ProcessException(e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 			throw new ProcessException(e);
 		} finally {
 			termSemaphore.release();
@@ -315,7 +318,10 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
 	public boolean execute(Submission<?> submission) {
 		try {
 			return execute(submission, false);
-		} catch (IOException | InterruptedException e) {
+		} catch (IOException e) {
+			throw new ProcessException(e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 			throw new ProcessException(e);
 		}
 	}

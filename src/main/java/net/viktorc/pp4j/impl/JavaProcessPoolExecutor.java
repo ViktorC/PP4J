@@ -122,8 +122,11 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 	public void execute(Runnable command) {
 		try {
 			submit(command).get();
-		} catch (InterruptedException | ExecutionException e) {
-			throw new RuntimeException(e);
+		} catch (ExecutionException e) {
+			throw new ProcessException(e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new ProcessException(e);
 		}
 	}
 	@Override
@@ -289,9 +292,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 				for (URL url : urlClassLoader.getURLs()) {
 					try {
 						classPathEntries.add(Paths.get(url.toURI()).toAbsolutePath().toString());
-					} catch (FileSystemNotFoundException e){
-						continue;
-					} catch (URISyntaxException e) {
+					} catch (FileSystemNotFoundException | URISyntaxException e) {
 						continue;
 					}
 				}
@@ -416,7 +417,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 		/**
 		 * Creates a submission for the specified {@link java.util.concurrent.Callable}.
 		 * 
-		 * @param runnablePart The runnablePart to execute.
+		 * @param task The task to execute.
 		 * @throws IOException If the encoding of the serialized runnablePart fails.
 		 * @throws NotSerializableException If some object to be serialized does not implement the 
 		 * {@link java.io.Serializable} interface.
