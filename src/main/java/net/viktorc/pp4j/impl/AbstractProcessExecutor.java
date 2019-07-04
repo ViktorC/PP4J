@@ -265,14 +265,7 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
             return false;
           }
           submission.onStartedProcessing();
-          List<Command> commands = submission.getCommands();
-          List<Command> processedCommands = commands.size() > 1 ?
-              new ArrayList<>(commands.size() - 1) : null;
-          for (int i = 0; i < commands.size(); i++) {
-            command = commands.get(i);
-            if (i != 0 && !command.doExecute(new ArrayList<>(processedCommands))) {
-              continue;
-            }
+          for (Command command : submission.getCommands()) {
             commandCompleted = !command.generatesOutput();
             stdInWriter.write(command.getInstruction());
             stdInWriter.newLine();
@@ -288,9 +281,6 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
              * to signal failure. */
             if (!commandCompleted) {
               return false;
-            }
-            if (i < commands.size() - 1) {
-              processedCommands.add(command);
             }
           }
           command = null;

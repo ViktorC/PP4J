@@ -60,17 +60,4 @@ public interface Command {
    */
   boolean isProcessed(String outputLine, boolean standard);
 
-  /**
-   * A method called before the execution of every command, except the first one, in a submission containing multiple commands. It
-   * determines whether the command is to be executed. This allows for the establishment of conditions on which certain commands should be
-   * executed. If a submission contains only a single command, this method is not called at all. By default, it returns true in all cases.
-   *
-   * @param prevCommands The commands preceding this one in the submission that have already been executed and processed or skipped if their
-   * respective {@link #doExecute(List)} methods returned false.
-   * @return Whether this command should be executed.
-   */
-  default boolean doExecute(List<Command> prevCommands) {
-    return true;
-  }
-
 }
