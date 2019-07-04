@@ -66,7 +66,7 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
    * It prompts the currently running process, if there is one, to terminate. Once the process has successfully terminated, subsequent calls
    * are ignored and return true.
    *
-   * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pp4j.api.ProcessManager#terminateGracefully)}
+   * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pp4j.api.ProcessManager#terminateGracefully}
    * method of the
    * <code>ProcessManager</code> instance assigned to the executor. The latter might be ineffective if
    * the process is currently executing a submission or has not started up yet.
