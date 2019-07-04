@@ -15,7 +15,6 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
