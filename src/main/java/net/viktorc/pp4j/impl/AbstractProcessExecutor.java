@@ -255,14 +255,14 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
           /* If the process has terminated or the ProcessExecutor has been stopped while acquiring
            * the execLock, return. */
           if (!running || stopped) {
-            return success;
+            return false;
           }
           // Stop the timer as the process is not idle anymore.
           if (doTime) {
             timer.stop();
           }
           if (stopped) {
-            return success;
+            return false;
           }
           submission.onStartedProcessing();
           List<Command> commands = submission.getCommands();
@@ -287,7 +287,7 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
             /* If the process has terminated or the ProcessExecutor has been stopped, return false
              * to signal failure. */
             if (!commandCompleted) {
-              return success;
+              return false;
             }
             if (i < commands.size() - 1) {
               processedCommands.add(command);
@@ -304,7 +304,7 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
             }
           }
           success = true;
-          return success;
+          return true;
         } finally {
           try {
             if (success) {
@@ -344,7 +344,6 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
       termSemaphore.drainPermits();
       int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
       long lifeTime = 0;
-      long startupTime = 0;
       try {
         // Startup block.
         boolean orderly = false;
@@ -361,6 +360,7 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
             timer = doTime && timer == null ? new KeepAliveTimer() : timer;
             threadsToWaitFor.set(doTime ? 3 : 2);
             // Start the process.
+            long startupTime;
             synchronized (processLock) {
               startupTime = System.currentTimeMillis();
               process = manager.start();
@@ -404,11 +404,8 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
           }
           submissionLock.unlock();
         }
-        /* If the startup failed, the process might not be initialized. Otherwise, wait for the process
-         * to terminate. */
-        if (orderly) {
-          rc = process.waitFor();
-        }
+        // Wait for the process to terminate.
+        rc = process.waitFor();
       } catch (Exception e) {
         throw new ProcessException(e);
       } finally {
