@@ -29,8 +29,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -158,7 +160,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   @Override
   public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
       throws InterruptedException {
-    List<Future<T>> futures = new ArrayList<Future<T>>();
+    List<Future<T>> futures = new ArrayList<>();
     for (Callable<T> t : tasks) {
       futures.add(submit(t));
     }
@@ -168,7 +170,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           f.get();
         }
       } catch (ExecutionException | CancellationException e) {
-        continue;
+        // Ignore it.
       }
     }
     return futures;
@@ -177,7 +179,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   @Override
   public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
       long timeout, TimeUnit unit) throws InterruptedException {
-    List<Future<T>> futures = new ArrayList<Future<T>>();
+    List<Future<T>> futures = new ArrayList<>();
     for (Callable<T> t : tasks) {
       futures.add(submit(t));
     }
@@ -190,7 +192,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           f.get(waitTimeNs, TimeUnit.NANOSECONDS);
         }
       } catch (ExecutionException | CancellationException e) {
-        continue;
+        // Ignore it.
       } catch (TimeoutException e) {
         for (int j = i; j < futures.size(); j++) {
           futures.get(j).cancel(true);
@@ -213,7 +215,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       } catch (ExecutionException e) {
         execException = e;
       } catch (CancellationException e) {
-        continue;
+        // Ignore it.
       }
     }
     if (execException == null) {
@@ -232,7 +234,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       } catch (ExecutionException e) {
         execException = e;
       } catch (CancellationException e) {
-        continue;
+        // Ignore it.
       }
     }
     if (execException == null) {
@@ -251,7 +253,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     return super.forceShutdown().stream()
         .filter(s -> s instanceof JavaSubmission)
         .map(s -> ((SerializableCallable<?, ?>) ((JavaSubmission<?, ?>) s).task).runnablePart)
-        .filter(r -> r != null)
+        .filter(Objects::nonNull)
         .collect(Collectors.toList());
   }
 
@@ -299,20 +301,19 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           try {
             classPathEntries.add(Paths.get(url.toURI()).toAbsolutePath().toString());
           } catch (FileSystemNotFoundException | URISyntaxException e) {
-            continue;
+            // Ignore it.
           }
         }
         classPath = String.join(File.pathSeparator, classPathEntries);
       }
       String className = JavaProcess.class.getCanonicalName();
-      long keepAliveTime = 0;
       List<String> javaOptions = new ArrayList<>();
       JVMArch arch = options.getArch();
       JVMType type = options.getType();
       Integer initHeap = options.getInitHeapSizeMb();
       Integer maxHeap = options.getMaxHeapSizeMb();
       Integer stack = options.getStackSizeKb();
-      keepAliveTime = options.getKeepAliveTime();
+      long keepAliveTime = options.getKeepAliveTime();
       if (arch != null) {
         javaOptions.add(arch.equals(JVMArch.BIT_32) ? "-d32" : "-d64");
       }
@@ -388,7 +389,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           }));
         }
       } catch (Exception e) {
-        return;
+        // Ignore it.
       }
     }
 
@@ -444,7 +445,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     @SuppressWarnings("unchecked")
     @Override
     public List<Command> getCommands() {
-      return Arrays.asList(new SimpleCommand(command, (c, l) -> {
+      return Collections.singletonList(new SimpleCommand(command, (c, l) -> {
         try {
           if (l.startsWith(JavaProcess.ERROR_PREFIX)) {
             error = (Throwable) Conversion.toObject(l.substring(
@@ -459,7 +460,10 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
         } catch (Exception e) {
           throw new ProcessException(e);
         }
-      }, (c, l) -> true /* It cannot happen, as stderr is redirected. */));
+      }, (c, l) -> {
+        // It cannot happen, as stderr is redirected.
+        return true;
+      }));
     }
 
     @Override
@@ -515,12 +519,12 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
     @Override
     public T get() throws InterruptedException, ExecutionException {
-      return (T) origFuture.get();
+      return origFuture.get();
     }
 
     @Override
     public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-      return (T) origFuture.get(timeout, unit);
+      return origFuture.get(timeout, unit);
     }
 
   }

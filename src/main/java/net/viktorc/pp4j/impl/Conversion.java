@@ -37,8 +37,6 @@ class Conversion {
   private Conversion() {
   }
 
-  ;
-
   /**
    * Serializes the specified object into a string and encodes it using Base64.
    *

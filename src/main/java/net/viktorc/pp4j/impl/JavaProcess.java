@@ -16,7 +16,6 @@
 package net.viktorc.pp4j.impl;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -73,12 +72,14 @@ class JavaProcess {
        * stdout through the System.err stream. */
       try {
         System.setErr(dummyErr);
-      } catch (SecurityException e) { /* Ignore it. */ }
+      } catch (SecurityException e) {
+        // Ignore it.
+      }
       PrintStream out = System.out;
       // Send the startup signal.
       System.out.println(STARTUP_SIGNAL);
       try {
-        for (; ; ) {
+        for (;;) {
           try {
             String line = in.readLine();
             if (line == null) {
@@ -100,32 +101,40 @@ class JavaProcess {
                * done falsely. */
               try {
                 System.setOut(dummyOut);
-              } catch (SecurityException e) { /* Ignore it. */ }
+              } catch (SecurityException e) {
+                // Ignore it.
+              }
               Object output = c.call();
               try {
                 System.setOut(out);
-              } catch (SecurityException e) { /* Ignore it. */ }
+              } catch (SecurityException e) {
+                // Ignore it.
+              }
               System.out.println(RESULT_PREFIX + Conversion.toString(output));
-            } else {
-              continue;
             }
           } catch (Throwable e) {
             try {
               System.setOut(out);
-            } catch (SecurityException e1) { /* Ignore it. */ }
+            } catch (SecurityException e1) {
+              // Ignore it.
+            }
             System.out.println(ERROR_PREFIX + Conversion.toString(e));
           }
         }
       } catch (Throwable e) {
         try {
           System.setOut(out);
-        } catch (SecurityException e1) { /* Ignore it. */ }
+        } catch (SecurityException e1) {
+          // Ignore it.
+        }
         throw e;
       }
     } catch (Throwable e) {
       try {
         System.out.println(ERROR_PREFIX + Conversion.toString(e));
-      } catch (Exception e1) { /* Give up all hope. */ }
+      } catch (Exception e1) {
+        // Give up all hope.
+      }
     }
   }
 
@@ -143,7 +152,7 @@ class JavaProcess {
       super(new OutputStream() {
 
         @Override
-        public void write(int b) throws IOException {
+        public void write(int b) {
           // This is why it is called "DummyPrintStream".
         }
       });

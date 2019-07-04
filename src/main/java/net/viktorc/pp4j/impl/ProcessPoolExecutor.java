@@ -30,7 +30,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -236,7 +235,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    * @return Whether the process was successfully started.
    */
   private boolean startNewProcess() {
-    InternalProcessExecutor executor = null;
+    InternalProcessExecutor executor;
     try {
       executor = procExecObjectPool.borrowObject();
     } catch (Exception e) {
@@ -351,7 +350,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     logger.info("Submission {} received.{}", internalSubmission, System.lineSeparator() +
         getPoolStats());
     // Return a Future holding the total execution time including the submission delay.
-    return new InternalSubmissionFuture<T>(internalSubmission);
+    return new InternalSubmissionFuture<>(internalSubmission);
   }
 
   @Override
@@ -684,7 +683,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
             completed = true;
           } catch (InterruptedException e) {
             // Next round (unless the process is stopped).
-            continue;
           } catch (Exception e) {
             // Signal the exception to the future and do not put the submission back into the queue.
             if (submission != null) {
@@ -774,12 +772,14 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       super(new PooledObjectFactory<InternalProcessExecutor>() {
 
         @Override
-        public PooledObject<InternalProcessExecutor> makeObject() throws Exception {
-          return new DefaultPooledObject<InternalProcessExecutor>(new InternalProcessExecutor());
+        public PooledObject<InternalProcessExecutor> makeObject() {
+          return new DefaultPooledObject<>(new InternalProcessExecutor());
         }
 
         @Override
-        public void activateObject(PooledObject<InternalProcessExecutor> p) { /* No-operation. */ }
+        public void activateObject(PooledObject<InternalProcessExecutor> p) {
+          // No-operation.
+        }
 
         @Override
         public boolean validateObject(PooledObject<InternalProcessExecutor> p) {
@@ -787,10 +787,14 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         }
 
         @Override
-        public void passivateObject(PooledObject<InternalProcessExecutor> p) { /* No-operation. */ }
+        public void passivateObject(PooledObject<InternalProcessExecutor> p) {
+          // No-operation.
+        }
 
         @Override
-        public void destroyObject(PooledObject<InternalProcessExecutor> p) { /* No-operation. */ }
+        public void destroyObject(PooledObject<InternalProcessExecutor> p) {
+          // No-operation.
+        }
       });
       setBlockWhenExhausted(false);
       setMaxTotal(maxPoolSize);
@@ -828,17 +832,13 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
 
     @Override
     public Thread newThread(Runnable r) {
-      Thread t = defaultFactory.newThread(r);
-      t.setName(t.getName().replaceFirst("pool-[0-9]+", poolName));
-      t.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-
-        @Override
-        public void uncaughtException(Thread t, Throwable e) {
-          logger.error(e.getMessage(), e);
-          ProcessPoolExecutor.this.forceShutdown();
-        }
+      Thread thread = defaultFactory.newThread(r);
+      thread.setName(thread.getName().replaceFirst("pool-[0-9]+", poolName));
+      thread.setUncaughtExceptionHandler((t, e) -> {
+        logger.error(e.getMessage(), e);
+        ProcessPoolExecutor.this.forceShutdown();
       });
-      return t;
+      return thread;
     }
 
   }
@@ -872,22 +872,19 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
                * else decline it and force the pool to create a new thread for running the runnablePart. */
               return tryTransfer(r);
             }
-          }, new CustomizedThreadFactory(ProcessPoolExecutor.this + "-procExecThreadPool"),
-          new RejectedExecutionHandler() {
-
-            @Override
-            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-              try {
-                /* If there are no threads waiting on the queue (all of them are busy executing)
-                 * and the maximum pool size has been reached, when the queue declines the offer,
-                 * the pool will not create any more threads but call this handler instead. This
-                 * handler 'forces' the declined runnablePart on the queue, ensuring that it is not
-                 * rejected. */
-                executor.getQueue().put(r);
-              } catch (InterruptedException e) {
-                // Should not happen.
-                Thread.currentThread().interrupt();
-              }
+          },
+          new CustomizedThreadFactory(ProcessPoolExecutor.this + "-procExecThreadPool"),
+          (r, executor) -> {
+            try {
+              /* If there are no threads waiting on the queue (all of them are busy executing)
+               * and the maximum pool size has been reached, when the queue declines the offer,
+               * the pool will not create any more threads but call this handler instead. This
+               * handler 'forces' the declined runnablePart on the queue, ensuring that it is not
+               * rejected. */
+              executor.getQueue().put(r);
+            } catch (InterruptedException e) {
+              // Should not happen.
+              Thread.currentThread().interrupt();
             }
           });
     }
