@@ -78,10 +78,8 @@ public class TestUtils {
    * Returns a test {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance.
    *
    * @return A test <code>ProcessManagerFactory</code> instance.
-   * @throws URISyntaxException If the path to the executable cannot be resolved.
    */
-  public static ProcessManagerFactory createTestProcessManagerFactory()
-      throws URISyntaxException {
+  public static ProcessManagerFactory createTestProcessManagerFactory() {
     return new TestProcessManagerFactory();
   }
 
@@ -96,10 +94,8 @@ public class TestUtils {
 
     /**
      * Constructs an instance for creating process managers.
-     *
-     * @throws URISyntaxException If the path to the test executable cannot be resolved.
      */
-    TestProcessManagerFactory() throws URISyntaxException {
+    TestProcessManagerFactory() {
       builder = new ProcessBuilder(getExecutable().getAbsolutePath());
     }
 

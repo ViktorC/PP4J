@@ -15,7 +15,6 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 import net.viktorc.pp4j.api.JavaProcessExecutorService;
 import net.viktorc.pp4j.api.ProcessExecutor;
@@ -40,8 +39,7 @@ public class ProcessExecutorsTest {
    * @param verbose The expected verbosity of the pool.
    * @return Whether the specified values match those of the properties of the pool.
    */
-  private boolean test(ProcessExecutor executor, int minSize, int maxSize, int reserveSize,
-      boolean verbose) {
+  private boolean test(ProcessExecutor executor, int minSize, int maxSize, int reserveSize, boolean verbose) {
     if (executor instanceof ProcessPoolExecutor) {
       ProcessPoolExecutor stdPool = (ProcessPoolExecutor) executor;
       return stdPool.getMinSize() == minSize && stdPool.getMaxSize() == maxSize &&
@@ -51,7 +49,7 @@ public class ProcessExecutorsTest {
   }
 
   @Test
-  public void test01() throws InterruptedException, URISyntaxException {
+  public void test01() throws InterruptedException {
     ProcessExecutorService pool = ProcessExecutors.newCustomProcessPool(TestUtils
         .createTestProcessManagerFactory(), 0, 5, 2);
     try {
@@ -63,7 +61,7 @@ public class ProcessExecutorsTest {
   }
 
   @Test
-  public void test02() throws InterruptedException, URISyntaxException {
+  public void test02() throws InterruptedException {
     ProcessExecutorService pool = ProcessExecutors.newFixedProcessPool(TestUtils
         .createTestProcessManagerFactory(), 5);
     try {
@@ -75,7 +73,7 @@ public class ProcessExecutorsTest {
   }
 
   @Test
-  public void test03() throws InterruptedException, URISyntaxException {
+  public void test03() throws InterruptedException {
     ProcessExecutorService pool = ProcessExecutors.newCachedProcessPool(TestUtils
         .createTestProcessManagerFactory());
     try {
@@ -87,7 +85,7 @@ public class ProcessExecutorsTest {
   }
 
   @Test
-  public void test04() throws InterruptedException, URISyntaxException {
+  public void test04() throws InterruptedException {
     ProcessExecutorService pool = ProcessExecutors.newSingleProcessPool(TestUtils
         .createTestProcessManagerFactory());
     try {

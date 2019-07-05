@@ -15,7 +15,6 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -52,10 +51,8 @@ public class PPETest {
 
   /**
    * Resolves the path to the test program and ensures that it is executable.
-   *
-   * @throws URISyntaxException If the path to the test program cannot be resolved.
    */
-  public PPETest() throws URISyntaxException {
+  public PPETest() {
     programLocation = TestUtils.getExecutable().getAbsolutePath();
   }
 
@@ -229,8 +226,7 @@ public class PPETest {
       }
       assert processPool.isShutdown() : "Process pool considered alive falsely.";
     }
-    for (int i = 0; i < futures.size(); i++) {
-      Future<?> future = futures.get(i);
+    for (Future<?> future : futures) {
       if (waitTimeout > 0) {
         future.get(waitTimeout, TimeUnit.MILLISECONDS);
       } else {
@@ -278,7 +274,7 @@ public class PPETest {
       for (Long time : times) {
         // Convert nanoseconds to milliseconds.
         time = Math.round(((double) time / 1000000));
-        boolean fail = time == null || time > upperBound || time < lowerBound;
+        boolean fail = time > upperBound || time < lowerBound;
         if (fail) {
           pass = false;
         }

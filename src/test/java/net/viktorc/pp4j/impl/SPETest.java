@@ -42,8 +42,6 @@ public class SPETest {
       Assert.assertTrue(executor.stop(true));
       Assert.assertTrue(command.getJointStandardOutLines()
           .contains("in progress\nin progress\nready"));
-    } catch (Exception e) {
-      e.printStackTrace();
     }
   }
 
@@ -69,7 +67,7 @@ public class SPETest {
 
   @Test
   public void test04() throws Exception {
-    Thread t = null;
+    Thread t;
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
         TestUtils.createTestProcessManagerFactory().newProcessManager())) {
       t = new Thread(() -> {

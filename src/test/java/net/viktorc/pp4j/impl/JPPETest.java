@@ -188,7 +188,7 @@ public class JPPETest {
       for (Future<?> f : futures) {
         f.get();
       }
-      Assert.assertTrue(j.get() == 2);
+      Assert.assertEquals(2, j.get());
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -224,7 +224,7 @@ public class JPPETest {
         }, j));
       }
       for (Future<?> f : futures) {
-        Assert.assertTrue(((AtomicInteger) f.get()).get() == 4);
+        Assert.assertEquals(4, ((AtomicInteger) f.get()).get());
       }
     } finally {
       exec.shutdown();
@@ -241,8 +241,7 @@ public class JPPETest {
         }, 1, 1, 0, null, false);
     int base = 13;
     try {
-      Assert.assertTrue(exec.submit((Callable<Integer> & Serializable) () -> 4 * base)
-          .get() == 52);
+      Assert.assertEquals(52, (int) exec.submit((Callable<Integer> & Serializable) () -> 4 * base).get());
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -251,7 +250,7 @@ public class JPPETest {
 
   // Synchronous execution testing.
   @Test
-  public void test10() throws InterruptedException, ExecutionException {
+  public void test10() throws InterruptedException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 10);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new JavaProcessOptions() {
@@ -285,7 +284,6 @@ public class JPPETest {
         }, 2, 2, 0, null, false);
     try {
       int base = 13;
-      List<Future<Integer>> results = new ArrayList<>();
       List<Callable<Integer>> tasks = new ArrayList<>();
       tasks.add((Callable<Integer> & Serializable) () -> {
         Thread.sleep(2000);
@@ -296,13 +294,13 @@ public class JPPETest {
         return (int) Math.pow(base, 3);
       });
       long start = System.currentTimeMillis();
-      results = exec.invokeAll(tasks);
+      List<Future<Integer>> results = exec.invokeAll(tasks);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 4300 && time > 3995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
-      Assert.assertTrue(results.get(0).get() == 169);
-      Assert.assertTrue(results.get(1).get() == 2197);
+      Assert.assertEquals(169, (int) results.get(0).get());
+      Assert.assertEquals(2197, (int) results.get(1).get());
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -318,7 +316,6 @@ public class JPPETest {
         }, 1, 1, 0, null, false);
     try {
       int base = 13;
-      List<Future<Integer>> results = new ArrayList<>();
       List<Callable<Integer>> tasks = new ArrayList<>();
       tasks.add((Callable<Integer> & Serializable) () -> {
         Thread.sleep(2000);
@@ -329,13 +326,13 @@ public class JPPETest {
         return (int) Math.pow(base, 3);
       });
       long start = System.currentTimeMillis();
-      results = exec.invokeAll(tasks);
+      List<Future<Integer>> results = exec.invokeAll(tasks);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 6300 && time > 5995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
-      Assert.assertTrue(results.get(0).get() == 169);
-      Assert.assertTrue(results.get(1).get() == 2197);
+      Assert.assertEquals(169, (int) results.get(0).get());
+      Assert.assertEquals(2197, (int) results.get(1).get());
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -351,7 +348,6 @@ public class JPPETest {
         }, 2, 2, 0, null, false);
     try {
       int base = 13;
-      List<Future<Integer>> results = new ArrayList<>();
       List<Callable<Integer>> tasks = new ArrayList<>();
       tasks.add((Callable<Integer> & Serializable) () -> {
         Thread.sleep(2000);
@@ -362,12 +358,12 @@ public class JPPETest {
         return (int) Math.pow(base, 3);
       });
       long start = System.currentTimeMillis();
-      results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
+      List<Future<Integer>> results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 3300 && time > 2995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
-      Assert.assertTrue(results.get(0).get() == 169);
+      Assert.assertEquals(169, (int) results.get(0).get());
       exceptionRule.expect(CancellationException.class);
       results.get(1).get();
     } finally {
@@ -385,7 +381,6 @@ public class JPPETest {
         }, 1, 1, 0, null, false);
     try {
       int base = 13;
-      List<Future<Integer>> results = new ArrayList<>();
       List<Callable<Integer>> tasks = new ArrayList<>();
       tasks.add((Callable<Integer> & Serializable) () -> {
         Thread.sleep(2000);
@@ -396,12 +391,12 @@ public class JPPETest {
         return (int) Math.pow(base, 3);
       });
       long start = System.currentTimeMillis();
-      results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
+      List<Future<Integer>> results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 3300 && time > 2995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
-      Assert.assertTrue(results.get(0).get() == 169);
+      Assert.assertEquals(169, (int) results.get(0).get());
       exceptionRule.expect(CancellationException.class);
       results.get(1).get();
     } finally {
@@ -467,7 +462,7 @@ public class JPPETest {
       boolean success = time < 2300 && time > 1995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
-      Assert.assertTrue(result == 169);
+      Assert.assertEquals(169, result);
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -498,7 +493,7 @@ public class JPPETest {
       boolean success = time < 3300 && time > 2995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
-      Assert.assertTrue(result == 169);
+      Assert.assertEquals(169, result);
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -533,7 +528,7 @@ public class JPPETest {
 
   // Test of shutdownNow.
   @Test
-  public void test19() throws InterruptedException, ExecutionException {
+  public void test19() throws InterruptedException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 19);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new JavaProcessOptions() {
@@ -601,7 +596,7 @@ public class JPPETest {
       boolean success = time < 2300 && time > 1995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
-      Assert.assertTrue(res.get() == 13);
+      Assert.assertEquals(13, res.get());
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -669,13 +664,13 @@ public class JPPETest {
 
   // Java process options testing.
   @Test
-  public void test23() throws InterruptedException, ExecutionException {
+  public void test23() throws InterruptedException {
     System.out.println(System.lineSeparator() + "Test 23");
     SimpleJavaProcessOptions options = new SimpleJavaProcessOptions(0);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(options,
         5, 5, 0, null, false);
     try {
-      Assert.assertTrue(exec.getJavaProcessOptions() == options);
+      Assert.assertEquals(options, exec.getJavaProcessOptions());
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -685,7 +680,7 @@ public class JPPETest {
   // Java process testing.
   @SuppressWarnings("unchecked")
   @Test
-  public void test24() throws IOException, InterruptedException, ClassNotFoundException {
+  public void test24() throws IOException, ClassNotFoundException {
     System.out.println(System.lineSeparator() + "Test 24");
     PrintStream origOutStream = System.out;
     String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n", "", Conversion.toString("test"),
@@ -699,16 +694,15 @@ public class JPPETest {
       System.setIn(in);
       JavaProcess.main(new String[0]);
       String[] lines = out.toString().split(System.lineSeparator());
-      Assert.assertTrue(lines.length == 5);
-      Assert.assertTrue(JavaProcess.STARTUP_SIGNAL.equals(lines[0]));
+      Assert.assertEquals(5, lines.length);
+      Assert.assertEquals(JavaProcess.STARTUP_SIGNAL, lines[0]);
       Assert.assertTrue(lines[1].startsWith(JavaProcess.RESULT_PREFIX));
-      Assert.assertTrue((3 == (Long) Conversion.toObject(lines[1]
-          .substring(JavaProcess.RESULT_PREFIX.length()))));
+      Assert.assertEquals(3, (long) Conversion.toObject(lines[1].substring(JavaProcess.RESULT_PREFIX.length())));
       Assert.assertTrue(lines[2].startsWith(JavaProcess.ERROR_PREFIX));
-      Assert.assertTrue("test".equals(((Exception) Conversion.toObject(lines[2]
-          .substring(JavaProcess.ERROR_PREFIX.length()))).getMessage()));
+      Assert.assertEquals("test",
+          ((Exception) Conversion.toObject(lines[2].substring(JavaProcess.ERROR_PREFIX.length()))).getMessage());
       Assert.assertTrue(lines[3].startsWith(JavaProcess.ERROR_PREFIX));
-      Assert.assertTrue(JavaProcess.STOP_SIGNAL.equals(lines[4]));
+      Assert.assertEquals(JavaProcess.STOP_SIGNAL, lines[4]);
     } finally {
       System.setOut(origOutStream);
     }
@@ -716,7 +710,7 @@ public class JPPETest {
 
   // Not serializable task testing.
   @Test
-  public void test25() throws InterruptedException, ExecutionException {
+  public void test25() throws InterruptedException {
     System.out.println(System.lineSeparator() + "Test 25");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new JavaProcessOptions() {
@@ -731,14 +725,14 @@ public class JPPETest {
   }
 
   @Test
-  public void test26() throws InterruptedException, ExecutionException {
+  public void test26() throws InterruptedException {
     System.out.println(System.lineSeparator() + "Test 26");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new JavaProcessOptions() {
         }, 0, 1, 0, null, false);
     try {
       exceptionRule.expect(IllegalArgumentException.class);
-      exec.submit(() -> System.gc());
+      exec.submit(System::gc);
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -746,7 +740,7 @@ public class JPPETest {
   }
 
   @Test
-  public void test27() throws InterruptedException, ExecutionException {
+  public void test27() throws InterruptedException {
     System.out.println(System.lineSeparator() + "Test 27");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new JavaProcessOptions() {
@@ -774,7 +768,7 @@ public class JPPETest {
     }, false);
     try {
       AtomicInteger n = new AtomicInteger(0);
-      Assert.assertTrue(exec.submit((Runnable & Serializable) () -> n.set(1), n).get().get() == 1);
+      Assert.assertEquals(1, exec.submit((Runnable & Serializable) () -> n.set(1), n).get().get());
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);

@@ -48,8 +48,7 @@ public class PPEVsJPPETest {
   private long testJNI(int minSize, int maxSize, int reserveSize, int submissions, int taskTime,
       boolean reuse) throws Exception {
     JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512, 0),
-        minSize, maxSize, reserveSize, reuse ? (Runnable & Serializable) () -> new WrapperJNI() :
-        null, false);
+        minSize, maxSize, reserveSize, reuse ? (Runnable & Serializable) WrapperJNI::new : null, false);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> (new WrapperJNI()).doStuff(taskTime);
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
@@ -85,8 +84,7 @@ public class PPEVsJPPETest {
   private long testJNA(int minSize, int maxSize, int reserveSize, int submissions, int taskTime,
       boolean reuse) throws Exception {
     JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512, 0),
-        minSize, maxSize, reserveSize, reuse ? (Runnable & Serializable) () -> WrapperJNA.INSTANCE.hashCode() :
-        null, false);
+        minSize, maxSize, reserveSize, reuse ? (Runnable & Serializable) WrapperJNA.INSTANCE::hashCode : null, false);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> WrapperJNA.INSTANCE.doStuff(taskTime);
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
@@ -119,8 +117,8 @@ public class PPEVsJPPETest {
    * @param jna Whether the Java process pool should use JNA or JNI to invoke the native method.
    * @throws Exception If something goes wrong.
    */
-  private void test(int minSize, int maxSize, int reserveSize, int submissions, int taskTime,
-      boolean reuse, boolean jna) throws Exception {
+  private void test(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse, boolean jna)
+      throws Exception {
     long start, time, javaTime;
     List<Future<?>> futures = new ArrayList<>();
     ProcessPoolExecutor nativePool = new ProcessPoolExecutor(TestUtils.createTestProcessManagerFactory(),

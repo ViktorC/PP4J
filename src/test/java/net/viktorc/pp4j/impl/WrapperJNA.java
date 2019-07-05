@@ -26,8 +26,7 @@ import com.sun.jna.Native;
 public interface WrapperJNA extends Library {
 
   // Load the library.
-  WrapperJNA INSTANCE = (WrapperJNA) Native.loadLibrary(TestUtils.getLibrary()
-      .getAbsolutePath(), WrapperJNA.class);
+  WrapperJNA INSTANCE = Native.loadLibrary(TestUtils.getLibrary().getAbsolutePath(), WrapperJNA.class);
 
   void doStuff(int seconds);
 
