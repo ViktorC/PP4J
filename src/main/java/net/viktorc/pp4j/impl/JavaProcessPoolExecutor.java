@@ -421,8 +421,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
    * @author Viktor Csomor
    */
-  private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable>
-      implements Submission<T> {
+  private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable> implements Submission<T> {
 
     final S task;
     final String command;
