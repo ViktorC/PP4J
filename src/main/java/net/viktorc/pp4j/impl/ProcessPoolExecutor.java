@@ -80,8 +80,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   private final ExecutorService auxThreadPool;
   private final Queue<InternalProcessExecutor> activeProcExecutors;
   private final BlockingDeque<InternalSubmission<?>> submissionQueue;
-  private final CountDownLatch prestartLatch;
-  private final CountDownLatch poolTermLatch;
+  private final CountDownLatch preStartLatch;
+  private final CountDownLatch poolTerminationLatch;
   private final Lock shutdownLock;
   private final Lock poolLock;
   private final Logger logger;
@@ -136,8 +136,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         new CustomizedThreadFactory(this + "-auxThreadPool"));
     submissionQueue = new LinkedBlockingDeque<>();
     activeProcExecutors = new LinkedBlockingQueue<>();
-    prestartLatch = new CountDownLatch(actualMinSize);
-    poolTermLatch = new CountDownLatch(1);
+    preStartLatch = new CountDownLatch(actualMinSize);
+    poolTerminationLatch = new CountDownLatch(1);
     shutdownLock = new ReentrantLock();
     poolLock = new ReentrantLock(true);
     logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
@@ -150,7 +150,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       }
     }
     // Wait for the processes in the initial pool to start up.
-    prestartLatch.await();
+    preStartLatch.await();
     logger.info("Pool started up.");
   }
 
@@ -272,8 +272,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     try {
       poolLock.lock();
       try {
-        while (prestartLatch.getCount() != 0) {
-          prestartLatch.countDown();
+        while (preStartLatch.getCount() != 0) {
+          preStartLatch.countDown();
         }
         logger.debug("Shutting down process executors...");
         for (InternalProcessExecutor executor : activeProcExecutors) {
@@ -299,7 +299,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         Thread.currentThread().interrupt();
       }
       logger.info("Process pool shut down.");
-      poolTermLatch.countDown();
+      poolTerminationLatch.countDown();
     } finally {
       shutdownLock.unlock();
     }
@@ -376,7 +376,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         queuedSubmissions.add(s.origSubmission);
       }
     }
-    if (poolTermLatch.getCount() != 0 && shutdownLock.tryLock()) {
+    if (poolTerminationLatch.getCount() != 0 && shutdownLock.tryLock()) {
       try {
         (new Thread(this::syncForceShutdown)).start();
       } finally {
@@ -393,12 +393,12 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
 
   @Override
   public boolean isTerminated() {
-    return poolTermLatch.getCount() == 0;
+    return poolTerminationLatch.getCount() == 0;
   }
 
   @Override
   public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-    return poolTermLatch.await(timeout, unit);
+    return poolTerminationLatch.await(timeout, unit);
   }
 
   @Override
@@ -730,7 +730,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         threadsToWaitFor.incrementAndGet();
         threadPool.submit(this::startHandlingSubmissions);
       }
-      prestartLatch.countDown();
+      preStartLatch.countDown();
     }
 
     @Override
