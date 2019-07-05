@@ -266,6 +266,7 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
           }
           submission.onStartedProcessing();
           for (Command command : submission.getCommands()) {
+            this.command = command;
             commandCompleted = !command.generatesOutput();
             stdInWriter.write(command.getInstruction());
             stdInWriter.newLine();
