@@ -37,8 +37,9 @@ public class ProcessExecutors {
   /**
    * Returns a pool of processes. The initial size of the pool is the greater of the minimum pool size and the reserve size. This method
    * blocks until the initial number of processes started up. The size of the pool is dynamically adjusted based on the pool parameters and
-   * the rate of incoming submissions. It is a convenience method for the constructor {@link net.viktorc.pp4j.impl.ProcessPoolExecutor#ProcessPoolExecutor(ProcessManagerFactory,
-   * int, int, int, boolean)} with <code>verbose</code> set to <code>false</code>.
+   * the rate of incoming submissions. It is a convenience method for the constructor
+   * {@link net.viktorc.pp4j.impl.ProcessPoolExecutor#ProcessPoolExecutor(ProcessManagerFactory, int, int, int, boolean)} with
+   * <code>verbose</code> set to <code>false</code>.
    *
    * @param managerFactory A {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance that is used to build {@link
    * net.viktorc.pp4j.api.ProcessManager} instances that manage the processes' life cycle in the pool.
@@ -102,28 +103,32 @@ public class ProcessExecutors {
    * Returns a custom process pool using Java processes. The initial size of the pool is the greater of the minimum pool size and the
    * reserve size. This method blocks until the initial number of processes started up. The size of the pool is dynamically adjusted based
    * on the pool parameters and the rate of incoming submissions. It is a convenience method for the constructor {@link
-   * net.viktorc.pp4j.impl.JavaProcessPoolExecutor#JavaProcessPoolExecutor(JavaProcessOptions, int, int, int, Runnable, boolean)} with
-   * <code>startupTask</code> set to <code>null</code> and <code>verbose</code> set to <code>false</code>.
+   * net.viktorc.pp4j.impl.JavaProcessPoolExecutor#JavaProcessPoolExecutor(JavaProcessOptions, int, int, int, long, Runnable, boolean)}
+   * with <code>startupTask</code> set to <code>null</code> and <code>verbose</code> set to <code>false</code>.
    *
    * @param options The options for the "java" program used to create the new JVM.
    * @param minPoolSize The minimum size of the process pool.
    * @param maxPoolSize The maximum size of the process pool.
    * @param reserveSize The number of available processes to keep in the pool.
+   * @param keepAliveTime The duration of continuous idleness, in milliseconds, after which the processes are to be terminated. A process
+   * is considered idle if it is started up and not processing any submission. If the value of this parameter is less than or equal to
+   * <code>0</code>, the life spans of the processes will not be limited.
    * @return A custom pool of Java processes.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the maximum pool size is
    * less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
    */
   public static JavaProcessExecutorService newCustomJavaProcessPool(JavaProcessOptions options, int minPoolSize, int maxPoolSize,
-      int reserveSize) throws InterruptedException {
-    return new JavaProcessPoolExecutor(options, minPoolSize, maxPoolSize, reserveSize, null, false);
+      int reserveSize, long keepAliveTime) throws InterruptedException {
+    return new JavaProcessPoolExecutor(options, minPoolSize, maxPoolSize, reserveSize, keepAliveTime, null, false);
   }
 
   /**
    * Returns a custom process pool using Java processes. The initial size of the pool is the greater of the minimum pool size and the
    * reserve size. This method blocks until the initial number of processes started up. The size of the pool is dynamically adjusted based
    * on the pool parameters and the rate of incoming submissions. It is a convenience method for {@link
-   * #newCustomJavaProcessPool(JavaProcessOptions, int, int, int)} with <code>options</code> set to <code>null</code>.
+   * #newCustomJavaProcessPool(JavaProcessOptions, int, int, int, long)} with <code>options</code> set to
+   * {@link net.viktorc.pp4j.api.JavaProcessOptions#DEFAULT} and <code>keepAliveTime</code> set to <code>0</code>.
    *
    * @param minPoolSize The minimum size of the process pool.
    * @param maxPoolSize The maximum size of the process pool.
@@ -135,92 +140,98 @@ public class ProcessExecutors {
    */
   public static JavaProcessExecutorService newCustomJavaProcessPool(int minPoolSize, int maxPoolSize, int reserveSize)
       throws InterruptedException {
-    return newCustomJavaProcessPool(new JavaProcessOptions() {
-    }, minPoolSize, maxPoolSize, reserveSize);
+    return newCustomJavaProcessPool(JavaProcessOptions.DEFAULT, minPoolSize, maxPoolSize, reserveSize, 0);
   }
 
   /**
    * Returns a pool of a fixed number of Java processes. It is a convenience method for calling {@link
-   * #newCustomJavaProcessPool(JavaProcessOptions, int, int, int)} with <code>minPoolSize</code> and
+   * #newCustomJavaProcessPool(JavaProcessOptions, int, int, int, long)} with <code>minPoolSize</code> and
    * <code>maxPoolSize</code> set to the value of <code>size</code> and <code>reserveSize</code> set to
    * <code>0</code>. The number of executors in the pool is always kept at the specified value.
    *
    * @param options The options for the "java" program used to create the new JVM.
    * @param size The number of processes to maintain in the pool.
+   * @param keepAliveTime The duration of continuous idleness, in milliseconds, after which the processes are to be terminated. A process
+   * is considered idle if it is started up and not processing any submission. If the value of this parameter is less than or equal to
+   * <code>0</code>, the life spans of the processes will not be limited.
    * @return A fixed-sized pool of Java processes.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    */
-  public static JavaProcessExecutorService newFixedJavaProcessPool(JavaProcessOptions options, int size)
+  public static JavaProcessExecutorService newFixedJavaProcessPool(JavaProcessOptions options, int size, long keepAliveTime)
       throws InterruptedException {
-    return newCustomJavaProcessPool(options, size, size, 0);
+    return newCustomJavaProcessPool(options, size, size, 0, keepAliveTime);
   }
 
   /**
    * Returns a pool of a fixed number of Java processes. It is a convenience method for calling {@link
-   * #newFixedJavaProcessPool(JavaProcessOptions, int)} with <code>options</code> set to
-   * <code>null</code>. The number of executors in the pool is always kept at the specified value.
+   * #newFixedJavaProcessPool(JavaProcessOptions, int, long)} with <code>options</code> set to
+   * {@link net.viktorc.pp4j.api.JavaProcessOptions#DEFAULT} and <code>keepAliveTime</code> set to <code>0</code>. The number of
+   * executors in the pool is always kept at the specified value.
    *
    * @param size The number of processes to maintain in the pool.
    * @return A fixed-sized pool of Java processes.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    */
   public static JavaProcessExecutorService newFixedJavaProcessPool(int size) throws InterruptedException {
-    return newFixedJavaProcessPool(new JavaProcessOptions() {
-    }, size);
+    return newFixedJavaProcessPool(JavaProcessOptions.DEFAULT, size, 0);
   }
 
   /**
    * Returns a pool of Java processes that grows in size as required.. It is a convenience method for calling {@link
-   * #newCustomJavaProcessPool(JavaProcessOptions, int, int, int)} with <code>minPoolSize
+   * #newCustomJavaProcessPool(JavaProcessOptions, int, int, int, long)} with <code>minPoolSize
    * </code> set to <code>0</code>, <code>maxPoolSize</code> set to <code>Integer.MAX_VALUE</code> and
    * <code>reserveSize</code> set to <code>0</code>.
    *
    * @param options The options for the "java" program used to create the new JVM.
+   * @param keepAliveTime The duration of continuous idleness, in milliseconds, after which the processes are to be terminated. A process
+   * is considered idle if it is started up and not processing any submission. If the value of this parameter is less than or equal to
+   * <code>0</code>, the life spans of the processes will not be limited.
    * @return A pool of Java processes that grows in size as required.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    */
-  public static JavaProcessExecutorService newCachedJavaProcessPool(JavaProcessOptions options)
+  public static JavaProcessExecutorService newCachedJavaProcessPool(JavaProcessOptions options, long keepAliveTime)
       throws InterruptedException {
-    return newCustomJavaProcessPool(options, 0, Integer.MAX_VALUE, 0);
+    return newCustomJavaProcessPool(options, 0, Integer.MAX_VALUE, 0, keepAliveTime);
   }
 
   /**
    * Returns a pool of Java processes that grows in size as required.. It is a convenience method for calling {@link
-   * #newCachedJavaProcessPool(JavaProcessOptions)} with <code>options</code> set to
-   * <code>null</code>.
+   * #newCachedJavaProcessPool(JavaProcessOptions, long)} with <code>options</code> set to
+   * {@link net.viktorc.pp4j.api.JavaProcessOptions#DEFAULT} and <code>keepAliveTime</code> set to <code>0</code>.
    *
    * @return A pool of Java processes that grows in size as required.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    */
-  public static JavaProcessExecutorService newCachedJavaProcessPool()
-      throws InterruptedException {
-    return newCachedJavaProcessPool(new JavaProcessOptions() {
-    });
+  public static JavaProcessExecutorService newCachedJavaProcessPool() throws InterruptedException {
+    return newCachedJavaProcessPool(JavaProcessOptions.DEFAULT, 0);
   }
 
   /**
    * Returns a fixed size pool holding a single Java process. It is a convenience method for calling the method {@link
-   * #newFixedJavaProcessPool(JavaProcessOptions, int)} with <code>size</code> set to <code>1</code>.
+   * #newFixedJavaProcessPool(JavaProcessOptions, int, long)} with <code>size</code> set to <code>1</code>.
    *
    * @param options The options for the "java" program used to create the new JVM.
+   * @param keepAliveTime The duration of continuous idleness, in milliseconds, after which the processes are to be terminated. A process
+   * is considered idle if it is started up and not processing any submission. If the value of this parameter is less than or equal to
+   * <code>0</code>, the life spans of the processes will not be limited.
    * @return A pool maintaining a single Java process executor.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    */
-  public static JavaProcessExecutorService newSingleJavaProcessPool(JavaProcessOptions options)
+  public static JavaProcessExecutorService newSingleJavaProcessPool(JavaProcessOptions options, long keepAliveTime)
       throws InterruptedException {
-    return newFixedJavaProcessPool(options, 1);
+    return newFixedJavaProcessPool(options, 1, keepAliveTime);
   }
 
   /**
    * Returns a fixed size pool holding a single Java process. It is a convenience method for calling the method {@link
-   * #newSingleJavaProcessPool(JavaProcessOptions)} with <code>options</code> set to <code>null</code>.
+   * #newSingleJavaProcessPool(JavaProcessOptions, long)} with <code>options</code> set to
+   * {@link net.viktorc.pp4j.api.JavaProcessOptions#DEFAULT} and <code>keepAliveTime</code> set to <code>0</code>.
    *
    * @return A pool maintaining a single Java process executor.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    */
   public static JavaProcessExecutorService newSingleJavaProcessPool() throws InterruptedException {
-    return newSingleJavaProcessPool(new JavaProcessOptions() {
-    });
+    return newSingleJavaProcessPool(JavaProcessOptions.DEFAULT, 0);
   }
 
 }

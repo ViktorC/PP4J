@@ -21,8 +21,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -357,10 +355,10 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
               process = manager.start();
             }
             lifeTime = System.currentTimeMillis();
-            Charset chars = manager.getEncoding();
-            stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream(), chars));
-            stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), chars));
-            stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), chars));
+            Charset charset = manager.getEncoding();
+            stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream(), charset));
+            stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), charset));
+            stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), charset));
             // Handle the startup; check if the process is to be considered immediately started up.
             startedUp = manager.startsUpInstantly();
             threadPool.submit(() -> startListeningToProcess(stdOutReader, true));

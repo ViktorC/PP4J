@@ -15,25 +15,16 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.Serializable;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystemNotFoundException;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -69,6 +60,9 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @param minPoolSize The minimum size of the process pool.
    * @param maxPoolSize The maximum size of the process pool.
    * @param reserveSize The number of available processes to keep in the pool.
+   * @param keepAliveTime The duration of continuous idleness, in milliseconds, after which the processes are to be terminated. A process
+   * is considered idle if it is started up and not processing any submission. If the value of this parameter is less than or equal to
+   * <code>0</code>, the life spans of the processes will not be limited.
    * @param startupTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
    * <code>null</code>, no taks are executed on startup.
    * @param verbose Whether the events related to the management of the process pool should be logged. Setting this parameter to
@@ -79,10 +73,9 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @throws IllegalArgumentException If <code>options</code> is <code>null</code>, the minimum pool size is less than 0, or the maximum
    * pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
    */
-  public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessOptions options, int minPoolSize,
-      int maxPoolSize, int reserveSize, T startupTask, boolean verbose) throws InterruptedException {
-    super(new JavaProcessManagerFactory<>(options, startupTask), minPoolSize, maxPoolSize,
-        reserveSize, verbose);
+  public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessOptions options, int minPoolSize, int maxPoolSize,
+      int reserveSize, long keepAliveTime, T startupTask, boolean verbose) throws InterruptedException {
+    super(new JavaProcessManagerFactory<>(options, startupTask, keepAliveTime), minPoolSize, maxPoolSize, reserveSize, verbose);
   }
 
   /**
@@ -127,8 +120,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   @Override
   public <T> Future<T> submit(Callable<T> task, boolean terminateProcessAfterwards) {
     try {
-      return new CastFuture<>(submitExplicitly(new SerializableCallable<>((Callable<T> & Serializable) task),
-          terminateProcessAfterwards));
+      return new CastFuture<>(submitExplicitly(new SerializableCallable<>((Callable<T> & Serializable) task), terminateProcessAfterwards));
     } catch (Exception e) {
       throw new IllegalArgumentException("The task is not serializable.", e);
     }
@@ -151,15 +143,14 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   @Override
   public Future<?> submit(Runnable task, boolean terminateProcessAfterwards) {
     try {
-      return submit((Runnable & Serializable) task, null, terminateProcessAfterwards);
+      return submit(task, null, terminateProcessAfterwards);
     } catch (Exception e) {
       throw new IllegalArgumentException("The task is not serializable.", e);
     }
   }
 
   @Override
-  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
-      throws InterruptedException {
+  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
     List<Future<T>> futures = new ArrayList<>();
     for (Callable<T> t : tasks) {
       futures.add(submit(t));
@@ -177,8 +168,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   @Override
-  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
-      long timeout, TimeUnit unit) throws InterruptedException {
+  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
     List<Future<T>> futures = new ArrayList<>();
     for (Callable<T> t : tasks) {
       futures.add(submit(t));
@@ -206,8 +196,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   @Override
-  public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-      throws InterruptedException, ExecutionException {
+  public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
     ExecutionException execException = null;
     for (Future<T> f : invokeAll(tasks)) {
       try {
@@ -269,6 +258,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
     JavaProcessOptions options;
     T startupTask;
+    long keepAliveTime;
 
     /**
      * Constructs an instance based on the specified JVM options and <code>keepAliveTime</code> which are used for the creation of all
@@ -277,63 +267,35 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
      * @param options The JVM options for starting the Java process.
      * @param startupTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
      * <code>null</code>, no taks are executed on startup.
+     * @param keepAliveTime The number of milliseconds after which idle processes are terminated.
      * @throws IllegalArgumentException If <code>options</code> is <code>null</code>.
      */
-    JavaProcessManagerFactory(JavaProcessOptions options, T startupTask) {
+    JavaProcessManagerFactory(JavaProcessOptions options, T startupTask, long keepAliveTime) {
       if (options == null) {
         throw new IllegalArgumentException("The options argument cannot be null.");
       }
-      this.startupTask = startupTask;
       this.options = options;
+      this.startupTask = startupTask;
+      this.keepAliveTime = keepAliveTime;
     }
 
     @Override
     public ProcessManager newProcessManager() {
-      String javaPath = System.getProperty("java.home") + File.separator + "bin" +
-          File.separator + "java";
-      String classPath = System.getProperty("java.class.path");
-      ClassLoader classLoader = this.getClass().getClassLoader();
-      if (classLoader instanceof URLClassLoader) {
-        @SuppressWarnings("resource")
-        URLClassLoader urlClassLoader = (URLClassLoader) classLoader;
-        Set<String> classPathEntries = new HashSet<>(Arrays.asList(classPath.split(File.pathSeparator)));
-        for (URL url : urlClassLoader.getURLs()) {
-          try {
-            classPathEntries.add(Paths.get(url.toURI()).toAbsolutePath().toString());
-          } catch (FileSystemNotFoundException | URISyntaxException e) {
-            // Ignore it.
-          }
-        }
-        classPath = String.join(File.pathSeparator, classPathEntries);
-      }
-      String className = JavaProcess.class.getCanonicalName();
+      String javaCommand = options.getJavaLauncherCommand();
       List<String> javaOptions = new ArrayList<>();
-      JVMArch arch = options.getArch();
-      JVMType type = options.getType();
-      Integer initHeap = options.getInitHeapSizeMb();
-      Integer maxHeap = options.getMaxHeapSizeMb();
-      Integer stack = options.getStackSizeKb();
-      long keepAliveTime = options.getKeepAliveTime();
-      if (arch != null) {
-        javaOptions.add(arch.equals(JVMArch.BIT_32) ? "-d32" : "-d64");
-      }
-      if (type != null) {
-        javaOptions.add(type.equals(JVMType.CLIENT) ? "-client" : "-server");
-      }
-      if (initHeap > 0) {
-        javaOptions.add(String.format("-Xms%dm", initHeap));
-      }
-      if (maxHeap > 0) {
-        javaOptions.add(String.format("-Xmx%dm", maxHeap));
-      }
-      if (stack > 0) {
-        javaOptions.add(String.format("-Xss%dk", stack));
-      }
+      options.getClassPath().ifPresent(v -> {
+        javaOptions.add("-cp");
+        javaOptions.add(v);
+      });
+      options.getArch().ifPresent(v -> javaOptions.add(v == JVMArch.BIT_32 ? "-d32" : "-d64"));
+      options.getType().ifPresent(v -> javaOptions.add(v == JVMType.CLIENT ? "-client" : "-server"));
+      options.getInitHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xms%dm", v)));
+      options.getMaxHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xmx%dm", v)));
+      options.getStackSizeKb().ifPresent(v -> javaOptions.add(String.format("-Xss%dk", v)));
+      String className = JavaProcess.class.getCanonicalName();
       List<String> args = new ArrayList<>();
-      args.add(javaPath);
+      args.add(javaCommand);
       args.addAll(javaOptions);
-      args.add("-cp");
-      args.add(classPath);
       args.add(className);
       ProcessBuilder builder = new ProcessBuilder(args);
       // Redirect the error stream to reduce the number of used threads per process.
@@ -447,11 +409,9 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       return Collections.singletonList(new SimpleCommand(command, (c, l) -> {
         try {
           if (l.startsWith(JavaProcess.ERROR_PREFIX)) {
-            error = (Throwable) Conversion.toObject(l.substring(
-                JavaProcess.ERROR_PREFIX.length()));
+            error = (Throwable) Conversion.toObject(l.substring(JavaProcess.ERROR_PREFIX.length()));
           } else if (l.startsWith(JavaProcess.RESULT_PREFIX)) {
-            result = (T) Conversion.toObject(l.substring(
-                JavaProcess.RESULT_PREFIX.length()));
+            result = (T) Conversion.toObject(l.substring(JavaProcess.RESULT_PREFIX.length()));
           } else {
             return false;
           }
