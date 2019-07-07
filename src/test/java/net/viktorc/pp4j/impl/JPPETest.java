@@ -32,6 +32,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import net.viktorc.pp4j.api.JavaProcessOptions;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
+import net.viktorc.pp4j.impl.JavaProcess.Request;
+import net.viktorc.pp4j.impl.JavaProcess.Response;
+import net.viktorc.pp4j.impl.JavaProcess.Signal;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -651,11 +654,15 @@ public class JPPETest {
   public void test24() throws IOException, ClassNotFoundException {
     System.out.println(System.lineSeparator() + "Test 24");
     PrintStream origOutStream = System.out;
-    String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n", "", Conversion.toString("test"),
+    String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n",
+        "",
+        Conversion.toString("test"),
         Conversion.toString((Callable<Long> & Serializable) () -> Math.round(Math.E)),
         Conversion.toString((Callable<Object> & Serializable) () -> {
           throw new Exception("test");
-        }), "test", JavaProcess.STOP_REQUEST);
+        }),
+        "test",
+        Conversion.toString(Request.TERMINATE));
     try (ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayInputStream in = new ByteArrayInputStream(testInput.getBytes())) {
       System.setOut(new PrintStream(out));
@@ -663,14 +670,16 @@ public class JPPETest {
       JavaProcess.main(new String[0]);
       String[] lines = out.toString().split(System.lineSeparator());
       Assert.assertEquals(5, lines.length);
-      Assert.assertEquals(JavaProcess.STARTUP_SIGNAL, lines[0]);
-      Assert.assertTrue(lines[1].startsWith(JavaProcess.RESULT_PREFIX));
-      Assert.assertEquals(3, (long) Conversion.toObject(lines[1].substring(JavaProcess.RESULT_PREFIX.length())));
-      Assert.assertTrue(lines[2].startsWith(JavaProcess.ERROR_PREFIX));
-      Assert.assertEquals("test",
-          ((Exception) Conversion.toObject(lines[2].substring(JavaProcess.ERROR_PREFIX.length()))).getMessage());
-      Assert.assertTrue(lines[3].startsWith(JavaProcess.ERROR_PREFIX));
-      Assert.assertEquals(JavaProcess.STOP_SIGNAL, lines[4]);
+      Assert.assertEquals(Signal.READY, Conversion.toObject(lines[0]));
+      Response response1 = (Response) Conversion.toObject(lines[1]);
+      Assert.assertFalse(response1.isError());
+      Assert.assertEquals(3L, response1.getResult());
+      Response response2 = (Response) Conversion.toObject(lines[2]);
+      Assert.assertTrue(response2.isError());
+      Assert.assertEquals("test", ((Throwable) response2.getResult()).getMessage());
+      Response response3 = (Response) Conversion.toObject(lines[3]);
+      Assert.assertTrue(response3.isError());
+      Assert.assertEquals(Signal.TERMINATED, Conversion.toObject(lines[4]));
     } finally {
       System.setOut(origOutStream);
     }

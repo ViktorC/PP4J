@@ -40,9 +40,9 @@ public class SimpleJavaProcessOptions implements JavaProcessOptions {
    *
    * @param arch The architecture of the JVM. If it is null, it will be ignored.
    * @param type The type of the JVM. If it is null, it will be ignored.
-   * @param initHeapSizeMb The initial heap size of the JVM in megabytes.
-   * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes.
-   * @param stackSizeKb The maximum stack size of the JVM in kilobytes.
+   * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is null, it will be ignored.
+   * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is null, it will be ignored.
+   * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is null, it will be ignored.
    * @param additionalClassPaths Any additional class paths to be used by the JVM.
    */
   public SimpleJavaProcessOptions(JVMArch arch, JVMType type, Integer initHeapSizeMb, Integer maxHeapSizeMb, Integer stackSizeKb,
@@ -58,9 +58,9 @@ public class SimpleJavaProcessOptions implements JavaProcessOptions {
   /**
    * Constructs an instance according to the specified parameters.
    *
-   * @param initHeapSizeMb The initial heap size of the JVM in megabytes.
-   * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes.
-   * @param stackSizeKb The maximum stack size of the JVM in kilobytes.
+   * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is null, it will be ignored.
+   * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is null, it will be ignored.
+   * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is null, it will be ignored.
    */
   public SimpleJavaProcessOptions(Integer initHeapSizeMb, Integer maxHeapSizeMb, Integer stackSizeKb) {
     this(null, null, initHeapSizeMb, maxHeapSizeMb, stackSizeKb);

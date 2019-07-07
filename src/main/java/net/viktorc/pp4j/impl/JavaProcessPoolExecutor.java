@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.Serializable;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,6 +41,9 @@ import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
+import net.viktorc.pp4j.impl.JavaProcess.Request;
+import net.viktorc.pp4j.impl.JavaProcess.Response;
+import net.viktorc.pp4j.impl.JavaProcess.Signal;
 
 /**
  * A sub-class of {@link net.viktorc.pp4j.impl.ProcessPoolExecutor} that implements the {@link net.viktorc.pp4j.api.JavaProcessExecutorService}
@@ -336,7 +338,15 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
     @Override
     public boolean isStartedUp(String outputLine, boolean standard) {
-      return standard && JavaProcess.STARTUP_SIGNAL.equals(outputLine);
+      if (standard) {
+        try {
+          Object output = Conversion.toObject(outputLine);
+          return output == Signal.READY;
+        } catch (IOException | ClassNotFoundException e) {
+          // Ignore.
+        }
+      }
+      return false;
     }
 
     @SuppressWarnings("unchecked")
@@ -358,17 +368,27 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     @Override
     public boolean terminateGracefully(ProcessExecutor executor) {
       AtomicBoolean success = new AtomicBoolean(false);
-      executor.execute(new SimpleSubmission(new SimpleCommand(JavaProcess.STOP_REQUEST,
-          (c, l) -> {
-            success.set(JavaProcess.STOP_SIGNAL.equals(l));
-            return true;
-          }, (c, l) -> true)));
-      return success.get();
+      try {
+        String terminationCommand = Conversion.toString(Request.TERMINATE);
+        executor.execute(new SimpleSubmission(new SimpleCommand(terminationCommand,
+            (command, outputLine) -> {
+              try {
+                Object output = Conversion.toObject(outputLine);
+                success.set(output == Signal.TERMINATED);
+              } catch (IOException | ClassNotFoundException e) {
+                // Ignore.
+              }
+              return true;
+            }, (c, l) -> true)));
+        return success.get();
+      } catch (IOException e) {
+        return false;
+      }
     }
 
     @Override
     public Charset getEncoding() {
-      return StandardCharsets.UTF_8;
+      return JavaProcess.CHARSET;
     }
 
   }
@@ -406,20 +426,23 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     @SuppressWarnings("unchecked")
     @Override
     public List<Command> getCommands() {
-      return Collections.singletonList(new SimpleCommand(command, (c, l) -> {
+      return Collections.singletonList(new SimpleCommand(command, (command, outputLine) -> {
         try {
-          if (l.startsWith(JavaProcess.ERROR_PREFIX)) {
-            error = (Throwable) Conversion.toObject(l.substring(JavaProcess.ERROR_PREFIX.length()));
-          } else if (l.startsWith(JavaProcess.RESULT_PREFIX)) {
-            result = (T) Conversion.toObject(l.substring(JavaProcess.RESULT_PREFIX.length()));
-          } else {
-            return false;
+          Object output = Conversion.toObject(outputLine);
+          if (output instanceof Response) {
+            Response response = (Response) output;
+            if (response.isError()) {
+              error = (Throwable) response.getResult();
+            } else {
+              result = (T) response.getResult();
+            }
+            return true;
           }
-          return true;
+          return false;
         } catch (Exception e) {
           throw new ProcessException(e);
         }
-      }, (c, l) -> {
+      }, (command, outputLine) -> {
         // It cannot happen, as stderr is redirected.
         return true;
       }));
