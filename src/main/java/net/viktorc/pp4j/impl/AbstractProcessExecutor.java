@@ -447,21 +447,21 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
           try {
             stdOutReader.close();
           } catch (IOException e) {
-            // Ignore it.
+            logger.warn(e.getMessage(), e);
           }
         }
         if (stdErrReader != null) {
           try {
             stdErrReader.close();
           } catch (IOException e) {
-            // Ignore it.
+            logger.warn(e.getMessage(), e);
           }
         }
         if (stdInWriter != null) {
           try {
             stdInWriter.close();
           } catch (IOException e) {
-            // Ignore it.
+            logger.warn(e.getMessage(), e);
           }
         }
         // The process life cycle is over.
@@ -556,6 +556,7 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
         }
       } catch (InterruptedException e) {
         // Just let the thread terminate.
+        logger.warn(e.getMessage(), e);
       } catch (Exception e) {
         throw new ProcessException(e);
       } finally {

@@ -84,7 +84,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   private final CountDownLatch poolTerminationLatch;
   private final Lock shutdownLock;
   private final Lock poolLock;
-  private final Logger logger;
+  protected final Logger logger;
   private volatile int numOfSubmissions;
   private volatile boolean shutdown;
 

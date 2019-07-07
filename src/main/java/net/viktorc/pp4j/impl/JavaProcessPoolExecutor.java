@@ -163,7 +163,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           f.get();
         }
       } catch (ExecutionException | CancellationException e) {
-        // Ignore it.
+        logger.warn(e.getMessage(), e);
       }
     }
     return futures;
@@ -184,7 +184,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           f.get(waitTimeNs, TimeUnit.NANOSECONDS);
         }
       } catch (ExecutionException | CancellationException e) {
-        // Ignore it.
+        logger.warn(e.getMessage(), e);
       } catch (TimeoutException e) {
         for (int j = i; j < futures.size(); j++) {
           futures.get(j).cancel(true);
@@ -206,7 +206,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       } catch (ExecutionException e) {
         execException = e;
       } catch (CancellationException e) {
-        // Ignore it.
+        logger.warn(e.getMessage(), e);
       }
     }
     if (execException == null) {
@@ -225,7 +225,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       } catch (ExecutionException e) {
         execException = e;
       } catch (CancellationException e) {
-        // Ignore it.
+        logger.warn(e.getMessage(), e);
       }
     }
     if (execException == null) {
@@ -343,7 +343,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           Object output = Conversion.toObject(outputLine);
           return output == Signal.READY;
         } catch (IOException | ClassNotFoundException e) {
-          // Ignore.
+          throw new ProcessException(e);
         }
       }
       return false;
@@ -355,13 +355,15 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       try {
         // If there is a startup task, execute it.
         if (startupTask != null) {
+          // Avoid having to have the process manager serialized.
+          T startupTask = this.startupTask;
           executor.execute(new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
             startupTask.run();
             return null;
           }));
         }
       } catch (Exception e) {
-        // Ignore it.
+        throw new ProcessException(e);
       }
     }
 
@@ -376,7 +378,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
                 Object output = Conversion.toObject(outputLine);
                 success.set(output == Signal.TERMINATED);
               } catch (IOException | ClassNotFoundException e) {
-                // Ignore.
+                throw new ProcessException(e);
               }
               return true;
             }, (c, l) -> true)));
