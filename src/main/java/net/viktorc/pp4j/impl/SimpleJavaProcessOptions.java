@@ -17,8 +17,10 @@ package net.viktorc.pp4j.impl;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import net.viktorc.pp4j.api.JavaProcessOptions;
 
 /**
@@ -43,7 +45,7 @@ public class SimpleJavaProcessOptions implements JavaProcessOptions {
    * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is null, it will be ignored.
    * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is null, it will be ignored.
    * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is null, it will be ignored.
-   * @param additionalClassPaths Any additional class paths to be used by the JVM.
+   * @param additionalClassPaths Any additional class paths to be used by the JVM. Null entries and empty strings will be ignored.
    */
   public SimpleJavaProcessOptions(JVMArch arch, JVMType type, Integer initHeapSizeMb, Integer maxHeapSizeMb, Integer stackSizeKb,
       String... additionalClassPaths) {
@@ -52,7 +54,10 @@ public class SimpleJavaProcessOptions implements JavaProcessOptions {
     this.initHeapSizeMb = initHeapSizeMb;
     this.maxHeapSizeMb = maxHeapSizeMb;
     this.stackSizeKb = stackSizeKb;
-    additionalClassPath = additionalClassPaths.length > 0 ? String.join(File.pathSeparator, additionalClassPaths) : null;
+    List<String> additionalClassPathList = Arrays.stream(additionalClassPaths)
+        .filter(s -> s != null && !s.isEmpty())
+        .collect(Collectors.toList());
+    additionalClassPath = additionalClassPathList.isEmpty() ? null : String.join(File.pathSeparator, additionalClassPathList);
   }
 
   /**

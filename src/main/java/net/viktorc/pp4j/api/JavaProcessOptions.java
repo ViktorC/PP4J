@@ -56,6 +56,9 @@ public interface JavaProcessOptions {
    */
   default Optional<String> getClassPath() {
     String classPath = System.getProperty("java.class.path");
+    if (classPath == null) {
+      classPath = "";
+    }
     ClassLoader classLoader = this.getClass().getClassLoader();
     if (classLoader instanceof URLClassLoader) {
       @SuppressWarnings("resource")
@@ -68,9 +71,10 @@ public interface JavaProcessOptions {
           // Ignore it.
         }
       }
+      classPathEntries.removeIf(String::isEmpty);
       classPath = String.join(File.pathSeparator, classPathEntries);
     }
-    return Optional.ofNullable(classPath);
+    return Optional.ofNullable(classPath.isEmpty() ? null : classPath);
   }
 
   /**

@@ -271,11 +271,23 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
      * @param startupTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
      * <code>null</code>, no taks are executed on startup.
      * @param keepAliveTime The number of milliseconds after which idle processes are terminated.
-     * @throws IllegalArgumentException If <code>options</code> is <code>null</code>.
+     * @throws IllegalArgumentException If the <code>options</code> is <code>null</code> or contains invalid values.
      */
     JavaProcessManagerFactory(JavaProcessOptions options, T startupTask, long keepAliveTime) {
       if (options == null) {
         throw new IllegalArgumentException("The options argument cannot be null.");
+      }
+      if (options.getInitHeapSizeMb().isPresent() && options.getInitHeapSizeMb().get() <= 0) {
+        throw new IllegalArgumentException("Initial heap size must be greater than 0");
+      }
+      if (options.getMaxHeapSizeMb().isPresent() && options.getMaxHeapSizeMb().get() <= 0) {
+        throw new IllegalArgumentException("Maximum heap size must be greater than 0");
+      }
+      if (options.getStackSizeKb().isPresent() && options.getStackSizeKb().get() <= 0) {
+        throw new IllegalArgumentException("Stack size must be greater than 0");
+      }
+      if (options.getClassPath().isPresent() && options.getClassPath().get().isEmpty()) {
+        throw new IllegalArgumentException("Class path cannot be an empty string");
       }
       this.options = options;
       this.startupTask = startupTask;
