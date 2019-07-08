@@ -28,6 +28,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -94,11 +95,11 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * the pool and returns its return value. If the implementation contains non-serializable, non-transient fields, or the return type is not
    * serializable, the method fails.
    *
-   * @param task The runnablePart to execute.
-   * @param terminateProcessAfterwards Whether the process that executes the runnablePart should be terminated afterwards.
+   * @param task The task to execute.
+   * @param terminateProcessAfterwards Whether the process that executes the task should be terminated afterwards.
    * @param <T> The serializable return type variable of the <code>Callable</code>
    * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
-   * @return A {@link java.util.concurrent.Future} instance associated with the return value of the runnablePart.
+   * @return A {@link java.util.concurrent.Future} instance associated with the return value of the task.
    * @throws IOException If the serialization fails.
    * @throws NotSerializableException If some object to be serialized does not implement the {@link java.io.Serializable} interface.
    */
@@ -124,7 +125,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     try {
       return new CastFuture<>(submitExplicitly(new SerializableCallable<>((Callable<T> & Serializable) task), terminateProcessAfterwards));
     } catch (Exception e) {
-      throw new IllegalArgumentException("The task is not serializable.", e);
+      throw new RejectedExecutionException(e);
     }
   }
 
@@ -138,7 +139,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
             return result;
           }, task), terminateProcessAfterwards));
     } catch (Exception e) {
-      throw new IllegalArgumentException("The task is not serializable.", e);
+      throw new RejectedExecutionException(e);
     }
   }
 
@@ -147,7 +148,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     try {
       return submit(task, null, terminateProcessAfterwards);
     } catch (Exception e) {
-      throw new IllegalArgumentException("The task is not serializable.", e);
+      throw new RejectedExecutionException(e);
     }
   }
 
@@ -210,7 +211,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       }
     }
     if (execException == null) {
-      throw new ExecutionException(new Exception("No runnablePart completed successfully."));
+      throw new ExecutionException(new Exception("No task completed successfully."));
     }
     throw execException;
   }
@@ -416,8 +417,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
      * Creates a submission for the specified {@link java.util.concurrent.Callable}.
      *
      * @param task The task to execute.
-     * @throws IOException If the encoding of the serialized runnablePart fails.
-     * @throws NotSerializableException If some object to be serialized does not implement the {@link java.io.Serializable} interface.
+     * @throws IOException If the encoding of the serialized task fails.
      */
     JavaSubmission(S task) throws IOException {
       this.task = task;

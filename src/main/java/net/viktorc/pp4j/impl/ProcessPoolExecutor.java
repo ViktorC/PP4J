@@ -866,8 +866,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
 
             @Override
             public boolean offer(Runnable r) {
-              /* If there is at least one thread waiting on the queue, delegate the runnablePart immediately;
-               * else decline it and force the pool to create a new thread for running the runnablePart. */
+              /* If there is at least one thread waiting on the queue, delegate the task immediately;
+               * else decline it and force the pool to create a new thread for running the task. */
               return tryTransfer(r);
             }
           },
@@ -877,8 +877,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
               /* If there are no threads waiting on the queue (all of them are busy executing)
                * and the maximum pool size has been reached, when the queue declines the offer,
                * the pool will not create any more threads but call this handler instead. This
-               * handler 'forces' the declined runnablePart on the queue, ensuring that it is not
-               * rejected. */
+               * handler 'forces' the declined task on the queue, ensuring that it is not rejected. */
               executor.getQueue().put(r);
             } catch (InterruptedException e) {
               // Should not happen.
