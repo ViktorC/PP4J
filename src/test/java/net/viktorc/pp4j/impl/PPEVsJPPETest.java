@@ -82,7 +82,7 @@ public class PPEVsJPPETest {
    */
   private long testJNA(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
     JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512),
-        minSize, maxSize, reserveSize, 0, reuse ? (Runnable & Serializable) WrapperJNA.INSTANCE::hashCode : null, false);
+        minSize, maxSize, reserveSize, 0, reuse ? (Runnable & Serializable) WrapperJNA::getInstance : null, false);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> WrapperJNA.INSTANCE.doStuff(taskTime);
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
@@ -104,6 +104,18 @@ public class PPEVsJPPETest {
   }
 
   /**
+   * Returns a submission for the native process pool.
+   *
+   * @param taskTime The number of seconds a single task should take.
+   * @return A native process submission.
+   */
+  private SimpleSubmission getNativeSubmission(int taskTime) {
+    return new SimpleSubmission(new SimpleCommand("process " + taskTime,
+        (c, o) -> "ready".equals(o),
+        (c, o) -> true));
+  }
+
+  /**
    * Executes the performance comparison according to the provided arguments.
    *
    * @param minSize The minimum sizes of the two pools.
@@ -122,15 +134,12 @@ public class PPEVsJPPETest {
     ProcessPoolExecutor nativePool = new ProcessPoolExecutor(TestUtils.createTestProcessManagerFactory(),
         minSize, maxSize, reserveSize, false);
     try {
-      SimpleSubmission nativeSubmission = new SimpleSubmission(new SimpleCommand("process " + taskTime,
-          (c, o) -> "ready".equals(o),
-          (c, o) -> true));
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
-        nativePool.submit(nativeSubmission, !reuse).get();
+        nativePool.submit(getNativeSubmission(taskTime), !reuse).get();
       }
       start = System.nanoTime();
       for (int i = 0; i < submissions; i++) {
-        futures.add(nativePool.submit(nativeSubmission, !reuse));
+        futures.add(nativePool.submit(getNativeSubmission(taskTime), !reuse));
       }
       for (Future<?> f : futures) {
         f.get();

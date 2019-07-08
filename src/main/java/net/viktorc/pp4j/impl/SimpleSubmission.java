@@ -46,7 +46,10 @@ public class SimpleSubmission implements Submission<Object> {
     if (commands.isEmpty()) {
       throw new IllegalArgumentException("The commands cannot be empty.");
     }
-    if (!commands.stream().filter(Objects::isNull).collect(Collectors.toList()).isEmpty()) {
+    if (!commands.stream()
+        .filter(Objects::isNull)
+        .collect(Collectors.toList())
+        .isEmpty()) {
       throw new IllegalArgumentException("The commands cannot include null references.");
     }
     this.commands = new ArrayList<>(commands);
@@ -70,7 +73,8 @@ public class SimpleSubmission implements Submission<Object> {
   @Override
   public String toString() {
     return String.format("{commands:[%s]}", String.join(",", commands.stream()
-        .map(c -> "\"" + c.getInstruction() + "\"").collect(Collectors.toList())));
+        .map(c -> "\"" + c.getInstruction() + "\"")
+        .collect(Collectors.toList())));
   }
 
 }

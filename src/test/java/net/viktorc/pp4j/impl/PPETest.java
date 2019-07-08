@@ -65,22 +65,15 @@ public class PPETest {
    * @param reserveSize The process reserve size.
    * @param verbose Whether the events relating to the management of the pool should be logged to the console.
    */
-  private void checkPool(ProcessPoolExecutor pool, int minPoolSize, int maxPoolSize, int reserveSize,
-      boolean verbose) {
+  private void checkPool(ProcessPoolExecutor pool, int minPoolSize, int maxPoolSize, int reserveSize, boolean verbose) {
     // Basic, implementation-specific pool state checks.
-    assert minPoolSize == pool.getMinSize() : "Different min pool sizes: " + minPoolSize + " and " +
-        pool.getMinSize() + ".";
-    assert maxPoolSize == pool.getMaxSize() : "Different max pool sizes: " + maxPoolSize + " and " +
-        pool.getMaxSize() + ".";
-    assert reserveSize == pool.getReserveSize() : "Different reserve sizes: " + reserveSize + " and " +
-        pool.getReserveSize() + ".";
-    assert verbose == pool.isVerbose() : "Different verbosity: " + verbose + " and " +
-        pool.isVerbose() + ".";
-    assert pool.getNumOfSubmissions() == 0 : "Non-zero number of active submissions on " +
-        "startup: " + pool.getNumOfSubmissions() + ".";
-    assert pool.getNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of " +
-        "total processes: " + pool.getNumOfProcesses() + " instead of " +
-        Math.max(minPoolSize, reserveSize) + ".";
+    assert minPoolSize == pool.getMinSize() : "Different min pool sizes: " + minPoolSize + " and " + pool.getMinSize() + ".";
+    assert maxPoolSize == pool.getMaxSize() : "Different max pool sizes: " + maxPoolSize + " and " + pool.getMaxSize() + ".";
+    assert reserveSize == pool.getReserveSize() : "Different reserve sizes: " + reserveSize + " and " + pool.getReserveSize() + ".";
+    assert verbose == pool.isVerbose() : "Different verbosity: " + verbose + " and " + pool.isVerbose() + ".";
+    assert pool.getNumOfSubmissions() == 0 : "Non-zero number of active submissions on " + "startup: " + pool.getNumOfSubmissions() + ".";
+    assert pool.getNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of " + "total processes: " +
+        pool.getNumOfProcesses() + " instead of " + Math.max(minPoolSize, reserveSize) + ".";
   }
 
   /**
@@ -97,13 +90,11 @@ public class PPETest {
    * @return The process pool created according to the specified parameters.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    */
-  public ProcessPoolExecutor getPool(int minPoolSize, int maxPoolSize, int reserveSize,
-      long keepAliveTime, boolean verifyStartup, boolean manuallyTerminate, boolean verbose,
-      boolean throwStartupException) throws InterruptedException {
-    TestProcessManagerFactory managerFactory = new TestProcessManagerFactory(keepAliveTime,
-        verifyStartup, manuallyTerminate, throwStartupException);
-    ProcessPoolExecutor pool = new ProcessPoolExecutor(managerFactory, minPoolSize, maxPoolSize,
-        reserveSize, verbose);
+  private ProcessPoolExecutor getPool(int minPoolSize, int maxPoolSize, int reserveSize, long keepAliveTime, boolean verifyStartup,
+      boolean manuallyTerminate, boolean verbose, boolean throwStartupException) throws InterruptedException {
+    TestProcessManagerFactory managerFactory = new TestProcessManagerFactory(keepAliveTime, verifyStartup, manuallyTerminate,
+        throwStartupException);
+    ProcessPoolExecutor pool = new ProcessPoolExecutor(managerFactory, minPoolSize, maxPoolSize, reserveSize, verbose);
     checkPool(pool, minPoolSize, maxPoolSize, reserveSize, verbose);
     return pool;
   }
@@ -132,10 +123,9 @@ public class PPETest {
    * @return Whether the test passes.
    * @throws Exception If the process pool cannot be created.
    */
-  private boolean perfTest(ProcessPoolExecutor processPool, boolean reuse, int[] procTimes,
-      int requests, long timeSpan, boolean throwExecutionException, long cancelTime,
-      boolean forcedCancel, boolean earlyClose, boolean forcedEarlyClose, long waitTimeout,
-      long lowerBound, long upperBound) throws Exception {
+  private boolean perfTest(ProcessPoolExecutor processPool, boolean reuse, int[] procTimes, int requests, long timeSpan,
+      boolean throwExecutionException, long cancelTime, boolean forcedCancel, boolean earlyClose, boolean forcedEarlyClose,
+      long waitTimeout, long lowerBound, long upperBound) throws Exception {
     List<Long> times = new ArrayList<>();
     List<Future<?>> futures = new ArrayList<>(requests);
     long frequency = requests > 0 ? timeSpan / requests : 0;
@@ -156,23 +146,18 @@ public class PPETest {
           commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
             if ("ready".equals(o)) {
               // Output line caching check.
-              assert c.getStandardOutLines().size() == procTime - 1 &&
-                  c.getStandardErrLines().size() == 0 :
-                  "Unexpected numbers of output lines: " +
-                      c.getStandardOutLines().size() + " instead of " +
-                      (procTime - 1) + " and " + c.getStandardErrLines().size() +
-                      " instead of " + 0 + ".";
+              assert c.getStandardOutLines().size() == procTime - 1 && c.getStandardErrLines().size() == 0 :
+                  "Unexpected numbers of output lines: " + c.getStandardOutLines().size() + " instead of " + (procTime - 1) + " and " +
+                      c.getStandardErrLines().size() + " instead of " + 0 + ".";
               String expectedStdOutput = Arrays.stream(new String[procTime - 1])
-                  .map(s -> "in progress").reduce("", (s1, s2) -> (s1 +
-                      "\n" + s2).trim());
+                  .map(s -> "in progress")
+                  .reduce("", (s1, s2) -> (s1 + "\n" + s2).trim());
               assert expectedStdOutput.equals(c.getJointStandardOutLines()) :
-                  "Wrongly captured standard output. Expected: \"" +
-                      expectedStdOutput + "\"" + System.lineSeparator() +
-                      "Actual: \"" + c.getJointStandardOutLines() + "\"";
-              assert "".equals(c.getJointStandardErrLines()) : "Wrongly " +
-                  "captured error output. Expected: \"\"" + System
-                  .lineSeparator() + "Actual: \"" + c
-                  .getJointStandardErrLines() + "\"";
+                  "Wrongly captured standard output. Expected: \"" + expectedStdOutput + "\"" + System.lineSeparator() + "Actual: \"" +
+                      c.getJointStandardOutLines() + "\"";
+              assert "".equals(c.getJointStandardErrLines()) :
+                  "Wrongly " + "captured error output. Expected: \"\"" + System.lineSeparator() + "Actual: \"" +
+                      c.getJointStandardErrLines() + "\"";
               c.reset();
               return true;
             }
@@ -262,13 +247,10 @@ public class PPETest {
     System.arraycopy(additionalArgs, 0, extendedArgs, 0, additionalArgs.length);
     System.arraycopy(args, 0, extendedArgs, additionalArgs.length, args.length);
     args = extendedArgs;
-    System.out.println("------------------------------" +
-        "---------------------------------------------" +
-        "---------------");
+    String separator = "------------------------------------------------------------------------------------------";
+    System.out.println(separator);
     System.out.printf(testArgMessage, args);
-    System.out.println("------------------------------" +
-        "---------------------------------------------" +
-        "---------------");
+    System.out.println(separator);
     if (times.size() == requests) {
       boolean pass = true;
       for (Long time : times) {
@@ -659,7 +641,8 @@ public class PPETest {
     ProcessPoolExecutor pool = new ProcessPoolExecutor(() ->
         new SimpleProcessManager(new ProcessBuilder(programLocation), e -> {
           SimpleSubmission submission = new SimpleSubmission(new SimpleCommand("start",
-              (c, o) -> "ok".equals(o), (c, o) -> true));
+              (c, o) -> "ok".equals(o),
+              (c, o) -> true));
           Assert.assertTrue(e.execute(submission));
           (new Thread(() -> Assert.assertFalse(e.execute(submission)))).start();
         }), 1, 1, 0, false);
@@ -673,7 +656,8 @@ public class PPETest {
     ProcessPoolExecutor pool = new ProcessPoolExecutor(() ->
         new SimpleProcessManager(new ProcessBuilder(programLocation), e -> {
           SimpleSubmission submission = new SimpleSubmission(new SimpleCommand("start",
-              (c, o) -> "ok".equals(o), (c, o) -> true));
+              (c, o) -> "ok".equals(o),
+              (c, o) -> true));
           Thread t = Thread.currentThread();
           Timer timer = new Timer();
           timer.schedule(new TimerTask() {

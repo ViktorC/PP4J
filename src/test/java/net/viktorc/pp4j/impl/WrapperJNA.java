@@ -28,6 +28,10 @@ public interface WrapperJNA extends Library {
   // Load the library.
   WrapperJNA INSTANCE = Native.loadLibrary(TestUtils.getLibrary().getAbsolutePath(), WrapperJNA.class);
 
+  static WrapperJNA getInstance() {
+    return INSTANCE;
+  }
+
   void doStuff(int seconds);
 
 }

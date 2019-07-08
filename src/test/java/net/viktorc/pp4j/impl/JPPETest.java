@@ -26,6 +26,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -691,7 +692,7 @@ public class JPPETest {
     System.out.println(System.lineSeparator() + "Test 25");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, 0, null, false);
     try {
-      exceptionRule.expect(IllegalArgumentException.class);
+      exceptionRule.expect(RejectedExecutionException.class);
       exec.submit(() -> 1);
     } finally {
       exec.shutdown();
@@ -704,7 +705,7 @@ public class JPPETest {
     System.out.println(System.lineSeparator() + "Test 26");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, 0, null, false);
     try {
-      exceptionRule.expect(IllegalArgumentException.class);
+      exceptionRule.expect(RejectedExecutionException.class);
       exec.submit(System::gc);
     } finally {
       exec.shutdown();
@@ -717,7 +718,7 @@ public class JPPETest {
     System.out.println(System.lineSeparator() + "Test 27");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, 0, null, false);
     try {
-      exceptionRule.expect(IllegalArgumentException.class);
+      exceptionRule.expect(RejectedExecutionException.class);
       AtomicInteger n = new AtomicInteger(0);
       exec.submit(() -> n.set(1), n);
     } finally {
