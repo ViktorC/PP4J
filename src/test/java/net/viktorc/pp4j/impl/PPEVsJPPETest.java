@@ -45,8 +45,7 @@ public class PPEVsJPPETest {
    * @return The time it took to execute the specified number of submissions with the specified execution length in nanoseconds.
    * @throws Exception If something goes wrong.
    */
-  private long testJNI(int minSize, int maxSize, int reserveSize, int submissions, int taskTime,
-      boolean reuse) throws Exception {
+  private long testJNI(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
     JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512),
         minSize, maxSize, reserveSize, 0, reuse ? (Runnable & Serializable) WrapperJNI::new : null, false);
     try {
@@ -81,8 +80,7 @@ public class PPEVsJPPETest {
    * @return The time it took to execute the specified number of submissions with the specified execution length in nanoseconds.
    * @throws Exception If something goes wrong.
    */
-  private long testJNA(int minSize, int maxSize, int reserveSize, int submissions, int taskTime,
-      boolean reuse) throws Exception {
+  private long testJNA(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
     JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512),
         minSize, maxSize, reserveSize, 0, reuse ? (Runnable & Serializable) WrapperJNA.INSTANCE::hashCode : null, false);
     try {
@@ -125,7 +123,8 @@ public class PPEVsJPPETest {
         minSize, maxSize, reserveSize, false);
     try {
       SimpleSubmission nativeSubmission = new SimpleSubmission(new SimpleCommand("process " + taskTime,
-          (c, o) -> "ready".equals(o), (c, o) -> true));
+          (c, o) -> "ready".equals(o),
+          (c, o) -> true));
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
         nativePool.submit(nativeSubmission, !reuse).get();
       }

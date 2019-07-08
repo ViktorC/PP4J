@@ -25,15 +25,40 @@ import net.viktorc.pp4j.api.ProcessManagerFactory;
  *
  * @author Viktor Csomor
  */
-public class TestUtils {
+class TestUtils {
 
-  public static final String TEST_TITLE_FORMAT = "%nTest %d%n" +
-      "-------------------------------------------------%n";
+  static final String TEST_TITLE_FORMAT = "%nTest %d%n-------------------------------------------------%n";
 
-  /**
-   * Not initializable.
-   */
+  private static final String EXECUTABLE_PATH;
+  private static final String LIBRARY_PATH;
+  static {
+    // Support testing on Linux, Windows, and Mac.
+    String osName = System.getProperty("os.name").toLowerCase();
+    if ("mac os x".equals(osName)) {
+      EXECUTABLE_PATH = "osx/testwrapper";
+      LIBRARY_PATH = "osx/libtest.so";
+    } else if (osName.contains("win")) {
+      EXECUTABLE_PATH = "win/testwrapper.exe";
+      LIBRARY_PATH = "win/test.dll";
+    } else {
+      EXECUTABLE_PATH = "linux/testwrapper";
+      LIBRARY_PATH = "linux/libtest.so";
+    }
+  }
+
   private TestUtils() {
+  }
+
+  private static File getFileResource(String path) {
+    try {
+      File file = new File(ClassLoader.getSystemClassLoader()
+          .getResource(path)
+          .toURI().getPath());
+      file.setExecutable(true);
+      return file;
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -41,18 +66,8 @@ public class TestUtils {
    *
    * @return A <code>File</code> pointing to the test executable.
    */
-  public static File getExecutable() {
-    // Support testing both on Linux and Windows.
-    boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-    try {
-      File file = new File(ClassLoader.getSystemClassLoader()
-          .getResource(windows ? "win/testwrapper.exe" : "linux/testwrapper")
-          .toURI().getPath());
-      file.setExecutable(true);
-      return file;
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
+  static File getExecutable() {
+    return getFileResource(EXECUTABLE_PATH);
   }
 
   /**
@@ -60,18 +75,8 @@ public class TestUtils {
    *
    * @return A <code>File</code> pointing to the test library.
    */
-  public static File getLibrary() {
-    // Support testing both on Linux and Windows.
-    boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-    try {
-      File file = new File(ClassLoader.getSystemClassLoader()
-          .getResource(windows ? "win/test.dll" : "linux/libtest.so")
-          .toURI().getPath());
-      file.setExecutable(true);
-      return file;
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
+  static File getLibrary() {
+    return getFileResource(LIBRARY_PATH);
   }
 
   /**
@@ -79,7 +84,7 @@ public class TestUtils {
    *
    * @return A test <code>ProcessManagerFactory</code> instance.
    */
-  public static ProcessManagerFactory createTestProcessManagerFactory() {
+  static ProcessManagerFactory createTestProcessManagerFactory() {
     return new TestProcessManagerFactory();
   }
 
