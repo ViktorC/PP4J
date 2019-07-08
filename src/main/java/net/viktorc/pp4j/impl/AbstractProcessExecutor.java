@@ -361,8 +361,8 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
             stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), charset));
             // Handle the startup; check if the process is to be considered immediately started up.
             startedUp = manager.startsUpInstantly();
-            threadPool.submit(() -> startListeningToProcess(stdOutReader, true));
-            threadPool.submit(() -> startListeningToProcess(stdErrReader, false));
+            threadPool.execute(() -> startListeningToProcess(stdOutReader, true));
+            threadPool.execute(() -> startListeningToProcess(stdErrReader, false));
             while (!startedUp) {
               execLock.wait();
               if (stopped) {
@@ -378,7 +378,7 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
                 ((float) startupTime) / 1000));
             if (doTime) {
               // Start the timer.
-              threadPool.submit(timer);
+              threadPool.execute(timer);
               timer.start();
             }
             orderly = true;

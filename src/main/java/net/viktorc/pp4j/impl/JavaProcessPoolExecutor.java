@@ -419,8 +419,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
      * @throws IOException If the encoding of the serialized runnablePart fails.
      * @throws NotSerializableException If some object to be serialized does not implement the {@link java.io.Serializable} interface.
      */
-    JavaSubmission(S task)
-        throws IOException {
+    JavaSubmission(S task) throws IOException {
       this.task = task;
       command = Conversion.toString(task);
     }
@@ -429,21 +428,22 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     @Override
     public List<Command> getCommands() {
       return Collections.singletonList(new SimpleCommand(command, (command, outputLine) -> {
+        Object output;
         try {
-          Object output = Conversion.toObject(outputLine);
-          if (output instanceof Response) {
-            Response response = (Response) output;
-            if (response.isError()) {
-              error = (Throwable) response.getResult();
-            } else {
-              result = (T) response.getResult();
-            }
-            return true;
-          }
-          return false;
+          output = Conversion.toObject(outputLine);
         } catch (Exception e) {
-          throw new ProcessException(e);
+          return false;
         }
+        if (output instanceof Response) {
+          Response response = (Response) output;
+          if (response.isError()) {
+            error = (Throwable) response.getResult();
+          } else {
+            result = (T) response.getResult();
+          }
+          return true;
+        }
+        return false;
       }, (command, outputLine) -> {
         // It cannot happen, as stderr is redirected.
         return true;

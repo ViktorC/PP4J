@@ -132,8 +132,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     /* One normal process requires minimum 2 auxiliary threads (stdout listener, submission handler), 3 if
      * the stderr is not redirected to stdout (stderr listener), and 4 if keepAliveTime is positive (timer). */
     auxThreadPool = new ThreadPoolExecutor(2 * actualMinSize, Integer.MAX_VALUE, EVICT_TIME,
-        TimeUnit.MILLISECONDS, new SynchronousQueue<>(),
-        new CustomizedThreadFactory(this + "-auxThreadPool"));
+        TimeUnit.MILLISECONDS, new SynchronousQueue<>(), new CustomizedThreadFactory(this + "-auxThreadPool"));
     submissionQueue = new LinkedBlockingDeque<>();
     activeProcExecutors = new LinkedBlockingQueue<>();
     preStartLatch = new CountDownLatch(actualMinSize);
