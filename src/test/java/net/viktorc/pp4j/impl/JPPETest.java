@@ -625,7 +625,7 @@ public class JPPETest {
         res.get();
       }
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 15000 && time > 7500;
+      boolean success = time < 18000 && time > 7500;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
