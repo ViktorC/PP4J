@@ -83,7 +83,7 @@ public interface JavaProcessOptions {
    * @return The architecture of the JVM.
    */
   default Optional<JVMArch> getArch() {
-    return Optional.ofNullable(null);
+    return Optional.empty();
   }
 
   /**
@@ -92,7 +92,7 @@ public interface JavaProcessOptions {
    * @return The type of the JVM.
    */
   default Optional<JVMType> getType() {
-    return Optional.ofNullable(null);
+    return Optional.empty();
   }
 
   /**
@@ -101,7 +101,7 @@ public interface JavaProcessOptions {
    * @return The minimum heap size of the JVM in megabytes.
    */
   default Optional<Integer> getInitHeapSizeMb() {
-    return Optional.ofNullable(null);
+    return Optional.empty();
   }
 
   /**
@@ -110,7 +110,7 @@ public interface JavaProcessOptions {
    * @return The maximum heap size of the JVM in megabytes.
    */
   default Optional<Integer> getMaxHeapSizeMb() {
-    return Optional.ofNullable(null);
+    return Optional.empty();
   }
 
   /**
@@ -119,7 +119,7 @@ public interface JavaProcessOptions {
    * @return The max stack size of the JVM in kilobytes.
    */
   default Optional<Integer> getStackSizeKb() {
-    return Optional.ofNullable(null);
+    return Optional.empty();
   }
 
   /**
