@@ -15,8 +15,6 @@
  */
 package net.viktorc.pp4j.api;
 
-import java.util.List;
-
 /**
  * An interface that defines methods that provide a textual command instruction and allow for the processing of the outputs of the process
  * in response to the instruction. Besides possible processing activities, the {@link #isProcessed(String, boolean)} method is also
