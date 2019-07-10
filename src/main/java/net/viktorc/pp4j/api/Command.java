@@ -21,9 +21,7 @@ package net.viktorc.pp4j.api;
  * responsible for determining when the process finished processing the command. E.g. if a process takes the command "go" which triggers the
  * execution of a long-running task, and it prints "ready" to its standard out stream once the task is completed, the method should only
  * return true if the output "ready" has been written to the standard out, in any other case, it should return false (unless perhaps an
- * error message is printed to the standard error stream). The interface also defines a method that is called before the execution of
- * chained commands with the previous command as its parameter to determine whether the current command should be executed based on the
- * results of the previous commands.
+ * error message is printed to the standard error stream).
  *
  * @author Viktor Csomor
  */
@@ -52,9 +50,7 @@ public interface Command {
    *
    * @param outputLine The new line of output printed to the standard out of the process.
    * @param error Whether this line has been output to the standard error or to the standard out stream.
-   * @return Whether this line of output denotes that the process has finished processing the command. The {@link
-   * net.viktorc.pp4j.api.ProcessExecutor} instance executing the command will not accept new commands until the processing of the command
-   * is completed.
+   * @return Whether this line of output denotes that the process has finished processing the command.
    */
   boolean isProcessed(String outputLine, boolean error);
 
