@@ -131,9 +131,9 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
    * Starts listening to an out stream of the process using the specified reader.
    *
    * @param reader The buffered reader to use to listen to the steam.
-   * @param standard Whether it is the standard out or the standard error stream of the process.
+   * @param error Whether it is the standard error or the standard out stream of the process.
    */
-  private void startListeningToProcess(BufferedReader reader, boolean standard) {
+  private void startListeningToProcess(BufferedReader reader, boolean error) {
     try {
       String line;
       while ((line = reader.readLine()) != null) {
@@ -152,13 +152,13 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
             }
             if (command != null) {
               // Process the next line.
-              commandCompleted = command.isProcessed(line, standard);
+              commandCompleted = command.isProcessed(line, error);
               if (commandCompleted) {
                 execLock.notifyAll();
               }
             }
           } else {
-            startedUp = manager.isStartedUp(line, standard);
+            startedUp = manager.isStartedUp(line, error);
             if (startedUp) {
               execLock.notifyAll();
             }
@@ -365,8 +365,8 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
             stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), charset));
             // Handle the startup; check if the process is to be considered immediately started up.
             startedUp = manager.startsUpInstantly();
-            threadPool.execute(() -> startListeningToProcess(stdOutReader, true));
-            threadPool.execute(() -> startListeningToProcess(stdErrReader, false));
+            threadPool.execute(() -> startListeningToProcess(stdOutReader, false));
+            threadPool.execute(() -> startListeningToProcess(stdErrReader, true));
             while (!startedUp) {
               execLock.wait();
               if (stopped) {

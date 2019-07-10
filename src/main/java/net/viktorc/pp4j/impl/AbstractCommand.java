@@ -97,12 +97,12 @@ public abstract class AbstractCommand implements Command {
   }
 
   @Override
-  public final boolean isProcessed(String outputLine, boolean standard) {
-    boolean processed = onOutput(outputLine, standard);
-		if (standard) {
-			stdOutLines.add(outputLine);
+  public final boolean isProcessed(String outputLine, boolean error) {
+    boolean processed = isExecutionComplete(outputLine, error);
+		if (error) {
+      stdErrLines.add(outputLine);
 		} else {
-			stdErrLines.add(outputLine);
+			stdOutLines.add(outputLine);
 		}
     return processed;
   }
@@ -112,9 +112,9 @@ public abstract class AbstractCommand implements Command {
    * execution of the command.
    *
    * @param outputLine The new line of output printed to the standard out of the process.
-   * @param standard Whether this line has been output to the standard out or to the standard error stream.
+   * @param error Whether this line has been output to the standard error or to the standard out stream.
    * @return Whether this line of output denotes that the process has finished processing the command.
    */
-  protected abstract boolean onOutput(String outputLine, boolean standard);
+  protected abstract boolean isExecutionComplete(String outputLine, boolean error);
 
 }

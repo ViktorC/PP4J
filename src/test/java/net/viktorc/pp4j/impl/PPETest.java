@@ -623,9 +623,7 @@ public class PPETest {
       pool.execute(new SimpleSubmission(command));
       long dur = System.currentTimeMillis() - start;
       boolean success = dur > 2995 && dur < 3050;
-      System.out.println("------------------------------" +
-          "---------------------------------------------" +
-          "---------------");
+      System.out.println("------------------------------------------------------------------------------------------");
       System.out.printf("Time: %.3f %s%n", ((float) dur) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -710,7 +708,8 @@ public class PPETest {
     public ProcessManager newProcessManager() {
       return new SimpleProcessManager(new ProcessBuilder(programLocation),
           e -> e.execute(new SimpleSubmission(new SimpleCommand("start",
-              (c, o) -> "ok".equals(o), (c, o) -> true)))) {
+              (c, o) -> "ok".equals(o),
+              (c, o) -> true)))) {
 
         @Override
         public boolean startsUpInstantly() {
@@ -721,9 +720,9 @@ public class PPETest {
         }
 
         @Override
-        public boolean isStartedUp(String output, boolean standard) {
-          return (super.isStartedUp(output, standard) && !verifyStartup) ||
-              (standard && "hi".equals(output));
+        public boolean isStartedUp(String output, boolean error) {
+          return (super.isStartedUp(output, error) && !verifyStartup) ||
+              (!error && "hi".equals(output));
         }
 
         @Override
@@ -731,7 +730,8 @@ public class PPETest {
           if (manuallyTerminate) {
             AtomicBoolean success = new AtomicBoolean(true);
             executor.execute(new SimpleSubmission(new SimpleCommand("stop",
-                (c, o) -> "bye".equals(o), (c, o) -> {
+                (c, o) -> "bye".equals(o),
+                (c, o) -> {
               success.set(false);
               return true;
             })));

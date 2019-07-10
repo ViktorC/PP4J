@@ -51,11 +51,11 @@ public interface Command {
    * sent to its standard in until the method returns <code>true</code>.
    *
    * @param outputLine The new line of output printed to the standard out of the process.
-   * @param standard Whether this line has been output to the standard out or to the standard error stream.
+   * @param error Whether this line has been output to the standard error or to the standard out stream.
    * @return Whether this line of output denotes that the process has finished processing the command. The {@link
    * net.viktorc.pp4j.api.ProcessExecutor} instance executing the command will not accept new commands until the processing of the command
    * is completed.
    */
-  boolean isProcessed(String outputLine, boolean standard);
+  boolean isProcessed(String outputLine, boolean error);
 
 }

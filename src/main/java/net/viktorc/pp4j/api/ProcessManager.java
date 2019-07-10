@@ -55,10 +55,10 @@ public interface ProcessManager {
    * <code>false</code>.
    *
    * @param outputLine A line of output produced by the process.
-   * @param standard Whether this line has been output to the standard out or the standard error stream.
+   * @param error Whether this line has been output to the standard error or the standard out stream.
    * @return Whether the process is to be considered started up.
    */
-  boolean isStartedUp(String outputLine, boolean standard);
+  boolean isStartedUp(String outputLine, boolean error);
 
   /**
    * Returns the character set to use to communicate with the managed process through its standard streams. By default, it returns the

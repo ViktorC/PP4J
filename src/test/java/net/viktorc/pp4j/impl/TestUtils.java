@@ -114,8 +114,8 @@ class TestUtils {
         }
 
         @Override
-        public boolean isStartedUp(String outputLine, boolean standard) {
-          return standard && "hi".equals(outputLine);
+        public boolean isStartedUp(String outputLine, boolean error) {
+          return !error && "hi".equals(outputLine);
         }
       };
     }

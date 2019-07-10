@@ -350,8 +350,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     }
 
     @Override
-    public boolean isStartedUp(String outputLine, boolean standard) {
-      if (standard) {
+    public boolean isStartedUp(String outputLine, boolean error) {
+      if (!error) {
         try {
           Object output = Conversion.toObject(outputLine);
           return output == Signal.READY;

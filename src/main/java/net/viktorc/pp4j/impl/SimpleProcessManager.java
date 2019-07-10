@@ -82,7 +82,7 @@ public class SimpleProcessManager extends AbstractProcessManager {
   }
 
   @Override
-  public boolean isStartedUp(String outputLine, boolean standard) {
+  public boolean isStartedUp(String outputLine, boolean error) {
     return true;
   }
 
