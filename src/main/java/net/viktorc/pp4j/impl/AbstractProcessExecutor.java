@@ -166,8 +166,8 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
         }
       }
     } catch (IOException e) {
-      synchronized (execLock) {
-        if (!stopped) {
+      synchronized (processLock) {
+        if (process != null && process.isAlive()) {
           throw new ProcessException(e);
         }
       }
