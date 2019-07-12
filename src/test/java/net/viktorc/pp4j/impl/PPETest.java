@@ -147,17 +147,16 @@ public class PPETest {
             if ("ready".equals(o)) {
               // Output line caching check.
               assert c.getStandardOutLines().size() == procTime - 1 && c.getStandardErrLines().size() == 0 :
-                  "Unexpected numbers of output lines: " + c.getStandardOutLines().size() + " instead of " + (procTime - 1) + " and " +
-                      c.getStandardErrLines().size() + " instead of " + 0 + ".";
+                  String.format("Unexpected numbers of output lines: %d instead of %d and %d instead of %d.",
+                      c.getStandardOutLines().size(), procTime - 1, c.getStandardErrLines().size(), 0);
               String expectedStdOutput = Arrays.stream(new String[procTime - 1])
                   .map(s -> "in progress")
                   .reduce("", (s1, s2) -> (s1 + "\n" + s2).trim());
               assert expectedStdOutput.equals(c.getJointStandardOutLines()) :
-                  "Wrongly captured standard output. Expected: \"" + expectedStdOutput + "\"" + System.lineSeparator() + "Actual: \"" +
-                      c.getJointStandardOutLines() + "\"";
+                  String.format("Wrongly captured standard output. Expected: \"%s\"%nActual: \"%s\"", expectedStdOutput,
+                      c.getJointStandardOutLines());
               assert "".equals(c.getJointStandardErrLines()) :
-                  "Wrongly " + "captured error output. Expected: \"\"" + System.lineSeparator() + "Actual: \"" +
-                      c.getJointStandardErrLines() + "\"";
+                  String.format("Wrongly captured standard output. Expected: \"\"%nActual: \"%s\"", c.getJointStandardOutLines());
               c.reset();
               return true;
             }
@@ -230,19 +229,15 @@ public class PPETest {
         "manuallyTerminate: %s; reuse: %s; procTimes: %s; requests: %d; timeSpan: %d;%n" +
         "throwExecutionError: %s; cancelTime: %d; forcedCancel: %s; earlyClose: %s;%n" +
         "forcedEarlyClose: %s; waitTimeout: %.3f; lowerBound: %.3f; upperBound: %.3f;%n";
-    TestProcessManagerFactory procManagerFactory = (TestProcessManagerFactory) processPool
-        .getProcessManagerFactory();
-    Object[] args = new Object[]{procManagerFactory.keepAliveTime, Boolean.toString(procManagerFactory
-        .throwStartupException), Boolean.toString(procManagerFactory.verifyStartup),
-        Boolean.toString(procManagerFactory.manuallyTerminate), Boolean.toString(reuse),
-        Arrays.toString(procTimes), requests, timeSpan, Boolean.toString(throwExecutionException),
-        cancelTime, Boolean.toString(forcedCancel), Boolean.toString(earlyClose),
-        Boolean.toString(forcedEarlyClose), (float) (((double) waitTimeout) / 1000), (float)
-        (((double) lowerBound) / 1000), (float) (((double) upperBound) / 1000)};
-    testArgMessage = "minPoolSize: %d; maxPoolSize: %d; reserveSize: %d; verbose: %s;%n" +
-        testArgMessage;
-    Object[] additionalArgs = new Object[]{processPool.getMinSize(), processPool.getMaxSize(),
-        processPool.getReserveSize(), Boolean.toString(processPool.isVerbose())};
+    TestProcessManagerFactory procManagerFactory = (TestProcessManagerFactory) processPool.getProcessManagerFactory();
+    Object[] args = new Object[]{procManagerFactory.keepAliveTime, Boolean.toString(procManagerFactory.throwStartupException),
+        Boolean.toString(procManagerFactory.verifyStartup), Boolean.toString(procManagerFactory.manuallyTerminate),
+        Boolean.toString(reuse), Arrays.toString(procTimes), requests, timeSpan, Boolean.toString(throwExecutionException),
+        cancelTime, Boolean.toString(forcedCancel), Boolean.toString(earlyClose), Boolean.toString(forcedEarlyClose),
+        (float) (((double) waitTimeout) / 1000), (float) (((double) lowerBound) / 1000), (float) (((double) upperBound) / 1000)};
+    testArgMessage = "minPoolSize: %d; maxPoolSize: %d; reserveSize: %d; verbose: %s;%n" + testArgMessage;
+    Object[] additionalArgs = new Object[]{processPool.getMinSize(), processPool.getMaxSize(), processPool.getReserveSize(),
+        Boolean.toString(processPool.isVerbose())};
     Object[] extendedArgs = new Object[args.length + additionalArgs.length];
     System.arraycopy(additionalArgs, 0, extendedArgs, 0, additionalArgs.length);
     System.arraycopy(args, 0, extendedArgs, additionalArgs.length, args.length);
