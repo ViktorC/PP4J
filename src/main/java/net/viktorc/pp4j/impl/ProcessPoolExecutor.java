@@ -17,6 +17,7 @@ package net.viktorc.pp4j.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CancellationException;
@@ -229,20 +230,17 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   /**
    * Starts a new process by borrowing a {@link net.viktorc.pp4j.impl.ProcessPoolExecutor.InternalProcessExecutor} instance from the pool
    * and executing it.
-   *
-   * @return Whether the process was successfully started.
    */
-  private boolean startNewProcess() {
-    InternalProcessExecutor executor;
+  private void startNewProcess() {
     try {
-      executor = procExecObjectPool.borrowObject();
+      InternalProcessExecutor executor = procExecObjectPool.borrowObject();
+      procExecThreadPool.execute(executor);
+      activeProcExecutors.add(executor);
+      logger.debug("Process executor {} started.{}", executor, System.lineSeparator() + getPoolStats());
     } catch (Exception e) {
-      return false;
+      // This cannot really happen.
+      logger.error(e.getMessage(), e);
     }
-    procExecThreadPool.execute(executor);
-    activeProcExecutors.add(executor);
-    logger.debug("Process executor {} started.{}", executor, System.lineSeparator() + getPoolStats());
-    return true;
   }
 
   /**
@@ -257,6 +255,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        logger.warn(e.getMessage(), e);
         return;
       }
     }
@@ -295,6 +294,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
           submission.setException(new Exception("The process pool has been shut down."));
         }
       } catch (InterruptedException e) {
+        logger.warn(e.getMessage(), e);
         Thread.currentThread().interrupt();
       }
       logger.info("Process pool shut down.");
@@ -492,7 +492,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
 
     @Override
-    public T getResult() throws ExecutionException {
+    public Optional<T> getResult() throws ExecutionException {
       return origSubmission.getResult();
     }
 
@@ -580,7 +580,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         if (submission.exception != null) {
           throw new ExecutionException(submission.exception);
         }
-        return submission.getResult();
+        return submission.getResult().orElse(null);
       }
     }
 
@@ -605,7 +605,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         if (timeoutNs <= 0) {
           throw new TimeoutException(String.format("Submission %s timed out.", submission));
         }
-        return submission.getResult();
+        return submission.getResult().orElse(null);
       }
     }
 

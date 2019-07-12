@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -129,7 +130,6 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public <T> Future<T> submit(Runnable task, T result, boolean terminateProcessAfterwards) {
     try {
@@ -362,7 +362,6 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       return false;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void onStartup(ProcessExecutor executor) {
       try {
@@ -463,11 +462,11 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     }
 
     @Override
-    public T getResult() throws ExecutionException {
+    public Optional<T> getResult() throws ExecutionException {
       if (error != null) {
         throw new ExecutionException(error);
       }
-      return result;
+      return Optional.ofNullable(result);
     }
 
     @Override
@@ -550,7 +549,6 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
      * @param runnablePart The optional <code>Runnable</code> part of the <code>Callable</code> instance in case it consists of a
      * <code>Runnable</code> and a return object.
      */
-    @SuppressWarnings("unchecked")
     SerializableCallable(S callable, Runnable runnablePart) {
       this.callable = (Callable<T> & Serializable) callable;
       this.runnablePart = runnablePart;

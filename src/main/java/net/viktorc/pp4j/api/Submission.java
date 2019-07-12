@@ -16,12 +16,12 @@
 package net.viktorc.pp4j.api;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 /**
  * An interface that defines methods necessary for the submission and execution of commands in {@link net.viktorc.pp4j.api.ProcessExecutor}
- * instances. It also defines methods to call once the processing of the submitted commands has started or finished which are by default
- * no-operations.
+ * instances. It also defines methods to call once the processing of the submitted commands has started or finished.
  *
  * @param <T> The return type associated with the submission.
  * @author Viktor Csomor
@@ -36,13 +36,14 @@ public interface Submission<T> {
   List<Command> getCommands();
 
   /**
-   * Returns the result of the submission. By default, it returns <code>null</code>.
+   * Returns the optional result of the submission.
    *
-   * @return The object representing the result of the submission or <code>null</code> if no result is associated with the submission.
+   * @return The optional object representing the result of the submission which may be empty if no result is associated with the
+   * submission.
    * @throws ExecutionException if an error occurred while executing the submission.
    */
-  default T getResult() throws ExecutionException {
-    return null;
+  default Optional<T> getResult() throws ExecutionException {
+    return Optional.empty();
   }
 
   /**
