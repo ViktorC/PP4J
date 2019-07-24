@@ -30,6 +30,7 @@ public interface ProcessExecutor {
    * @return Whether the submission was executed. If the executor is not running, busy processing an other submission, or stopped before it
    * could complete the execution of the submission, <code>false</code> is returned; otherwise the submission is processed and
    * <code>true</code> is returned once it's successfully executed.
+   * @throws InterruptedException If the thread is interrupted during the execution of the submission.
    */
   boolean execute(Submission<?> submission) throws InterruptedException;
 
