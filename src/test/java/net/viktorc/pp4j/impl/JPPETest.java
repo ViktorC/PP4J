@@ -33,9 +33,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import net.viktorc.pp4j.api.JavaProcessOptions;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
-import net.viktorc.pp4j.impl.JavaProcess.Request;
-import net.viktorc.pp4j.impl.JavaProcess.Response;
-import net.viktorc.pp4j.impl.JavaProcess.Signal;
+import net.viktorc.pp4j.impl.JavaProcessPoolExecutor.JavaProcess;
+import net.viktorc.pp4j.impl.JavaProcessPoolExecutor.JavaProcess.Request;
+import net.viktorc.pp4j.impl.JavaProcessPoolExecutor.JavaProcess.Response;
+import net.viktorc.pp4j.impl.JavaProcessPoolExecutor.JavaProcess.Signal;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -643,13 +644,13 @@ public class JPPETest {
     PrintStream origOutStream = System.out;
     String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n",
         "",
-        JavaProcess.convertToString("test"),
-        JavaProcess.convertToString((Callable<Long> & Serializable) () -> Math.round(Math.E)),
-        JavaProcess.convertToString((Callable<Object> & Serializable) () -> {
+        JavaProcessPoolExecutor.convertToString("test"),
+        JavaProcessPoolExecutor.convertToString((Callable<Long> & Serializable) () -> Math.round(Math.E)),
+        JavaProcessPoolExecutor.convertToString((Callable<Object> & Serializable) () -> {
           throw new Exception("test");
         }),
         "test",
-        JavaProcess.convertToString(Request.TERMINATE));
+        JavaProcessPoolExecutor.convertToString(Request.TERMINATE));
     try (ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayInputStream in = new ByteArrayInputStream(testInput.getBytes())) {
       System.setOut(new PrintStream(out));
@@ -657,16 +658,16 @@ public class JPPETest {
       JavaProcess.main(new String[0]);
       String[] lines = out.toString().split(System.lineSeparator());
       Assert.assertEquals(5, lines.length);
-      Assert.assertEquals(Signal.READY, JavaProcess.convertToObject(lines[0]));
-      Response response1 = (Response) JavaProcess.convertToObject(lines[1]);
+      Assert.assertEquals(Signal.READY, JavaProcessPoolExecutor.convertToObject(lines[0]));
+      Response response1 = (Response) JavaProcessPoolExecutor.convertToObject(lines[1]);
       Assert.assertFalse(response1.isError());
       Assert.assertEquals(3L, response1.getResult());
-      Response response2 = (Response) JavaProcess.convertToObject(lines[2]);
+      Response response2 = (Response) JavaProcessPoolExecutor.convertToObject(lines[2]);
       Assert.assertTrue(response2.isError());
       Assert.assertEquals("test", ((Throwable) response2.getResult()).getMessage());
-      Response response3 = (Response) JavaProcess.convertToObject(lines[3]);
+      Response response3 = (Response) JavaProcessPoolExecutor.convertToObject(lines[3]);
       Assert.assertTrue(response3.isError());
-      Assert.assertEquals(Signal.TERMINATED, JavaProcess.convertToObject(lines[4]));
+      Assert.assertEquals(Signal.TERMINATED, JavaProcessPoolExecutor.convertToObject(lines[4]));
     } finally {
       System.setOut(origOutStream);
     }
