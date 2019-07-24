@@ -43,6 +43,16 @@ public abstract class AbstractCommand implements Command {
   }
 
   /**
+   * It allows for the processing of the output and is responsible for determining whether the output line denotes the completion of the
+   * execution of the command.
+   *
+   * @param outputLine The new line of output printed to the standard out of the process.
+   * @param error Whether this line has been output to the standard error or to the standard out stream.
+   * @return Whether this line of output denotes that the process has finished processing the command.
+   */
+  protected abstract boolean isExecutionComplete(String outputLine, boolean error);
+
+  /**
    * Returns a list of lines output to the standard out of the underlying process after the instruction has been written to the standard in
    * of the process.
    *
@@ -69,7 +79,7 @@ public abstract class AbstractCommand implements Command {
    * @return A string of the lines output to the standard out of the underlying process.
    */
   public String getJointStandardOutLines() {
-    return String.join("\n", stdOutLines);
+    return String.join(System.lineSeparator(), stdOutLines);
   }
 
   /**
@@ -79,13 +89,10 @@ public abstract class AbstractCommand implements Command {
    * @return A string of the lines output to the standard error of the underlying process.
    */
   public String getJointStandardErrLines() {
-    return String.join("\n", stdErrLines);
+    return String.join(System.lineSeparator(), stdErrLines);
   }
 
-  /**
-   * Clears the lists holding the lines output to the standard out and standard error streams of the underlying process. Recommended in case
-   * the {@link net.viktorc.pp4j.api.Command} instance is reused.
-   */
+  @Override
   public void reset() {
     stdOutLines.clear();
     stdErrLines.clear();
@@ -106,15 +113,5 @@ public abstract class AbstractCommand implements Command {
 		}
     return processed;
   }
-
-  /**
-   * It allows for the processing of the output and is responsible for determining whether the output line denotes the completion of the
-   * execution of the command.
-   *
-   * @param outputLine The new line of output printed to the standard out of the process.
-   * @param error Whether this line has been output to the standard error or to the standard out stream.
-   * @return Whether this line of output denotes that the process has finished processing the command.
-   */
-  protected abstract boolean isExecutionComplete(String outputLine, boolean error);
 
 }

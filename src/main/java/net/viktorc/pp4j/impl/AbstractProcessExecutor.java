@@ -1,26 +1,13 @@
-/*
- * Copyright 2017 Viktor Csomor
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package net.viktorc.pp4j.impl;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,108 +19,87 @@ import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.Submission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.helpers.NOPLogger;
 
 /**
- * An abstract implementation of the {@link net.viktorc.pp4j.api.ProcessExecutor} interface for starting, managing, and interacting with a
- * process. The life cycle of the associated process is the same as that of the {@link #run()} method of the instance. The process is not
- * started until this method is called and the method does not terminate until the process does.
+ * An abstract implementation of the {@link ProcessExecutor} interface for starting, managing, and interacting with a process. The life
+ * cycle of the associated process is encapsulated within that of the {@link #run()} method of the instance.
  *
  * @author Viktor Csomor
  */
-abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
+public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
 
   /**
    * If a process cannot be started or an exception occurs which would make it impossible to retrieve the actual return code of the
    * process.
    */
-  static final int UNEXPECTED_TERMINATION_RESULT_CODE = -1;
+  public static final int UNEXPECTED_TERMINATION_RETURN_CODE = -1;
 
-  /**
-   * The manager of the underlying process' life-cycle.
-   */
-  final ProcessManager manager;
-  /**
-   * The thread pool providing the threads for executing background tasks required for the operation of the executor such as the listening
-   * of the process' out and error streams, and the timing of idle phases to recognize when a process times out.
-   */
-  final ExecutorService threadPool;
-  /**
-   * A lock used to ensure exclusive access to the {@link #run()} method.
-   */
-  final Lock runLock;
-  /**
-   * A lock used to ensure exclusive access to the {@link #stop(boolean)} method.
-   */
-  final Lock stopLock;
-  /**
-   * A lock used to ensure no more than one submission is being processed at a time. It guards the
-   * <code>execute</code> methods and the start-up block of the {@link #run()} method.
-   */
-  final Lock submissionLock;
-  /**
-   * A semaphore used to wait for all helper threads to terminate. All background tasks integral to the running of the process are expected
-   * to decrement its counter on termination.
-   */
-  final Semaphore termSemaphore;
-  /**
-   * The number of licenses to acquire from {@link #termSemaphore} when waiting for background operations to terminate. If an additional
-   * background operation is run using {@link #threadPool}, this number should be incremented so that the executor can wait for this
-   * operation to terminate before exiting the {@link #run()} method.
-   */
-  final AtomicInteger threadsToWaitFor;
-  /**
-   * The logger used to log events related to the life-cycle of the underlying process.
-   */
-  final Logger logger;
+  protected final ProcessManager manager;
+  protected final ExecutorService threadPool;
+  protected final Logger logger;
+  protected final Object runLock;
+  protected final Object stateLock;
+  protected final Lock executeLock;
+  protected final AtomicInteger numOfChildThreads;
+  protected final Semaphore terminationSemaphore;
 
-  private final Object execLock;
-  private final Object processLock;
   private Process process;
-  private KeepAliveTimer timer;
+  private BufferedWriter stdInWriter;
   private BufferedReader stdOutReader;
   private BufferedReader stdErrReader;
-  private BufferedWriter stdInWriter;
   private Command command;
-  private long keepAliveTime;
-  private boolean doTime;
-  private boolean onWait;
-  private boolean commandCompleted;
+  private boolean running;
   private boolean startedUp;
-  private volatile boolean running;
-  private volatile boolean stopped;
+  private boolean killed;
+  private boolean idle;
+  private boolean commandCompleted;
 
   /**
-   * Constructs an executor for the specified process using <code>threadPool</code> to provide the threads required for listening to the out
-   * streams of the process and ensuring that the process is terminated once it times out if the {@link
-   * net.viktorc.pp4j.api.ProcessManager#getKeepAliveTime()} method of
-   * <code>manager</code> returns a positive value.
+   * Constructs an executor for the specified process using <code>threadPool</code> to provide the threads required for listening to the
+   * standard streams of the process and ensuring that the process is terminated once it times out if the
+   * {@link ProcessManager#getKeepAliveTime()} method of <code>manager</code> returns a non-empty optional.
    *
-   * @param manager The <code>ProcessManager</code> implementation instance to manage the life-cycle of the underlying process.
+   * @param manager The <code>ProcessManager</code> instance to manage the life-cycle of the underlying process.
    * @param threadPool The thread pool to use for running the helper threads required for the running of the process and the execution of
-   * submissions; i.e.
-   * @param verbose Whether events related to the life-cycle of the process should be logged.
+   * submissions.
    */
-  protected AbstractProcessExecutor(ProcessManager manager, ExecutorService threadPool, boolean verbose) {
+  protected AbstractProcessExecutor(ProcessManager manager, ExecutorService threadPool) {
     this.manager = manager;
     this.threadPool = threadPool;
-    runLock = new ReentrantLock(true);
-    stopLock = new ReentrantLock(true);
-    submissionLock = new ReentrantLock();
-    execLock = new Object();
-    processLock = new Object();
-    termSemaphore = new Semaphore(0);
-    threadsToWaitFor = new AtomicInteger(0);
-    logger = verbose ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
+    logger = LoggerFactory.getLogger(getClass());
+    runLock = new Object();
+    stateLock = new Object();
+    executeLock = new ReentrantLock(true);
+    numOfChildThreads = new AtomicInteger();
+    terminationSemaphore = new Semaphore(0);
   }
 
   /**
-   * Starts listening to an out stream of the process using the specified reader.
+   * Handles any I/O exceptions thrown by any of the read, write, or flush methods of any of the process' streams according to the state
+   * of the process.
+   *
+   * @param e The I/O exception thrown.
+   */
+  private void handleProcessStreamIOException(IOException e) {
+    logger.trace(e.getMessage(), e);
+    synchronized (stateLock) {
+      if (isAlive()) {
+        throw new ProcessException(e);
+      } else {
+        stateLock.notifyAll();
+      }
+    }
+  }
+
+  /**
+   * Keeps listening to the specified output stream until the end of the stream is reached or the stream is closed.
    *
    * @param reader The buffered reader to use to listen to the steam.
    * @param error Whether it is the standard error or the standard out stream of the process.
    */
-  private void startListeningToProcess(BufferedReader reader, boolean error) {
+  private void listenToProcessStream(BufferedReader reader, boolean error) {
+    numOfChildThreads.incrementAndGet();
+    logger.trace("Starting listening to standard {} stream", error ? "error" : "out");
     try {
       String line;
       while ((line = reader.readLine()) != null) {
@@ -141,98 +107,215 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
         if (line.isEmpty()) {
           continue;
         }
-        // Make sure that the submission executor thread is waiting.
-        synchronized (execLock) {
-          if (startedUp) {
-            /* Before processing a new line, make sure that the submission executor
-             * thread is notified that the line signaling the completion of the command
-             * has been processed. */
-            while (commandCompleted && onWait) {
-              execLock.wait();
-            }
-            if (command != null) {
-              // Process the next line.
-              commandCompleted = command.isProcessed(line, error);
-              if (commandCompleted) {
-                execLock.notifyAll();
-              }
-            }
-          } else {
+        logger.trace("Output \"{}\" printed to standard {} stream", line, error ? "error" : "out");
+        synchronized (stateLock) {
+          if (!startedUp) {
             startedUp = manager.isStartedUp(line, error);
+            logger.trace("Output denotes process start-up completion: {}", startedUp);
             if (startedUp) {
-              execLock.notifyAll();
+              stateLock.notifyAll();
+            }
+          } else if (command != null && !commandCompleted) {
+            commandCompleted = command.isProcessed(line, error);
+            logger.trace("Output denotes command completion: {}", commandCompleted);
+            if (commandCompleted) {
+              stateLock.notifyAll();
             }
           }
         }
       }
     } catch (IOException e) {
-      synchronized (processLock) {
-        if (process != null && process.isAlive()) {
-          throw new ProcessException(e);
-        }
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new ProcessException(e);
+      handleProcessStreamIOException(e);
     } finally {
-      termSemaphore.release();
+      logger.trace("Stopping listening to standard {} stream", error ? "error" : "out");
+      terminationSemaphore.release();
     }
   }
 
   /**
-   * Returns whether the underlying process is running.
+   * Keeps measuring the time spent in an idle state and terminates the process once this time reaches the specified amount.
    *
-   * @return Whether the process is running.
+   * @param keepAliveTime The number of milliseconds of idleness after which the process is to be terminated.
    */
-  protected boolean isRunning() {
-    return running;
-  }
-
-  /**
-   * Returns whether the termination of the underlying process has been initiated.
-   *
-   * @return Whether the termination of the process has been initiated.
-   */
-  protected boolean isStopped() {
-    return stopped;
-  }
-
-  /**
-   * It prompts the currently running process, if there is one, to terminate. Once the process has been successfully terminated, subsequent
-   * calls are ignored and return true unless the process is started again.
-   *
-   * @param forcibly Whether the process should be killed forcibly or using the {@link net.viktorc.pp4j.api.ProcessManager#terminateGracefully(ProcessExecutor)}
-   * method of the {@link net.viktorc.pp4j.api.ProcessManager} instance assigned to the executor. The latter might be ineffective if the
-   * process is currently executing a command or has not started up.
-   * @return Whether the process was successfully terminated.
-   */
-  protected boolean stop(boolean forcibly) {
-    stopLock.lock();
+  private void timeIdleProcess(long keepAliveTime) {
+    numOfChildThreads.incrementAndGet();
+    logger.trace("Starting idleness timer");
     try {
-      if (stopped) {
-        return true;
-      }
-      synchronized (execLock) {
-        boolean success = true;
-        if (running) {
-          if (!forcibly) {
-            success = manager.terminateGracefully(this);
-          } else {
-            synchronized (processLock) {
-              if (process != null) {
-                process.destroy();
+      synchronized (stateLock) {
+        while (isAlive()) {
+          idle = true;
+          logger.trace("Process going idle");
+          long waitTime = keepAliveTime;
+          long startTime = System.currentTimeMillis();
+          while (isAlive() && idle && waitTime > 0) {
+            stateLock.wait(keepAliveTime);
+            waitTime -= System.currentTimeMillis() - startTime;
+          }
+          if (isAlive() && idle && executeLock.tryLock()) {
+            try {
+              logger.trace("Attempting to terminate process due to prolonged idleness");
+              if (!tryTerminate()) {
+                terminateForcibly();
               }
+            } finally {
+              executeLock.unlock();
             }
           }
         }
-        if (success) {
-          stopped = true;
-          execLock.notifyAll();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      logger.trace(e.getMessage(), e);
+    } finally {
+      logger.trace("Stopping idleness timer");
+      terminationSemaphore.release();
+    }
+  }
+
+  /**
+   * Closes the provided stream.
+   *
+   * @param stream The stream to close.
+   */
+  private void closeStream(Closeable stream) {
+    if (stream != null) {
+      try {
+        stream.close();
+      } catch (IOException e) {
+        logger.trace(e.getMessage(), e);
+      }
+    }
+  }
+
+  /**
+   * Starts up the process, sets up the executor infrastructure, invokes the appropriate callback methods, and executes the start-up
+   * submission if there is one.
+   *
+   * @throws IOException If the process cannot be started.
+   * @throws InterruptedException If the executing thread is interrupted while waiting for the process to start up.
+   */
+  private void setUpExecutor() throws IOException, InterruptedException {
+    executeLock.lock();
+    logger.trace("Setting up executor");
+    try {
+      synchronized (stateLock) {
+        numOfChildThreads.set(0);
+        terminationSemaphore.drainPermits();
+        Charset charset = manager.getEncoding();
+        process = manager.start();
+        logger.trace("Process launched");
+        running = true;
+        stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), charset));
+        stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream(), charset));
+        stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), charset));
+        threadPool.execute(() -> listenToProcessStream(stdOutReader, false));
+        threadPool.execute(() -> listenToProcessStream(stdErrReader, true));
+        logger.trace("Waiting for process to start up");
+        while (!startedUp) {
+          if (killed || !process.isAlive()) {
+            logger.trace("Process terminated before it could start up");
+            return;
+          }
+          stateLock.wait();
         }
-        return success;
+        logger.trace("Process started up");
+        manager.getKeepAliveTime().ifPresent(keepAliveTime -> threadPool.execute(() -> timeIdleProcess(keepAliveTime)));
+        logger.trace("Executing initial submission");
+        manager.getInitSubmission().ifPresent(this::execute);
+        logger.trace("Invoking start-up call-back methods");
+        manager.onStartup();
+        onExecutorStartup();
+        logger.trace("Executor set up");
       }
     } finally {
-      stopLock.unlock();
+      executeLock.unlock();
+    }
+  }
+
+  /**
+   * It tears down the executor infrastructure, invokes the appropriate callback methods, and waits for the child threads to terminate.
+   *
+   * @param returnCode The return code of the process.
+   */
+  private void tearDownExecutor(int returnCode) {
+    logger.trace("Tearing down executor");
+    synchronized (stateLock) {
+      idle = false;
+      killed = false;
+      startedUp = false;
+      running = false;
+      process = null;
+      stateLock.notifyAll();
+      logger.trace("Invoking termination call-back methods");
+      manager.onTermination(returnCode);
+      onExecutorTermination();
+    }
+    logger.trace("Closing streams");
+    closeStream(stdInWriter);
+    closeStream(stdOutReader);
+    closeStream(stdErrReader);
+    logger.trace("Waiting for child threads to terminate");
+    try {
+      terminationSemaphore.acquire(numOfChildThreads.get());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      logger.trace(e.getMessage(), e);
+    }
+    logger.trace("Executor torn down");
+  }
+
+  /**
+   * Executes the specified command by writing the instruction to the process' standard in and waiting for a signal denoting the completion
+   * of the command's execution if the command is expected to produce an output at all.
+   *
+   * @param command The command to execute.
+   * @return Whether the command's execution was successful.
+   * @throws IOException If writing to the process' stream is not possible.
+   * @throws InterruptedException If the thread is interrupted while waiting for the command's response output.
+   */
+  private boolean executeCommand(Command command) throws IOException, InterruptedException {
+    command.reset();
+    this.command = command;
+    try {
+      String instruction = command.getInstruction();
+      logger.trace("Writing instruction \"{}\" to process' standard in", instruction);
+      stdInWriter.write(instruction);
+      stdInWriter.newLine();
+      stdInWriter.flush();
+      commandCompleted = !command.generatesOutput();
+      while (!commandCompleted) {
+        if (!isAlive()) {
+          logger.trace("Abort command execution due to process termination");
+          return false;
+        }
+        stateLock.wait();
+      }
+      logger.trace("Command completed");
+      return true;
+    } finally {
+      this.command = null;
+      commandCompleted = false;
+    }
+  }
+
+  /**
+   * A method called after the startup of the process and the set up of the executor.
+   */
+  protected abstract void onExecutorStartup();
+
+  /**
+   * A call-back method invoked after the termination of the underlying process and the stopping of the executor's helper threads.
+   */
+  protected abstract void onExecutorTermination();
+
+  /**
+   * Returns whether the the underlying process is alive.
+   *
+   * @return Whether the process is alive.
+   */
+  protected boolean isAlive() {
+    synchronized (stateLock) {
+      return running && !killed && process != null && process.isAlive();
     }
   }
 
@@ -243,332 +326,118 @@ abstract class AbstractProcessExecutor implements ProcessExecutor, Runnable {
    * @param submission The submission to process and execute.
    * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the submission.
    * @return Whether the execution of the submission has completed successfully.
-   * @throws IOException If there is an error while writing to the standard in of the process.
-   * @throws InterruptedException If the thread is interrupted during the execution.
-   * @throws NullPointerException If <code>submission</code> is <code>null</code>.
    */
-  protected boolean execute(Submission<?> submission, boolean terminateProcessAfterwards)
-      throws IOException, InterruptedException {
-    if (submissionLock.tryLock()) {
-      // Make sure that the reader thread can only process output lines if this one is ready and waiting.
-      synchronized (execLock) {
-        boolean success = false;
-        try {
-          /* If the process has terminated or the ProcessExecutor has been stopped while acquiring
-           * the execLock, return. */
-          if (!running || stopped) {
+  protected boolean execute(Submission<?> submission, boolean terminateProcessAfterwards) {
+    logger.trace("Attempting to execute submission {}", submission);
+    if (executeLock.tryLock()) {
+      try {
+        synchronized (stateLock) {
+          if (!isAlive() || !startedUp) {
+            logger.trace("Process not ready for submissions");
             return false;
           }
-          // Stop the timer as the process is not idle anymore.
-          if (doTime) {
-            timer.stop();
-          }
-          if (stopped) {
-            return false;
-          }
+          idle = false;
+          stateLock.notifyAll();
+          logger.trace("Starting execution of submission");
           submission.onStartedProcessing();
           for (Command command : submission.getCommands()) {
-            this.command = command;
-            commandCompleted = !command.generatesOutput();
-            stdInWriter.write(command.getInstruction());
-            stdInWriter.newLine();
-            stdInWriter.flush();
-            while (running && !stopped && !commandCompleted) {
-              onWait = true;
-              execLock.wait();
-            }
-            // Let the readers know that the command may be considered effectively processed.
-            onWait = false;
-            execLock.notifyAll();
-            /* If the process has terminated or the ProcessExecutor has been stopped, return false
-             * to signal failure. */
-            if (!commandCompleted) {
+            if (!executeCommand(command)) {
               return false;
             }
           }
-          command = null;
-          if (running && !stopped && terminateProcessAfterwards && stopLock.tryLock()) {
-            try {
-              if (!stop(false)) {
-                stop(true);
-              }
-            } finally {
-              stopLock.unlock();
+          logger.trace("Submission {} executed", submission);
+          submission.onFinishedProcessing();
+          if (terminateProcessAfterwards) {
+            logger.trace("Terminating process after successful submission execution");
+            if (!tryTerminate()) {
+              terminateForcibly();
             }
           }
-          success = true;
           return true;
-        } finally {
-          try {
-            if (success) {
-              submission.onFinishedProcessing();
-            }
-          } finally {
-            command = null;
-            onWait = false;
-            execLock.notifyAll();
-            if (running && !stopped && doTime) {
-              timer.start();
-            }
-            submissionLock.unlock();
-          }
         }
+      } catch (IOException e) {
+        handleProcessStreamIOException(e);
+      } catch (InterruptedException e) {
+        logger.trace(e.getMessage(), e);
+        Thread.currentThread().interrupt();
+        return false;
+      } finally {
+        executeLock.unlock();
       }
     }
     return false;
   }
 
+  /**
+   * It attempts to terminate the currently running process, if there is one, using the {@link ProcessManager#getTerminationSubmission()}
+   * method of the process manager assigned to the executor. This might be ineffective if the process is currently executing a command, is
+   * not currently running, the optional termination submission is not defined by the process manager, or the termination submission is
+   * unsuccessful.
+   *
+   * @return Whether the termination submission has been successfully executed.
+   */
+  public boolean tryTerminate() {
+    logger.trace("Attempting to terminate process using termination submission");
+    if (executeLock.tryLock()) {
+      try {
+        Optional<Submission<?>> optionalTerminationSubmission = manager.getTerminationSubmission();
+        if (optionalTerminationSubmission.isPresent()) {
+          logger.trace("No termination submission found");
+          synchronized (stateLock) {
+            if (isAlive()) {
+              killed = execute(optionalTerminationSubmission.get());
+              return killed;
+            } else {
+              logger.trace("Cannot execute termination submission as process is already terminated");
+            }
+          }
+        }
+      } catch (Exception e) {
+        logger.trace("Error attempting to terminate process", e);
+      } finally {
+        executeLock.unlock();
+      }
+    }
+    return false;
+  }
+
+  /**
+   * It sends a kill signal to the currently running process, if there is one.
+   */
+  public void terminateForcibly() {
+    logger.trace("Terminating process forcibly");
+    synchronized (stateLock) {
+      if (isAlive()) {
+        process.destroyForcibly();
+        killed = true;
+        stateLock.notifyAll();
+        logger.trace("Process killed");
+      } else {
+        logger.trace("Cannot terminate process as it is already terminated");
+      }
+    }
+  }
+
   @Override
   public boolean execute(Submission<?> submission) {
-    try {
-      return execute(submission, false);
-    } catch (IOException e) {
-      throw new ProcessException(e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new ProcessException(e);
-    }
+    return execute(submission, false);
   }
 
   @Override
   public void run() {
-    runLock.lock();
-    try {
-      termSemaphore.drainPermits();
-      int rc = UNEXPECTED_TERMINATION_RESULT_CODE;
-      long lifeTime = 0;
+    synchronized (runLock) {
+      int returnCode = UNEXPECTED_TERMINATION_RETURN_CODE;
       try {
-        // Startup block.
-        boolean orderly = false;
-        submissionLock.lock();
-        try {
-          synchronized (execLock) {
-            if (stopped) {
-              return;
-            }
-            running = true;
-            command = null;
-            keepAliveTime = manager.getKeepAliveTime();
-            doTime = keepAliveTime > 0;
-            timer = doTime && timer == null ? new KeepAliveTimer() : timer;
-            threadsToWaitFor.set(doTime ? 3 : 2);
-            // Start the process.
-            long startupTime;
-            synchronized (processLock) {
-              startupTime = System.currentTimeMillis();
-              process = manager.start();
-            }
-            lifeTime = System.currentTimeMillis();
-            Charset charset = manager.getEncoding();
-            stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream(), charset));
-            stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), charset));
-            stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), charset));
-            // Handle the startup; check if the process is to be considered immediately started up.
-            startedUp = manager.startsUpInstantly();
-            threadPool.execute(() -> startListeningToProcess(stdOutReader, false));
-            threadPool.execute(() -> startListeningToProcess(stdErrReader, true));
-            while (!startedUp) {
-              execLock.wait();
-              if (stopped) {
-                return;
-              }
-            }
-            manager.onStartup(this);
-            if (stopped) {
-              return;
-            }
-            startupTime = System.currentTimeMillis() - startupTime;
-            logger.debug(String.format("Startup time in executor %s: %.3f", this,
-                ((float) startupTime) / 1000));
-            if (doTime) {
-              // Start the timer.
-              threadPool.execute(timer);
-              timer.start();
-            }
-            orderly = true;
-          }
-        } finally {
-          onExecutorStartup(orderly);
-          /* If the startup was not orderly, e.g. the process was stopped prematurely or an exception
-           * was thrown, release as many permits as there are slave threads to ensure that the
-           * semaphore does not block in the finally clause. */
-          if (!orderly) {
-            termSemaphore.release(threadsToWaitFor.get());
-          }
-          submissionLock.unlock();
-        }
-        // Wait for the process to terminate.
-        rc = process.waitFor();
+        setUpExecutor();
+        returnCode = process.waitFor();
+        logger.trace("Process exited with return code {}", returnCode);
       } catch (Exception e) {
+        logger.trace(e.getMessage(), e);
         throw new ProcessException(e);
       } finally {
-        // Stop the timer.
-        if (doTime) {
-          timer.stop();
-        }
-        // Make sure the process itself has terminated.
-        synchronized (processLock) {
-          if (process != null) {
-            if (process.isAlive()) {
-              process.destroyForcibly();
-              try {
-                process.waitFor();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
-            }
-            process = null;
-          }
-        }
-        lifeTime = lifeTime == 0 ? 0 : System.currentTimeMillis() - lifeTime;
-        logger.debug(String.format("Process runtime in executor %s: %.3f", this,
-            ((float) lifeTime) / 1000));
-        // Make sure that there are no submission currently being executed...
-        submissionLock.lock();
-        try {
-          // Set running to false...
-          synchronized (execLock) {
-            running = false;
-            execLock.notifyAll();
-          }
-          /* Make sure that the timer sees the new value of running and the timer thread can
-           * terminate. */
-          if (doTime) {
-            timer.stop();
-          }
-          onExecutorTermination();
-        } finally {
-          submissionLock.unlock();
-        }
-        // Wait for all the slave threads to finish.
-        try {
-          termSemaphore.acquire(threadsToWaitFor.get());
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-        // Try to shutdown all the streams.
-        if (stdOutReader != null) {
-          try {
-            stdOutReader.close();
-          } catch (IOException e) {
-            logger.warn(e.getMessage(), e);
-          }
-        }
-        if (stdErrReader != null) {
-          try {
-            stdErrReader.close();
-          } catch (IOException e) {
-            logger.warn(e.getMessage(), e);
-          }
-        }
-        if (stdInWriter != null) {
-          try {
-            stdInWriter.close();
-          } catch (IOException e) {
-            logger.warn(e.getMessage(), e);
-          }
-        }
-        // The process life cycle is over.
-        try {
-          manager.onTermination(rc, lifeTime);
-        } finally {
-          synchronized (execLock) {
-            stopped = false;
-          }
-        }
-      }
-    } finally {
-      runLock.unlock();
-    }
-  }
-
-  /**
-   * A method called after the startup of the process and the set up of the executor but before it is declared ready for submissions.
-   *
-   * @param orderly Whether the executor startup has been orderly or not. If it has not been orderly, the executor is shut down.
-   */
-  protected abstract void onExecutorStartup(boolean orderly);
-
-  /**
-   * A call-back method invoked after the termination of the underlying process and the stopping of the executor's helper threads.
-   */
-  protected abstract void onExecutorTermination();
-
-  /**
-   * A simple timer that stops the process after <code>keepAliveTime</code> milliseconds unless the process is inactive or the timer is
-   * cancelled. It also enables the timer to be restarted using the same thread.
-   *
-   * @author Viktor Csomor
-   */
-  private class KeepAliveTimer implements Runnable {
-
-    boolean go;
-
-    /**
-     * Restarts the timer.
-     */
-    synchronized void start() {
-      go = true;
-      notifyAll();
-    }
-
-    /**
-     * Stops the timer.
-     */
-    synchronized void stop() {
-      go = false;
-      notifyAll();
-    }
-
-    @Override
-    public synchronized void run() {
-      try {
-        while (running && !stopped) {
-          while (!go) {
-            wait();
-            if (!running || stopped) {
-              return;
-            }
-          }
-          long waitTime = keepAliveTime;
-          while (go && waitTime > 0) {
-            long start = System.currentTimeMillis();
-            wait(waitTime);
-            if (!running || stopped) {
-              return;
-            }
-            waitTime -= (System.currentTimeMillis() - start);
-          }
-          /* Normally, the timer should not be running while a submission is being processed, i.e.
-           * if the timer gets to this point with go set to true, submissionLock should be available to
-           * the timer thread. However, if the execute method acquires the submissionLock right after the
-           * timer's wait time elapses, it will not be able to disable the timer until it enters
-           * the wait method in the next cycle and gives up its intrinsic lock. Therefore, the
-           * first call of the stop method of the AbstractProcessExecutor would fail due to the
-           * lock held by the thread running the execute method, triggering the forcible shutdown
-           * of the process even though it is not idle. To avoid this behavior, first the submissionLock
-           * is attempted to be acquired to ensure that the process is indeed idle. */
-          if (go && submissionLock.tryLock()) {
-            try {
-              if (!AbstractProcessExecutor.this.stop(false)) {
-                AbstractProcessExecutor.this.stop(true);
-              }
-            } finally {
-              submissionLock.unlock();
-            }
-          }
-        }
-      } catch (InterruptedException e) {
-        // Just let the thread terminate.
-        logger.warn(e.getMessage(), e);
-      } catch (Exception e) {
-        throw new ProcessException(e);
-      } finally {
-        go = false;
-        termSemaphore.release();
+        tearDownExecutor(returnCode);
       }
     }
-
   }
 
 }

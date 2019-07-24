@@ -56,7 +56,7 @@ public class JPPETest {
   public void test01() throws InterruptedException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 1);
     long start = System.currentTimeMillis();
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, null, null);
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 1000;
@@ -74,7 +74,7 @@ public class JPPETest {
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256),
-        1, 1, 0, 0, null, false);
+        1, 1, 0, null, null);
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 500;
@@ -91,7 +91,7 @@ public class JPPETest {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 3);
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
-        new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096), 1, 1, 0, 5000, null, false);
+        new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096), 1, 1, 0, 5000L, null);
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 500;
@@ -107,7 +107,7 @@ public class JPPETest {
   public void test04() throws InterruptedException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 4);
     long start = System.currentTimeMillis();
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 10, 15, 5, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 10, 15, 5, null, null);
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 2000;
@@ -125,7 +125,7 @@ public class JPPETest {
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256),
-        10, 15, 5, 0, null, false);
+        10, 15, 5, null, null);
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 2000;
@@ -142,7 +142,7 @@ public class JPPETest {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 6);
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
-        new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096), 10, 15, 5, 5000, null, false);
+        new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096), 10, 15, 5, 5000L, null);
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 2000;
@@ -158,7 +158,7 @@ public class JPPETest {
   @Test
   public void test07() throws InterruptedException, ExecutionException {
     System.out.println(System.lineSeparator() + "Test 7");
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 5, 5, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 5, 5, 0, null, null);
     try {
       List<Future<?>> futures = new ArrayList<>();
       AtomicInteger j = new AtomicInteger(2);
@@ -196,7 +196,7 @@ public class JPPETest {
     System.out.println(System.lineSeparator() + "Test 8");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256),
-        5, 5, 0, 0, null, false);
+        5, 5, 0, null, null);
     try {
       List<Future<?>> futures = new ArrayList<>();
       AtomicInteger j = new AtomicInteger(2);
@@ -228,11 +228,10 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test09() throws InterruptedException, ExecutionException {
     System.out.println(System.lineSeparator() + "Test 9");
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, null, null);
     int base = 13;
     try {
       Assert.assertEquals(52, (int) exec.submit((Callable<Integer> & Serializable) () -> 4 * base).get());
@@ -246,7 +245,7 @@ public class JPPETest {
   @Test
   public void test10() throws InterruptedException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 10);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, null, null);
     try {
       long start = System.currentTimeMillis();
       exec.execute((Runnable & Serializable) () -> {
@@ -267,11 +266,10 @@ public class JPPETest {
   }
 
   // Invocation testing.
-  @SuppressWarnings("unchecked")
   @Test
   public void test11() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 11);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, null, null);
     try {
       int base = 13;
       List<Callable<Integer>> tasks = new ArrayList<>();
@@ -297,11 +295,10 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test12() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 12);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, null, null);
     try {
       int base = 13;
       List<Callable<Integer>> tasks = new ArrayList<>();
@@ -327,11 +324,10 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test13() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 13);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, null, null);
     try {
       int base = 13;
       List<Callable<Integer>> tasks = new ArrayList<>();
@@ -358,11 +354,10 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test14() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 14);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, null, null);
     try {
       int base = 13;
       List<Callable<Integer>> tasks = new ArrayList<>();
@@ -389,11 +384,10 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test15() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 15);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, null, null);
     try {
       int base = 13;
       List<Callable<Integer>> tasks = new ArrayList<>();
@@ -421,11 +415,10 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test16() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 16);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, null, null);
     try {
       int base = 13;
       List<Callable<Integer>> tasks = new ArrayList<>();
@@ -449,11 +442,10 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test17() throws InterruptedException, ExecutionException, TimeoutException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 17);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, null, null);
     try {
       int base = 13;
       List<Callable<Integer>> tasks = new ArrayList<>();
@@ -478,11 +470,10 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test18() throws InterruptedException, ExecutionException, TimeoutException {
     System.out.println(System.lineSeparator() + "Test 18");
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 2, 2, 0, null, null);
     try {
       int base = 13;
       List<Callable<Integer>> tasks = new ArrayList<>();
@@ -506,7 +497,7 @@ public class JPPETest {
   @Test
   public void test19() throws InterruptedException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 19);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, null, null);
     try {
       Runnable r1 = (Runnable & Serializable) () -> {
         try {
@@ -553,11 +544,10 @@ public class JPPETest {
   }
 
   // Task and result exchange performance testing.
-  @SuppressWarnings("unchecked")
   @Test
   public void test20() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 20);
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 1, 1, 0, null, null);
     try {
       long start = System.currentTimeMillis();
       AtomicInteger res = exec.submit((Callable<AtomicInteger> & Serializable) () -> {
@@ -575,13 +565,12 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test21() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 21);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
         new SimpleJavaProcessOptions(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256),
-        30, 80, 10, 0, null, false);
+        30, 80, 10, null, null);
     try {
       List<Future<AtomicInteger>> results = new ArrayList<>();
       long start = System.currentTimeMillis();
@@ -605,12 +594,11 @@ public class JPPETest {
     }
   }
 
-  @SuppressWarnings("unchecked")
   @Test
   public void test22() throws InterruptedException, ExecutionException {
     System.out.printf(TestUtils.TEST_TITLE_FORMAT, 22);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(
-        new SimpleJavaProcessOptions(2, 4, 256), 30, 80, 10, 500, null, false);
+        new SimpleJavaProcessOptions(2, 4, 256), 30, 80, 10, 500L, null);
     try {
       List<Future<AtomicInteger>> results = new ArrayList<>();
       long start = System.currentTimeMillis();
@@ -639,8 +627,7 @@ public class JPPETest {
   public void test23() throws InterruptedException {
     System.out.println(System.lineSeparator() + "Test 23");
     JavaProcessOptions options = new JavaProcessOptions() { };
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(options,
-        5, 5, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(options, 5, 5, 0, null, null);
     try {
       Assert.assertEquals(options, exec.getJavaProcessOptions());
     } finally {
@@ -650,20 +637,19 @@ public class JPPETest {
   }
 
   // Java process testing.
-  @SuppressWarnings("unchecked")
   @Test
   public void test24() throws IOException, ClassNotFoundException {
     System.out.println(System.lineSeparator() + "Test 24");
     PrintStream origOutStream = System.out;
     String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n",
         "",
-        Conversion.toString("test"),
-        Conversion.toString((Callable<Long> & Serializable) () -> Math.round(Math.E)),
-        Conversion.toString((Callable<Object> & Serializable) () -> {
+        JavaProcess.convertToString("test"),
+        JavaProcess.convertToString((Callable<Long> & Serializable) () -> Math.round(Math.E)),
+        JavaProcess.convertToString((Callable<Object> & Serializable) () -> {
           throw new Exception("test");
         }),
         "test",
-        Conversion.toString(Request.TERMINATE));
+        JavaProcess.convertToString(Request.TERMINATE));
     try (ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayInputStream in = new ByteArrayInputStream(testInput.getBytes())) {
       System.setOut(new PrintStream(out));
@@ -671,16 +657,16 @@ public class JPPETest {
       JavaProcess.main(new String[0]);
       String[] lines = out.toString().split(System.lineSeparator());
       Assert.assertEquals(5, lines.length);
-      Assert.assertEquals(Signal.READY, Conversion.toObject(lines[0]));
-      Response response1 = (Response) Conversion.toObject(lines[1]);
+      Assert.assertEquals(Signal.READY, JavaProcess.convertToObject(lines[0]));
+      Response response1 = (Response) JavaProcess.convertToObject(lines[1]);
       Assert.assertFalse(response1.isError());
       Assert.assertEquals(3L, response1.getResult());
-      Response response2 = (Response) Conversion.toObject(lines[2]);
+      Response response2 = (Response) JavaProcess.convertToObject(lines[2]);
       Assert.assertTrue(response2.isError());
       Assert.assertEquals("test", ((Throwable) response2.getResult()).getMessage());
-      Response response3 = (Response) Conversion.toObject(lines[3]);
+      Response response3 = (Response) JavaProcess.convertToObject(lines[3]);
       Assert.assertTrue(response3.isError());
-      Assert.assertEquals(Signal.TERMINATED, Conversion.toObject(lines[4]));
+      Assert.assertEquals(Signal.TERMINATED, JavaProcess.convertToObject(lines[4]));
     } finally {
       System.setOut(origOutStream);
     }
@@ -690,7 +676,7 @@ public class JPPETest {
   @Test
   public void test25() throws InterruptedException {
     System.out.println(System.lineSeparator() + "Test 25");
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, null, null);
     try {
       exceptionRule.expect(RejectedExecutionException.class);
       exec.submit(() -> 1);
@@ -703,7 +689,7 @@ public class JPPETest {
   @Test
   public void test26() throws InterruptedException {
     System.out.println(System.lineSeparator() + "Test 26");
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, null, null);
     try {
       exceptionRule.expect(RejectedExecutionException.class);
       exec.submit(System::gc);
@@ -716,7 +702,7 @@ public class JPPETest {
   @Test
   public void test27() throws InterruptedException {
     System.out.println(System.lineSeparator() + "Test 27");
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, 0, null, false);
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, null, null);
     try {
       exceptionRule.expect(RejectedExecutionException.class);
       AtomicInteger n = new AtomicInteger(0);
@@ -731,12 +717,12 @@ public class JPPETest {
   @Test
   public void test28() throws InterruptedException, ExecutionException {
     System.out.println(System.lineSeparator() + "Test 28");
-    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, 0,
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(JavaProcessOptions.DEFAULT, 0, 1, 0, null,
         (Runnable & Serializable) () -> {
           for (int i = 0; i < 10; i++) {
             System.out.println("Doing stuff");
           }
-        }, false);
+        });
     try {
       AtomicInteger n = new AtomicInteger(0);
       Assert.assertEquals(1, exec.submit((Runnable & Serializable) () -> n.set(1), n).get().get());

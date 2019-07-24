@@ -15,6 +15,8 @@
  */
 package net.viktorc.pp4j.impl;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -39,8 +41,7 @@ public class SPETest {
           (c, o) -> true);
       executor.start();
       executor.execute(new SimpleSubmission(command));
-      Assert.assertFalse(executor.stop(false));
-      Assert.assertTrue(executor.stop(true));
+      Assert.assertFalse(executor.tryTerminate());
       Assert.assertTrue(command.getJointStandardOutLines()
           .contains("in progress\nin progress\nready"));
     }
@@ -60,9 +61,9 @@ public class SPETest {
   public void test03() throws Exception {
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
         TestUtils.createTestProcessManagerFactory().newProcessManager())) {
-      Assert.assertFalse(executor.isRunning());
+      Assert.assertFalse(executor.isAlive());
       executor.start();
-      Assert.assertTrue(executor.isRunning());
+      Assert.assertTrue(executor.isAlive());
     }
   }
 
@@ -71,18 +72,18 @@ public class SPETest {
     Thread t;
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
         TestUtils.createTestProcessManagerFactory().newProcessManager())) {
+      Future<?> future = executor.start();
       t = new Thread(() -> {
         try {
-          executor.join();
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+          future.get();
+        } catch (ExecutionException | InterruptedException e) {
+          throw new RuntimeException(e);
         }
       });
-      executor.start();
       t.start();
       Assert.assertTrue(t.isAlive());
-      executor.stop(true);
-      executor.join();
+      executor.terminateForcibly();
+      future.get();
       Thread.sleep(20);
       Assert.assertFalse(t.isAlive());
     }

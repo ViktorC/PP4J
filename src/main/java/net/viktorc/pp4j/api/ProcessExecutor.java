@@ -31,6 +31,6 @@ public interface ProcessExecutor {
    * could complete the execution of the submission, <code>false</code> is returned; otherwise the submission is processed and
    * <code>true</code> is returned once it's successfully executed.
    */
-  boolean execute(Submission<?> submission);
+  boolean execute(Submission<?> submission) throws InterruptedException;
 
 }

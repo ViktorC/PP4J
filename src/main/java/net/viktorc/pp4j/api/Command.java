@@ -54,4 +54,9 @@ public interface Command {
    */
   boolean isProcessed(String outputLine, boolean error);
 
+  /**
+   * It resets the command, in case it is stateful, to its initial state.
+   */
+  void reset();
+
 }

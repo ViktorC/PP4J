@@ -32,14 +32,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.JavaProcessExecutorService;
 import net.viktorc.pp4j.api.JavaProcessOptions;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
-import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
@@ -48,10 +46,10 @@ import net.viktorc.pp4j.impl.JavaProcess.Response;
 import net.viktorc.pp4j.impl.JavaProcess.Signal;
 
 /**
- * A sub-class of {@link net.viktorc.pp4j.impl.ProcessPoolExecutor} that implements the {@link net.viktorc.pp4j.api.JavaProcessExecutorService}
- * interface. It uses Java processes for the implementation of multiprocessing. It communicates with the processes via their standard
- * streams exchanging serialized and encoded objects. It can send {@link java.lang.Runnable} and {@link java.util.concurrent.Callable}
- * instances to the processes; and it receives the result or exception object serialized and encoded into a string.
+ * A sub-class of {@link ProcessPoolExecutor} that implements the {@link JavaProcessExecutorService} interface. It uses Java processes for
+ * the implementation of multiprocessing. It communicates with the processes via their standard streams exchanging serialized and encoded
+ * objects. It can send {@link Runnable} and {@link Callable} instances to the processes; and it receives the result or exception object
+ * serialized and encoded into a string.
  *
  * @author Viktor Csomor
  */
@@ -65,21 +63,18 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @param maxPoolSize The maximum size of the process pool.
    * @param reserveSize The number of available processes to keep in the pool.
    * @param keepAliveTime The duration of continuous idleness, in milliseconds, after which the processes are to be terminated. A process
-   * is considered idle if it is started up and not processing any submission. If the value of this parameter is less than or equal to
-   * <code>0</code>, the life spans of the processes will not be limited.
+   * is considered idle if it is started up and not processing any submission. If the value of this parameter is <code>null</code>, the
+   * life spans of the processes will not be limited.
    * @param startupTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
    * <code>null</code>, no taks are executed on startup.
-   * @param verbose Whether the events related to the management of the process pool should be logged. Setting this parameter to
-   * <code>true</code> does not guarantee that logging will be performed as logging depends on the SLF4J binding and the logging
-   * configurations, but setting it to <code>false</code> guarantees that no logging will be performed by the constructed instance.
    * @param <T> The type of the startup task.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    * @throws IllegalArgumentException If <code>options</code> is <code>null</code>, the minimum pool size is less than 0, or the maximum
    * pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
    */
   public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessOptions options, int minPoolSize, int maxPoolSize,
-      int reserveSize, long keepAliveTime, T startupTask, boolean verbose) throws InterruptedException {
-    super(new JavaProcessManagerFactory<>(options, startupTask, keepAliveTime), minPoolSize, maxPoolSize, reserveSize, verbose);
+      int reserveSize, Long keepAliveTime, T startupTask) throws InterruptedException {
+    super(new JavaProcessManagerFactory<>(options, startupTask, keepAliveTime), minPoolSize, maxPoolSize, reserveSize);
   }
 
   /**
@@ -100,9 +95,9 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @param terminateProcessAfterwards Whether the process that executes the task should be terminated afterwards.
    * @param <T> The serializable return type variable of the <code>Callable</code>
    * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
-   * @return A {@link java.util.concurrent.Future} instance associated with the return value of the task.
+   * @return A {@link Future} instance associated with the return value of the task.
    * @throws IOException If the serialization fails.
-   * @throws NotSerializableException If some object to be serialized does not implement the {@link java.io.Serializable} interface.
+   * @throws NotSerializableException If some object to be serialized does not implement the {@link Serializable} interface.
    */
   public <T extends Serializable, S extends Callable<T> & Serializable> Future<T> submitExplicitly(S task,
       boolean terminateProcessAfterwards) throws IOException {
@@ -237,8 +232,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
   /**
    * See {@link java.util.concurrent.ExecutorService#shutdownNow()}. It is equivalent to {@link #forceShutdown()} with the only difference
-   * being that this method filters and converts the returned submissions to a list of {@link java.lang.Runnable} instances excluding {@link
-   * java.util.concurrent.Callable} based submissions.
+   * being that this method filters and converts the returned submissions to a list of {@link Runnable} instances excluding
+   * {@link Callable} based submissions.
    */
   @Override
   public List<Runnable> shutdownNow() {
@@ -250,18 +245,18 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   /**
-   * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} for the creation of {@link
-   * net.viktorc.pp4j.impl.JavaProcessPoolExecutor.JavaProcessManager} instances using a single {@link java.lang.ProcessBuilder} instance.
+   * An implementation of the {@link ProcessManagerFactory} for the creation of {@link JavaProcessManager} instances using a single
+   * {@link ProcessBuilder} instance.
    *
-   * @param <T> A type variable implementing the {@link java.lang.Runnable} and {@link java.io.Serializable} interfaces that defines the
-   * base class of the startup tasks.
+   * @param <T> A type variable implementing the {@link Runnable} and {@link Serializable} interfaces that defines the base class of the
+   * startup tasks of the created {@link JavaProcessManager} instances.
    * @author Viktor Csomor
    */
   private static class JavaProcessManagerFactory<T extends Runnable & Serializable> implements ProcessManagerFactory {
 
     JavaProcessOptions options;
     T startupTask;
-    long keepAliveTime;
+    Long keepAliveTime;
 
     /**
      * Constructs an instance based on the specified JVM options and <code>keepAliveTime</code> which are used for the creation of all
@@ -273,7 +268,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
      * @param keepAliveTime The number of milliseconds after which idle processes are terminated.
      * @throws IllegalArgumentException If the <code>options</code> is <code>null</code> or contains invalid values.
      */
-    JavaProcessManagerFactory(JavaProcessOptions options, T startupTask, long keepAliveTime) {
+    JavaProcessManagerFactory(JavaProcessOptions options, T startupTask, Long keepAliveTime) {
       if (options == null) {
         throw new IllegalArgumentException("The options argument cannot be null.");
       }
@@ -321,11 +316,10 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   /**
-   * A sub-class of {@link net.viktorc.pp4j.impl.AbstractProcessManager} for the management of process instances of the {@link
-   * net.viktorc.pp4j.impl.JavaProcess} class.
+   * A sub-class of {@link AbstractProcessManager} for the management of process instances of the {@link JavaProcess} class.
    *
-   * @param <T> A type variable implementing the {@link java.lang.Runnable} and {@link java.io.Serializable} interfaces that defines the
-   * base class of the startup task.
+   * @param <T> A type variable implementing the {@link Runnable} and {@link Serializable} interfaces that defines the base class of the
+   * startup task.
    * @author Viktor Csomor
    */
   private static class JavaProcessManager<T extends Runnable & Serializable> extends AbstractProcessManager {
@@ -336,10 +330,10 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
      * Constructs an instance using the specified <code>builder</code> and <code>keepAliveTime</code>.
      *
      * @param builder The <code>ProcessBuilder</code> to use for starting the Java processes.
-     * @param keepAliveTime The number of milliseconds of idleness after which the processes should be terminated. If it is non-positive,
-     * the life-cycle of processes will not be limited based on idleness.
+     * @param keepAliveTime The number of milliseconds of idleness after which the processes should be terminated. If it is
+     * <code>null</code>, the life-cycle of processes will not be limited based on idleness.
      */
-    JavaProcessManager(ProcessBuilder builder, long keepAliveTime, T startupTask) {
+    JavaProcessManager(ProcessBuilder builder, Long keepAliveTime, T startupTask) {
       super(builder, keepAliveTime);
       this.startupTask = startupTask;
     }
@@ -353,7 +347,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     public boolean isStartedUp(String outputLine, boolean error) {
       if (!error) {
         try {
-          Object output = Conversion.toObject(outputLine);
+          Object output = JavaProcess.convertToObject(outputLine);
           return output == Signal.READY;
         } catch (IOException | ClassNotFoundException e) {
           throw new ProcessException(e);
@@ -363,40 +357,40 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     }
 
     @Override
-    public void onStartup(ProcessExecutor executor) {
+    public Optional<Submission<?>> getInitSubmission() {
+      if (startupTask == null) {
+        return Optional.empty();
+      }
+      Optional<Submission<?>> initSubmission;
       try {
-        // If there is a startup task, execute it.
-        if (startupTask != null) {
-          // Avoid having to have the process manager serialized.
-          T startupTask = this.startupTask;
-          executor.execute(new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
-            startupTask.run();
-            return null;
-          }));
-        }
-      } catch (Exception e) {
+        // Avoid having to have the process manager serialized.
+        T startupTask = this.startupTask;
+        initSubmission = Optional.of(new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
+          startupTask.run();
+          return null;
+        }));
+      } catch (IOException e) {
         throw new ProcessException(e);
       }
+      return initSubmission;
     }
 
     @Override
-    public boolean terminateGracefully(ProcessExecutor executor) {
-      AtomicBoolean success = new AtomicBoolean(false);
+    public Optional<Submission<?>> getTerminationSubmission() {
       try {
-        String terminationCommand = Conversion.toString(Request.TERMINATE);
-        executor.execute(new SimpleSubmission(new SimpleCommand(terminationCommand,
+        String terminationCommand = JavaProcess.convertToString(Request.TERMINATE);
+        return Optional.of(new SimpleSubmission(new SimpleCommand(terminationCommand,
             (command, outputLine) -> {
               try {
-                Object output = Conversion.toObject(outputLine);
-                success.set(output == Signal.TERMINATED);
+                Object output = JavaProcess.convertToObject(outputLine);
+                return output == Signal.TERMINATED;
               } catch (IOException | ClassNotFoundException e) {
                 throw new ProcessException(e);
               }
-              return true;
-            }, (c, l) -> true)));
-        return success.get();
+            },
+            (command, outputLine) -> false)));
       } catch (IOException e) {
-        return false;
+        return Optional.empty();
       }
     }
 
@@ -408,10 +402,9 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   /**
-   * An implementation of {@link net.viktorc.pp4j.api.Submission} for serializable {@link java.util.concurrent.Callable} instances to submit
-   * in Java process. It serializes, encodes, and sends the <code>Callable</code> to the process for execution. It also looks for the
-   * serialized and encoded return value of the <code>Callable</code>, and for a serialized and encoded {@link java.lang.Throwable} instance
-   * output to the stderr stream in case of an error.
+   * An implementation of {@link Submission} for serializable {@link Callable} instances to submit in Java process. It serializes, encodes,
+   * and sends the <code>Callable</code> to the process for execution. It also looks for the serialized and encoded return value of the
+   * <code>Callable</code>, and for a serialized and encoded {@link Throwable} instance output to the stderr stream in case of an error.
    *
    * @param <T> The serializable return type variable of the <code>Callable</code>
    * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
@@ -425,14 +418,14 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     volatile Throwable error;
 
     /**
-     * Creates a submission for the specified {@link java.util.concurrent.Callable}.
+     * Creates a submission for the specified {@link Callable}.
      *
      * @param task The task to execute.
      * @throws IOException If the encoding of the serialized task fails.
      */
     JavaSubmission(S task) throws IOException {
       this.task = task;
-      command = Conversion.toString(task);
+      command = JavaProcess.convertToString(task);
     }
 
     @SuppressWarnings("unchecked")
@@ -441,7 +434,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       return Collections.singletonList(new SimpleCommand(command, (command, outputLine) -> {
         Object output;
         try {
-          output = Conversion.toObject(outputLine);
+          output = JavaProcess.convertToObject(outputLine);
         } catch (Exception e) {
           return false;
         }
@@ -477,8 +470,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   /**
-   * An implementation of the {@link java.util.concurrent.Future} interface for wrapping a <code>Future</code> instance into a
-   * <code>Future</code> object with a return type that is a sub-type of that of the wrapped instance.
+   * An implementation of the {@link Future} interface for wrapping a <code>Future</code> instance into a <code>Future</code> object with
+   * a return type that is a sub-type of that of the wrapped instance.
    *
    * @param <T> The return type of the original <code>Future</code> instance.
    * @param <S> A subtype of <code>T</code>; the return type of the wrapper <code>Future</code> instance.
@@ -525,9 +518,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   /**
-   * A wrapper class implementing the {@link java.util.concurrent.Callable} interface for turning a serializable
-   * <code>Callable</code> instance with a not explicitly serializable return type into a serializable
-   * <code>Callable</code> instance with an explicitly serializable return type.
+   * A wrapper class implementing the {@link Callable} interface for turning a serializable <code>Callable</code> instance with a not
+   * explicitly serializable return type into a serializable <code>Callable</code> instance with an explicitly serializable return type.
    *
    * @param <T> The serializable return type.
    * @param <S> The serializable <code>Callable</code> implementation with a not explicitly serializable return type.

@@ -47,7 +47,7 @@ public class PPEVsJPPETest {
    */
   private long testJNI(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
     JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512),
-        minSize, maxSize, reserveSize, 0, reuse ? (Runnable & Serializable) WrapperJNI::new : null, false);
+        minSize, maxSize, reserveSize, null, reuse ? (Runnable & Serializable) WrapperJNI::new : null);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> (new WrapperJNI()).doStuff(taskTime);
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
@@ -82,7 +82,7 @@ public class PPEVsJPPETest {
    */
   private long testJNA(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
     JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512),
-        minSize, maxSize, reserveSize, 0, reuse ? (Runnable & Serializable) WrapperJNA::getInstance : null, false);
+        minSize, maxSize, reserveSize, null, reuse ? (Runnable & Serializable) WrapperJNA::getInstance : null);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> WrapperJNA.INSTANCE.doStuff(taskTime);
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
@@ -131,8 +131,7 @@ public class PPEVsJPPETest {
       throws Exception {
     long start, time, javaTime;
     List<Future<?>> futures = new ArrayList<>();
-    ProcessPoolExecutor nativePool = new ProcessPoolExecutor(TestUtils.createTestProcessManagerFactory(),
-        minSize, maxSize, reserveSize, false);
+    ProcessPoolExecutor nativePool = new ProcessPoolExecutor(TestUtils.createTestProcessManagerFactory(), minSize, maxSize, reserveSize);
     try {
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
         nativePool.submit(getNativeSubmission(taskTime), !reuse).get();

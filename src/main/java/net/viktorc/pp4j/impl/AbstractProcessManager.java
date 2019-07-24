@@ -16,6 +16,7 @@
 package net.viktorc.pp4j.impl;
 
 import java.io.IOException;
+import java.util.Optional;
 import net.viktorc.pp4j.api.ProcessManager;
 
 /**
@@ -26,18 +27,27 @@ import net.viktorc.pp4j.api.ProcessManager;
 public abstract class AbstractProcessManager implements ProcessManager {
 
   private final ProcessBuilder builder;
-  private final long keepAliveTime;
+  private final Long keepAliveTime;
 
   /**
    * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with the specified maximum life span.
    *
    * @param builder The instance to build the processes with.
-   * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is
-   * <code>0</code> or less, the life span of the process will not be limited.
+   * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
+   * of the process will not be limited.
    */
-  protected AbstractProcessManager(ProcessBuilder builder, long keepAliveTime) {
+  protected AbstractProcessManager(ProcessBuilder builder, Long keepAliveTime) {
     this.builder = builder;
     this.keepAliveTime = keepAliveTime;
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with an unlimited life span.
+   *
+   * @param builder The instance to build the processes with.
+   */
+  protected AbstractProcessManager(ProcessBuilder builder) {
+    this(builder, null);
   }
 
   @Override
@@ -46,8 +56,8 @@ public abstract class AbstractProcessManager implements ProcessManager {
   }
 
   @Override
-  public long getKeepAliveTime() {
-    return keepAliveTime;
+  public Optional<Long> getKeepAliveTime() {
+    return Optional.ofNullable(keepAliveTime);
   }
 
 }
