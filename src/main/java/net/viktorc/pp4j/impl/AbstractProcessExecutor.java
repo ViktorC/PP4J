@@ -50,8 +50,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private Command command;
   private boolean running;
   private boolean startedUp;
-  private boolean killed;
   private boolean idle;
+  private boolean killed;
   private boolean commandCompleted;
 
   /**
@@ -75,18 +75,16 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   }
 
   /**
-   * Handles any I/O exceptions thrown by any of the read, write, or flush methods of any of the process' streams according to the state
-   * of the process.
+   * Closes the provided stream.
    *
-   * @param e The I/O exception thrown.
+   * @param stream The stream to close.
    */
-  private void handleProcessStreamIOException(IOException e) {
-    logger.trace(e.getMessage(), e);
-    synchronized (stateLock) {
-      if (isAlive()) {
-        throw new ProcessException(e);
-      } else {
-        stateLock.notifyAll();
+  private void closeStream(Closeable stream) {
+    if (stream != null) {
+      try {
+        stream.close();
+      } catch (IOException e) {
+        logger.trace(e.getMessage(), e);
       }
     }
   }
@@ -125,7 +123,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         }
       }
     } catch (IOException e) {
-      handleProcessStreamIOException(e);
+      logger.trace("Error while reading from process stream", e);
+      terminateForcibly();
     } finally {
       logger.trace("Stopping listening to standard {} stream", error ? "error" : "out");
       terminationSemaphore.release();
@@ -154,9 +153,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
           if (isAlive() && idle && executeLock.tryLock()) {
             try {
               logger.trace("Attempting to terminate process due to prolonged idleness");
-              if (!tryTerminate()) {
-                terminateForcibly();
-              }
+              terminate();
             } finally {
               executeLock.unlock();
             }
@@ -164,26 +161,12 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         }
       }
     } catch (InterruptedException e) {
+      logger.trace("Process keep alive timer interrupted", e);
+      terminateForcibly();
       Thread.currentThread().interrupt();
-      logger.trace(e.getMessage(), e);
     } finally {
       logger.trace("Stopping idleness timer");
       terminationSemaphore.release();
-    }
-  }
-
-  /**
-   * Closes the provided stream.
-   *
-   * @param stream The stream to close.
-   */
-  private void closeStream(Closeable stream) {
-    if (stream != null) {
-      try {
-        stream.close();
-      } catch (IOException e) {
-        logger.trace(e.getMessage(), e);
-      }
     }
   }
 
@@ -240,8 +223,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private void tearDownExecutor(int returnCode) {
     logger.trace("Tearing down executor");
     synchronized (stateLock) {
-      idle = false;
       killed = false;
+      idle = false;
       startedUp = false;
       running = false;
       process = null;
@@ -349,16 +332,17 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
           submission.onFinishedProcessing();
           if (terminateProcessAfterwards) {
             logger.trace("Terminating process after successful submission execution");
-            if (!tryTerminate()) {
-              terminateForcibly();
-            }
+            terminate();
           }
           return true;
         }
       } catch (IOException e) {
-        handleProcessStreamIOException(e);
+        logger.trace("Error while writing to process stream", e);
+        terminateForcibly();
+        return false;
       } catch (InterruptedException e) {
-        logger.trace(e.getMessage(), e);
+        logger.trace("Submission execution interrupted", e);
+        terminateForcibly();
         Thread.currentThread().interrupt();
         return false;
       } finally {
@@ -376,21 +360,21 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    *
    * @return Whether the termination submission has been successfully executed.
    */
-  public boolean tryTerminate() {
+  protected boolean tryTerminate() {
     logger.trace("Attempting to terminate process using termination submission");
     if (executeLock.tryLock()) {
       try {
         Optional<Submission<?>> optionalTerminationSubmission = manager.getTerminationSubmission();
         if (optionalTerminationSubmission.isPresent()) {
-          logger.trace("No termination submission found");
           synchronized (stateLock) {
             if (isAlive()) {
-              killed = execute(optionalTerminationSubmission.get());
-              return killed;
+              return execute(optionalTerminationSubmission.get());
             } else {
               logger.trace("Cannot execute termination submission as process is already terminated");
             }
           }
+        } else {
+          logger.trace("No termination submission found");
         }
       } catch (Exception e) {
         logger.trace("Error attempting to terminate process", e);
@@ -405,7 +389,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * It sends a kill signal to the currently running process, if there is one.
    */
   public void terminateForcibly() {
-    logger.trace("Terminating process forcibly");
+    logger.trace("Terminating process forcibly...");
     synchronized (stateLock) {
       if (isAlive()) {
         process.destroyForcibly();
@@ -416,6 +400,15 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         logger.trace("Cannot terminate process as it is already terminated");
       }
     }
+  }
+
+  /**
+   * It attempts to terminate the process using the termination submission defined by the process manger, if there is one, then proceeds
+   * to forcibly shut down the process if it is still alive.
+   */
+  public void terminate() {
+    tryTerminate();
+    terminateForcibly();
   }
 
   @Override

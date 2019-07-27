@@ -243,9 +243,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       synchronized (mainLock) {
         logger.debug("Shutting down process executors...");
         for (InternalProcessExecutor executor : processExecutors) {
-          if (!executor.tryTerminate()) {
-            executor.terminateForcibly();
-          }
+          executor.terminate();
         }
       }
       logger.debug("Shutting down thread pools...");
@@ -624,25 +622,25 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
      * thrown during its execution, the submission is deemed completed and the process is terminated.
      */
     void takeAndExecuteSubmission() {
-      InternalSubmission<?> submission = null;
+      InternalSubmission<?> submission;
       boolean submissionDone = false;
       try {
         submission = submissionQueue.takeFirst();
         logger.trace("Submission {} taken off queue", submission);
+      } catch (InterruptedException e) {
+        logger.trace("Thread interrupted while waiting for submission", e);
+        return;
+      }
+      try {
         submission.setThread(submissionThread);
         submissionDone = !submission.isCancelled() && execute(submission, submission.terminateProcessAfterwards);
-      } catch (InterruptedException e) {
-        logger.trace("Submission executor interrupted", e);
       } catch (Exception e) {
-        if (submission != null) {
-          submission.setException(e);
-          logger.trace("Exception while executing submission", e);
-          submissionDone = true;
-          // If the submission did not complete due to an error, kill the process.
-          terminateForcibly();
-        }
+        submission.setException(e);
+        logger.trace("Exception while executing submission", e);
+        submissionDone = true;
+        terminateForcibly();
       } finally {
-        if (submission != null && submission.isCancelled()) {
+        if (submission.isCancelled()) {
           logger.trace("Submission cancelled");
           submissionDone = true;
         }
