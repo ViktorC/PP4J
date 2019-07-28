@@ -163,7 +163,7 @@ public class PPETest {
               @Override
               public boolean generatesOutput() {
                 if (throwExecutionException) {
-                  throw new ProcessException("Test execution exception.");
+                  throw new RuntimeException("Test execution exception.");
                 }
                 return super.generatesOutput();
               }
@@ -666,7 +666,7 @@ public class PPETest {
         @Override
         public boolean startsUpInstantly() {
           if (throwStartupException) {
-            throw new ProcessException("Test startup exception.");
+            throw new RuntimeException("Test startup exception.");
           }
           return !verifyStartup && super.startsUpInstantly();
         }

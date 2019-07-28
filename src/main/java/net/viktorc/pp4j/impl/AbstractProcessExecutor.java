@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * An abstract implementation of the {@link ProcessExecutor} interface for starting, managing, and interacting with a process. The life
- * cycle of the associated process is encapsulated within that of the {@link #run()} method of the instance.
+ * cycle of the associated process is encapsulated within that of the {@link #run()} method of instances of this class.
  *
  * @author Viktor Csomor
  */
@@ -195,8 +195,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         threadPool.execute(() -> listenToProcessStream(stdErrReader, true));
         logger.trace("Waiting for process to start up");
         while (!startedUp) {
-          if (killed || !process.isAlive()) {
-            logger.trace("Process terminated before it could start up");
+          if (killed) {
+            logger.trace("Process killed before it could start up");
             return;
           }
           stateLock.wait();
@@ -298,7 +298,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   protected boolean isAlive() {
     synchronized (stateLock) {
-      return running && !killed && process != null && process.isAlive();
+      return running && !killed;
     }
   }
 
@@ -425,12 +425,29 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         returnCode = process.waitFor();
         logger.trace("Process exited with return code {}", returnCode);
       } catch (Exception e) {
-        logger.trace(e.getMessage(), e);
         throw new ProcessException(e);
       } finally {
         tearDownExecutor(returnCode);
       }
     }
+  }
+
+  /**
+   * An exception thrown if an unexpected error occurs while running or interacting with a process.
+   *
+   * @author Viktor Csomor
+   */
+  protected static class ProcessException extends RuntimeException {
+
+    /**
+     * Constructs a wrapper for the specified exception.
+     *
+     * @param e The source exception.
+     */
+    protected ProcessException(Exception e) {
+      super(e);
+    }
+
   }
 
 }

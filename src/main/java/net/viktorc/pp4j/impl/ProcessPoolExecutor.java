@@ -259,7 +259,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       synchronized (mainLock) {
         logger.debug("Setting remaining submission future exceptions...");
         for (InternalSubmission<?> submission : submissionQueue) {
-          submission.setException(new ProcessException("The process pool has shut down"));
+          submission.setException(new RejectedExecutionException("The process pool has shut down"));
         }
       }
       poolTerminationLatch.countDown();
@@ -278,10 +278,11 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       submit(submission).get();
       return true;
     } catch (ExecutionException e) {
-      throw new ProcessException(e);
+      throw new RuntimeException(e);
     } catch (InterruptedException e) {
+      logger.error(e.getMessage(), e);
       Thread.currentThread().interrupt();
-      throw new ProcessException(e);
+      return false;
     }
   }
 

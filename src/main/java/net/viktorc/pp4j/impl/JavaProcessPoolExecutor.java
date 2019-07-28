@@ -51,6 +51,8 @@ import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A sub-class of {@link ProcessPoolExecutor} that implements the {@link JavaProcessExecutorService} interface. It uses Java processes for
@@ -115,6 +117,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @return The decoded and deserialized string as an object.
    * @throws IOException If the deserialization fails.
    * @throws ClassNotFoundException If the deserialization fails due to the class of the object not having been found.
+   * @throws IllegalArgumentException If the string is not a valid Base64 string.
    */
   static Object convertToObject(String string) throws IOException, ClassNotFoundException {
     byte[] bytes = Base64.getDecoder().decode(string);
@@ -147,10 +150,10 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     try {
       submit(command).get();
     } catch (ExecutionException e) {
-      throw new ProcessException(e);
+      throw new RuntimeException(e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new ProcessException(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -362,6 +365,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    */
   private static class JavaProcessManager<T extends Runnable & Serializable> extends AbstractProcessManager {
 
+    static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessManager.class);
+
     T startupTask;
 
     /**
@@ -387,8 +392,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
         try {
           Object output = convertToObject(outputLine);
           return output == JavaProcess.Signal.READY;
-        } catch (IOException | ClassNotFoundException e) {
-          throw new ProcessException(e);
+        } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
+          LOGGER.trace(e.getMessage(), e);
         }
       }
       return false;
@@ -408,7 +413,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           return null;
         }));
       } catch (IOException e) {
-        throw new ProcessException(e);
+        LOGGER.warn(e.getMessage(), e);
+        return Optional.empty();
       }
       return initSubmission;
     }
@@ -422,12 +428,14 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
               try {
                 Object output = convertToObject(outputLine);
                 return output == JavaProcess.Signal.TERMINATED;
-              } catch (IOException | ClassNotFoundException e) {
-                throw new ProcessException(e);
+              } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
+                LOGGER.trace(e.getMessage(), e);
+                return false;
               }
             },
             (command, outputLine) -> false)));
       } catch (IOException e) {
+        LOGGER.warn(e.getMessage(), e);
         return Optional.empty();
       }
     }
@@ -450,6 +458,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    */
   private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable> implements Submission<T> {
 
+    static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessManager.class);
+
     final S task;
     final String command;
     volatile T result;
@@ -469,27 +479,30 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     @SuppressWarnings("unchecked")
     @Override
     public List<Command> getCommands() {
-      return Collections.singletonList(new SimpleCommand(command, (command, outputLine) -> {
-        Object output;
-        try {
-          output = convertToObject(outputLine);
-        } catch (Exception e) {
-          return false;
-        }
-        if (output instanceof JavaProcess.Response) {
-          JavaProcess.Response response = (JavaProcess.Response) output;
-          if (response.isError()) {
-            error = (Throwable) response.getResult();
-          } else {
-            result = (T) response.getResult();
-          }
-          return true;
-        }
-        return false;
-      }, (command, outputLine) -> {
-        // It cannot happen, as stderr is redirected.
-        return true;
-      }));
+      return Collections.singletonList(new SimpleCommand(command,
+          (command, outputLine) -> {
+            Object output;
+            try {
+              output = convertToObject(outputLine);
+            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
+              LOGGER.trace(e.getMessage(), e);
+              return false;
+            }
+            if (output instanceof JavaProcess.Response) {
+              JavaProcess.Response response = (JavaProcess.Response) output;
+              if (response.isError()) {
+                error = (Throwable) response.getResult();
+              } else {
+                result = (T) response.getResult();
+              }
+              return true;
+            }
+            return false;
+          },
+          (command, outputLine) -> {
+            // It cannot happen, as stderr is redirected.
+            return true;
+          }));
     }
 
     @Override

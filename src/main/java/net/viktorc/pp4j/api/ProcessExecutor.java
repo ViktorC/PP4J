@@ -23,8 +23,9 @@ package net.viktorc.pp4j.api;
 public interface ProcessExecutor {
 
   /**
-   * Sequentially sends the specified commands to the process and blocks until they are processed. The result of the submission, if there
-   * is one, can be subsequently  accessed by calling the {@link net.viktorc.pp4j.api.Submission#getResult()} method.
+   * It has the process sequentially execute the commands contained in the submission and blocks until the execution of every command is
+   * complete. The result of the submission, if there is one, can be subsequently accessed by calling the
+   * {@link net.viktorc.pp4j.api.Submission#getResult()} method.
    *
    * @param submission The submission to execute.
    * @return Whether the submission was executed. If the executor is not running, busy processing an other submission, or stopped before it
