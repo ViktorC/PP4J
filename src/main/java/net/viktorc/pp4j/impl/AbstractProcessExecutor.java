@@ -437,7 +437,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    *
    * @author Viktor Csomor
    */
-  protected static class ProcessException extends RuntimeException {
+  public static class ProcessException extends RuntimeException {
 
     /**
      * Constructs a wrapper for the specified exception.

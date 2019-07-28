@@ -150,10 +150,10 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     try {
       submit(command).get();
     } catch (ExecutionException e) {
-      throw new RuntimeException(e);
+      throw new FailedSubmissionExecutionException(e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
+      throw new FailedSubmissionExecutionException(e);
     }
   }
 

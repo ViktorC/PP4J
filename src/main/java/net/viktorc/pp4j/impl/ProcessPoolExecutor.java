@@ -278,7 +278,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       submit(submission).get();
       return true;
     } catch (ExecutionException e) {
-      throw new RuntimeException(e);
+      throw new FailedSubmissionExecutionException(e);
     } catch (InterruptedException e) {
       logger.error(e.getMessage(), e);
       Thread.currentThread().interrupt();
@@ -784,6 +784,24 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
           startNewProcess();
         }
       }
+    }
+
+  }
+
+  /**
+   * An exception thrown if an unexpected error occurs while executing a submission.
+   *
+   * @author Viktor Csomor
+   */
+  public static class FailedSubmissionExecutionException extends RuntimeException {
+
+    /**
+     * Constructs a wrapper for the specified exception.
+     *
+     * @param e The source exception.
+     */
+    protected FailedSubmissionExecutionException(Exception e) {
+      super(e);
     }
 
   }
