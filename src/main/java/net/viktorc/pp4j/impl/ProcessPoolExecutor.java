@@ -357,6 +357,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    * An implementation of the {@link Submission} interface for wrapping other instances of the interface into a class that allows for
    * waiting for the completion of the submission, the cancellation thereof, and the tracking of the time its processing took.
    *
+   * @param <T> The return type associated with the submission.
    * @author Viktor Csomor
    */
   private class InternalSubmission<T> implements Submission<T> {
@@ -474,6 +475,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    * An implementation of {@link Future} that can be used to cancel, wait on, and retrieve the return value of an
    * {@link InternalSubmission} instance.
    *
+   * @param <T> The return type associated with the submission.
    * @author Viktor Csomor
    */
   private class InternalSubmissionFuture<T> implements Future<T> {
@@ -784,24 +786,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
           startNewProcess();
         }
       }
-    }
-
-  }
-
-  /**
-   * An exception thrown if an unexpected error occurs while executing a submission.
-   *
-   * @author Viktor Csomor
-   */
-  public static class FailedSubmissionExecutionException extends RuntimeException {
-
-    /**
-     * Constructs a wrapper for the specified exception.
-     *
-     * @param e The source exception.
-     */
-    protected FailedSubmissionExecutionException(Exception e) {
-      super(e);
     }
 
   }

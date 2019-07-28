@@ -432,22 +432,4 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     }
   }
 
-  /**
-   * An exception thrown if an unexpected error occurs while running or interacting with a process.
-   *
-   * @author Viktor Csomor
-   */
-  public static class ProcessException extends RuntimeException {
-
-    /**
-     * Constructs a wrapper for the specified exception.
-     *
-     * @param e The source exception.
-     */
-    protected ProcessException(Exception e) {
-      super(e);
-    }
-
-  }
-
 }
