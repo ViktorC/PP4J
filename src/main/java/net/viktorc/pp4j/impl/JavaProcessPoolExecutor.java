@@ -15,26 +15,13 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.NotSerializableException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-import java.io.PrintStream;
 import java.io.Serializable;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -43,16 +30,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import net.viktorc.pp4j.api.Command;
-import net.viktorc.pp4j.api.JavaProcessConfig;
 import net.viktorc.pp4j.api.JavaProcessExecutorService;
-import net.viktorc.pp4j.api.JavaProcessConfig.JVMArch;
-import net.viktorc.pp4j.api.JavaProcessConfig.JVMType;
-import net.viktorc.pp4j.api.ProcessManager;
-import net.viktorc.pp4j.api.ProcessManagerFactory;
-import net.viktorc.pp4j.api.Submission;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A sub-class of {@link ProcessPoolExecutor} that implements the {@link JavaProcessExecutorService} interface. It uses Java processes for
@@ -67,66 +45,18 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   /**
    * Constructs a Java process pool executor using the specified parameters.
    *
-   * @param options The options for the "java" program used to create the new JVM.
+   * @param processManagerFactory The java process manager factory.
    * @param minPoolSize The minimum size of the process pool.
    * @param maxPoolSize The maximum size of the process pool.
    * @param reserveSize The number of available processes to keep in the pool.
-   * @param keepAliveTime The duration of continuous idleness, in milliseconds, after which the processes are to be terminated. A process
-   * is considered idle if it is started up and not processing any submission. If the value of this parameter is <code>null</code>, the
-   * life spans of the processes will not be limited.
-   * @param initTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
-   * <code>null</code>, no taks are executed on startup.
-   * @param wrapUpTask The task to execute in each process before it is terminated. If it is <code>null</code>, no wrap-up task is
-   * executed.
    * @param <T> The type of the startup task.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    * @throws IllegalArgumentException If <code>options</code> is <code>null</code>, the minimum pool size is less than 0, or the maximum
    * pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
    */
-  public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessConfig options, int minPoolSize, int maxPoolSize,
-      int reserveSize, Long keepAliveTime, T initTask, T wrapUpTask) throws InterruptedException {
-    super(new JavaProcessManagerFactory<>(options, initTask, wrapUpTask, keepAliveTime), minPoolSize, maxPoolSize, reserveSize);
-  }
-
-  /**
-   * Returns the Java process options associated with the pool.
-   *
-   * @return The Java process options used to create the processes.
-   */
-  public JavaProcessConfig getJavaProcessOptions() {
-    return ((JavaProcessManagerFactory<?>) getProcessManagerFactory()).options;
-  }
-
-  /**
-   * Serializes the specified object into a string and encodes it using Base64.
-   *
-   * @param object The object to serialize and encode.
-   * @return The serialized and encoded object as a string.
-   * @throws IOException If the serialization fails.
-   */
-  static String convertToString(Object object) throws IOException {
-    try (ByteArrayOutputStream byteArrayOut = new ByteArrayOutputStream();
-        ObjectOutputStream objectOutput = new ObjectOutputStream(byteArrayOut)) {
-      objectOutput.writeObject(object);
-      return Base64.getEncoder().encodeToString(byteArrayOut.toByteArray());
-    }
-  }
-
-  /**
-   * Decodes the string and deserializes it into an object.
-   *
-   * @param string The Base64-encoded string to deserialize.
-   * @return The decoded and deserialized string as an object.
-   * @throws IOException If the deserialization fails.
-   * @throws ClassNotFoundException If the deserialization fails due to the class of the object not having been found.
-   * @throws IllegalArgumentException If the string is not a valid Base64 string.
-   */
-  static Object convertToObject(String string) throws IOException, ClassNotFoundException {
-    byte[] bytes = Base64.getDecoder().decode(string);
-    try (ObjectInputStream objectInput = new ObjectInputStream(
-        new ByteArrayInputStream(bytes))) {
-      return objectInput.readObject();
-    }
+  public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessManagerFactory<T> processManagerFactory, int minPoolSize,
+      int maxPoolSize, int reserveSize) throws InterruptedException {
+    super(processManagerFactory, minPoolSize, maxPoolSize, reserveSize);
   }
 
   /**
@@ -282,271 +212,9 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   public List<Runnable> shutdownNow() {
     return super.forceShutdown().stream()
         .filter(s -> s instanceof JavaSubmission)
-        .map(s -> ((SerializableCallable<?, ?>) ((JavaSubmission<?, ?>) s).task).runnablePart)
+        .map(s -> ((SerializableCallable<?, ?>) ((JavaSubmission<?, ?>) s).getTask()).runnablePart)
         .filter(Objects::nonNull)
         .collect(Collectors.toList());
-  }
-
-  /**
-   * An implementation of {@link Submission} for serializable {@link Callable} instances to submit in Java process. It serializes, encodes,
-   * and sends the <code>Callable</code> to the process for execution. It also looks for the serialized and encoded return value of the
-   * <code>Callable</code>, and for a serialized and encoded {@link Throwable} instance output to the stderr stream in case of an error.
-   *
-   * @param <T> The serializable return type variable of the <code>Callable</code>
-   * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
-   * @author Viktor Csomor
-   */
-  private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable> implements Submission<T> {
-
-    static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessManager.class);
-
-    final S task;
-    final String command;
-    volatile T result;
-    volatile Throwable error;
-
-    /**
-     * Creates a submission for the specified {@link Callable}.
-     *
-     * @param task The task to execute.
-     * @throws IOException If the encoding of the serialized task fails.
-     */
-    JavaSubmission(S task) throws IOException {
-      this.task = task;
-      command = convertToString(task);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public List<Command> getCommands() {
-      return Collections.singletonList(new SimpleCommand(command,
-          (command, outputLine) -> {
-            Object output;
-            try {
-              output = convertToObject(outputLine);
-            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
-              LOGGER.trace(e.getMessage(), e);
-              return false;
-            }
-            if (output instanceof JavaProcess.Response) {
-              JavaProcess.Response response = (JavaProcess.Response) output;
-              if (response.isError()) {
-                error = (Throwable) response.getResult();
-              } else {
-                result = (T) response.getResult();
-              }
-              return true;
-            }
-            return false;
-          },
-          (command, outputLine) -> {
-            // It cannot happen, as stderr is redirected.
-            return true;
-          }));
-    }
-
-    @Override
-    public Optional<T> getResult() throws ExecutionException {
-      if (error != null) {
-        throw new ExecutionException(error);
-      }
-      return Optional.ofNullable(result);
-    }
-
-    @Override
-    public String toString() {
-      return task.toString();
-    }
-
-  }
-
-  /**
-   * A sub-class of {@link AbstractProcessManager} for the management of process instances of the {@link JavaProcess} class.
-   *
-   * @param <T> A type variable implementing the {@link Runnable} and {@link Serializable} interfaces that defines the base class of the
-   * startup task.
-   * @author Viktor Csomor
-   */
-  private static class JavaProcessManager<T extends Runnable & Serializable> extends AbstractProcessManager {
-
-    static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessManager.class);
-
-    T initTask;
-    T wrapUpTask;
-
-    /**
-     * Constructs a <code>JavaProcessManager</code> instance using the specified parameters.
-     *
-     * @param builder The <code>ProcessBuilder</code> to use for starting the Java processes.
-     * @param initTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
-     * <code>null</code>, no taks are executed on startup.
-     * @param wrapUpTask The task to execute in each process before it is terminated. If it is <code>null</code>, no wrap-up task is
-     * executed.
-     * @param keepAliveTime The number of milliseconds of idleness after which the processes should be terminated. If it is
-     * <code>null</code>, the life-cycle of processes will not be limited based on idleness.
-     */
-    JavaProcessManager(ProcessBuilder builder, T initTask, T wrapUpTask, Long keepAliveTime) {
-      super(builder, keepAliveTime);
-      this.initTask = initTask;
-      this.wrapUpTask = wrapUpTask;
-    }
-
-    @Override
-    public boolean startsUpInstantly() {
-      return false;
-    }
-
-    @Override
-    public boolean isStartedUp(String outputLine, boolean error) {
-      if (!error) {
-        try {
-          Object output = convertToObject(outputLine);
-          return output == JavaProcess.Signal.READY;
-        } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
-          LOGGER.trace(e.getMessage(), e);
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public Optional<Submission<?>> getInitSubmission() {
-      if (initTask == null) {
-        return Optional.empty();
-      }
-      Optional<Submission<?>> initSubmission;
-      try {
-        // Avoid having to have the process manager serialized.
-        T startupTask = this.initTask;
-        initSubmission = Optional.of(new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
-          startupTask.run();
-          return null;
-        }));
-      } catch (IOException e) {
-        LOGGER.warn(e.getMessage(), e);
-        return Optional.empty();
-      }
-      return initSubmission;
-    }
-
-    @Override
-    public Optional<Submission<?>> getTerminationSubmission() {
-      List<Command> commands = new ArrayList<>();
-      if (wrapUpTask != null) {
-        T wrapUpTask = this.wrapUpTask;
-        try {
-          Submission<?> wrapUpJavaSubmission = new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
-            wrapUpTask.run();
-            return null;
-          });
-          commands.addAll(wrapUpJavaSubmission.getCommands());
-        } catch (IOException e) {
-          LOGGER.warn(e.getMessage(), e);
-        }
-      }
-      try {
-        String terminationCommand = convertToString(JavaProcess.Request.TERMINATE);
-        commands.add(new SimpleCommand(terminationCommand,
-            (command, outputLine) -> {
-              try {
-                Object output = convertToObject(outputLine);
-                return output == JavaProcess.Signal.TERMINATED;
-              } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
-                LOGGER.trace(e.getMessage(), e);
-                return false;
-              }
-            },
-            (command, outputLine) -> false));
-        return Optional.of(new SimpleSubmission(commands));
-      } catch (IOException e) {
-        LOGGER.warn(e.getMessage(), e);
-        return Optional.empty();
-      }
-    }
-
-    @Override
-    public Charset getEncoding() {
-      return JavaProcess.CHARSET;
-    }
-
-  }
-
-  /**
-   * An implementation of the {@link ProcessManagerFactory} for the creation of {@link JavaProcessManager} instances using a single
-   * {@link ProcessBuilder} instance.
-   *
-   * @param <T> A type variable implementing the {@link Runnable} and {@link Serializable} interfaces that defines the base class of the
-   * startup tasks of the created {@link JavaProcessManager} instances.
-   * @author Viktor Csomor
-   */
-  private static class JavaProcessManagerFactory<T extends Runnable & Serializable> implements ProcessManagerFactory {
-
-    JavaProcessConfig options;
-    T initTask;
-    T wrapUpTask;
-    Long keepAliveTime;
-
-    /**
-     * Constructs an instance based on the specified JVM options and <code>keepAliveTime</code> which are used for the creation of all
-     * processes of the pool.
-     *
-     * @param options The JVM options for starting the Java process.
-     * @param initTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
-     * <code>null</code>, no taks are executed on startup.
-     * @param wrapUpTask The task to execute in each process before it is terminated. If it is <code>null</code>, no wrap-up task is
-     * executed.
-     * @param keepAliveTime The number of milliseconds after which idle processes are terminated.
-     * @throws IllegalArgumentException If the <code>options</code> is <code>null</code> or contains invalid values.
-     */
-    JavaProcessManagerFactory(JavaProcessConfig options, T initTask, T wrapUpTask, Long keepAliveTime) {
-      if (options == null) {
-        throw new IllegalArgumentException("The options argument cannot be null");
-      }
-      if (options.getJavaLauncherCommand() == null || options.getJavaLauncherCommand().isEmpty()) {
-        throw new IllegalArgumentException("The Java launcher command cannot be null or empty");
-      }
-      if (options.getInitHeapSizeMb().isPresent() && options.getInitHeapSizeMb().get() <= 0) {
-        throw new IllegalArgumentException("Initial heap size must be greater than 0");
-      }
-      if (options.getMaxHeapSizeMb().isPresent() && options.getMaxHeapSizeMb().get() <= 0) {
-        throw new IllegalArgumentException("Maximum heap size must be greater than 0");
-      }
-      if (options.getStackSizeKb().isPresent() && options.getStackSizeKb().get() <= 0) {
-        throw new IllegalArgumentException("Stack size must be greater than 0");
-      }
-      if (options.getClassPath().isPresent() && options.getClassPath().get().isEmpty()) {
-        throw new IllegalArgumentException("Class path cannot be an empty string");
-      }
-      this.options = options;
-      this.initTask = initTask;
-      this.wrapUpTask = wrapUpTask;
-      this.keepAliveTime = keepAliveTime;
-    }
-
-    @Override
-    public ProcessManager newProcessManager() {
-      String javaCommand = options.getJavaLauncherCommand();
-      List<String> javaOptions = new ArrayList<>();
-      options.getClassPath().ifPresent(v -> {
-        javaOptions.add("-cp");
-        javaOptions.add(v);
-      });
-      options.getArch().ifPresent(v -> javaOptions.add(v == JVMArch.BIT_32 ? "-d32" : "-d64"));
-      options.getType().ifPresent(v -> javaOptions.add(v == JVMType.CLIENT ? "-client" : "-server"));
-      options.getInitHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xms%dm", v)));
-      options.getMaxHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xmx%dm", v)));
-      options.getStackSizeKb().ifPresent(v -> javaOptions.add(String.format("-Xss%dk", v)));
-      String className = JavaProcess.class.getName();
-      List<String> args = new ArrayList<>();
-      args.add(javaCommand);
-      args.addAll(javaOptions);
-      args.add(className);
-      ProcessBuilder builder = new ProcessBuilder(args);
-      // Redirect the error stream to reduce the number of used threads per process.
-      builder.redirectErrorStream(true);
-      return new JavaProcessManager<>(builder, initTask, wrapUpTask, keepAliveTime);
-    }
-
   }
 
   /**
@@ -639,181 +307,6 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     @Override
     public T call() throws Exception {
       return callable.call();
-    }
-
-  }
-
-  /**
-   * The class whose main method is run as a separate process by the Java process pool executor.
-   *
-   * @author Viktor Csomor
-   */
-  static class JavaProcess {
-
-    /**
-     * The character set used for communicating via the Java processes standard streams.
-     */
-    private static final Charset CHARSET = StandardCharsets.UTF_8;
-
-    /**
-     * Redirects the process' standard out stream.
-     *
-     * @param outputStream The stream the standard output should be redirected to.
-     */
-    private static void redirectStdOut(PrintStream outputStream) {
-      try {
-        System.setOut(outputStream);
-      } catch (SecurityException e) {
-        // Ignore it.
-      }
-    }
-
-    /**
-     * Redirects the process' standard error stream.
-     *
-     * @param errorStream The stream the standard error should be redirected to.
-     */
-    private static void redirectStdErr(PrintStream errorStream) {
-      try {
-        System.setErr(errorStream);
-      } catch (SecurityException e) {
-        // Ignore it.
-      }
-    }
-
-    /**
-     * The method executed as a separate process. It listens to its standard in for encoded and serialized {@link Callable} instances,
-     * which it decodes, deserializes, and executes on receipt. The return value is normally output to its stdout stream in the form of the
-     * serialized and encoded return values of the <code>Callable</code> instances. If an exception occurs, it is serialized, encoded, and
-     * output to the stderr stream.
-     *
-     * @param args They are ignored for now.
-     */
-    public static void main(String[] args) {
-      PrintStream originalOut = System.out;
-      try (BufferedReader in = new BufferedReader(new InputStreamReader(System.in, CHARSET));
-          DummyPrintStream dummyOut = new DummyPrintStream();
-          DummyPrintStream dummyErr = new DummyPrintStream()) {
-        /* As the process' stderr is redirected to the stdout, there is no need for a
-         * reference to this stream; neither should the submissions be able to print to
-         * stdout through the System.err stream. */
-        redirectStdErr(dummyErr);
-        // Send the startup signal.
-        System.out.println(convertToString(Signal.READY));
-        try {
-          for (;;) {
-            try {
-              String line = in.readLine();
-              if (line == null) {
-                return;
-              }
-              line = line.trim();
-              if (line.isEmpty()) {
-                continue;
-              }
-              Object input = convertToObject(line);
-              if (input == Request.TERMINATE) {
-                System.out.println(convertToString(Signal.TERMINATED));
-                return;
-              } else if (input instanceof Callable<?>) {
-                Callable<?> c = (Callable<?>) input;
-                /* Try to redirect the out stream to make sure that print
-                 * statements and such do not cause the submission to be assumed
-                 * done falsely. */
-                redirectStdOut(dummyOut);
-                Object output = c.call();
-                redirectStdOut(originalOut);
-                System.out.println(convertToString(new Response(false, output)));
-              }
-            } catch (Throwable e) {
-              redirectStdOut(originalOut);
-              System.out.println(convertToString(new Response(true, e)));
-            }
-          }
-        } catch (Throwable e) {
-          redirectStdOut(dummyOut);
-          throw e;
-        }
-      } catch (Throwable e) {
-        try {
-          System.out.println(convertToString(new Response(true, e)));
-        } catch (Exception e1) {
-          // Give up all hope.
-        }
-      }
-    }
-
-    /**
-     * A dummy implementation of {@link PrintStream} that does nothing on <code>write</code>.
-     *
-     * @author Viktor Csomor
-     */
-    private static class DummyPrintStream extends PrintStream {
-
-      DummyPrintStream() {
-        super(new OutputStream() {
-
-          @Override
-          public void write(int b) {
-            // This is why it is called "DummyPrintStream".
-          }
-        });
-      }
-
-    }
-
-    /**
-     * An enum representing requests that can be sent to the Java process.
-     */
-    enum Request {
-      TERMINATE
-    }
-
-    /**
-     * An enum representing signals that the Java process can send back to the parent process.
-     */
-    enum Signal {
-      READY,
-      TERMINATED
-    }
-
-    /**
-     * A simple class to encapsulate the response of the Java process to a task.
-     */
-    static class Response implements Serializable {
-
-      private boolean error;
-      private Object result;
-
-      /**
-       * Constructs a <code>Response</code> object.
-       *
-       * @param error Whether the result is an exception thrown during execution.
-       * @param result The result of the submission.
-       */
-      private Response(boolean error, Object result) {
-        this.error = error;
-        this.result = result;
-      }
-
-      /**
-       * Returns whether the result is an exception or error thrown during the execution of the task.
-       *
-       * @return Whether the result is an instance of {@link Throwable} thrown during the execution of the task.
-       */
-      boolean isError() {
-        return error;
-      }
-
-      /**
-       * Returns the result of the task or the {@link Throwable} thrown during the execution of the task.
-       *
-       * @return The result of the task.
-       */
-      Object getResult() {
-        return result;
-      }
-
     }
 
   }

@@ -25,7 +25,7 @@ import org.junit.Test;
 
 /**
  * A test class for comparing the performance of {@link net.viktorc.pp4j.impl.ProcessPoolExecutor} using a native executable wrapper program
- * and {@link net.viktorc.pp4j.impl.JavaProcessPoolExecutor} using JNI.
+ * and {@link JavaProcessPoolExecutor} using JNI.
  *
  * @author Viktor Csomor
  */
@@ -46,8 +46,10 @@ public class PPEVsJPPETest {
    * @throws Exception If something goes wrong.
    */
   private long testJNI(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
-    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessConfig(1, 10, 512),
-        minSize, maxSize, reserveSize, null, reuse ? (Runnable & Serializable) WrapperJNI::new : null, null);
+    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
+        new SimpleJavaProcessConfig(1, 10, 512),
+        reuse ? (Runnable & Serializable) WrapperJNI::new : null, null, null),
+        minSize, maxSize, reserveSize);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> (new WrapperJNI()).doStuff(taskTime);
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
@@ -81,8 +83,10 @@ public class PPEVsJPPETest {
    * @throws Exception If something goes wrong.
    */
   private long testJNA(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
-    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessConfig(1, 10, 512),
-        minSize, maxSize, reserveSize, null, reuse ? (Runnable & Serializable) WrapperJNA::getInstance : null, null);
+    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
+        new SimpleJavaProcessConfig(1, 10, 512),
+        reuse ? (Runnable & Serializable) WrapperJNA::getInstance : null, null, null),
+        minSize, maxSize, reserveSize);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> WrapperJNA.INSTANCE.doStuff(taskTime);
       for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
