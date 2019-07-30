@@ -46,7 +46,7 @@ public class PPEVsJPPETest {
    * @throws Exception If something goes wrong.
    */
   private long testJNI(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
-    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512),
+    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessConfig(1, 10, 512),
         minSize, maxSize, reserveSize, null, reuse ? (Runnable & Serializable) WrapperJNI::new : null);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> (new WrapperJNI()).doStuff(taskTime);
@@ -81,7 +81,7 @@ public class PPEVsJPPETest {
    * @throws Exception If something goes wrong.
    */
   private long testJNA(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
-    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessOptions(1, 10, 512),
+    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new SimpleJavaProcessConfig(1, 10, 512),
         minSize, maxSize, reserveSize, null, reuse ? (Runnable & Serializable) WrapperJNA::getInstance : null);
     try {
       Runnable javaTask = (Runnable & Serializable) () -> WrapperJNA.INSTANCE.doStuff(taskTime);

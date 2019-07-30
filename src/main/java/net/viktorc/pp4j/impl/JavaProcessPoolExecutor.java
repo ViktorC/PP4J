@@ -44,10 +44,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.JavaProcessConfig;
 import net.viktorc.pp4j.api.JavaProcessExecutorService;
-import net.viktorc.pp4j.api.JavaProcessOptions;
-import net.viktorc.pp4j.api.JavaProcessOptions.JVMArch;
-import net.viktorc.pp4j.api.JavaProcessOptions.JVMType;
+import net.viktorc.pp4j.api.JavaProcessConfig.JVMArch;
+import net.viktorc.pp4j.api.JavaProcessConfig.JVMType;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
@@ -81,7 +81,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @throws IllegalArgumentException If <code>options</code> is <code>null</code>, the minimum pool size is less than 0, or the maximum
    * pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
    */
-  public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessOptions options, int minPoolSize, int maxPoolSize,
+  public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessConfig options, int minPoolSize, int maxPoolSize,
       int reserveSize, Long keepAliveTime, T startupTask) throws InterruptedException {
     super(new JavaProcessManagerFactory<>(options, startupTask, keepAliveTime), minPoolSize, maxPoolSize, reserveSize);
   }
@@ -91,7 +91,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    *
    * @return The Java process options used to create the processes.
    */
-  public JavaProcessOptions getJavaProcessOptions() {
+  public JavaProcessConfig getJavaProcessOptions() {
     return ((JavaProcessManagerFactory<?>) getProcessManagerFactory()).options;
   }
 
@@ -286,72 +286,74 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   /**
-   * An implementation of the {@link ProcessManagerFactory} for the creation of {@link JavaProcessManager} instances using a single
-   * {@link ProcessBuilder} instance.
+   * An implementation of {@link Submission} for serializable {@link Callable} instances to submit in Java process. It serializes, encodes,
+   * and sends the <code>Callable</code> to the process for execution. It also looks for the serialized and encoded return value of the
+   * <code>Callable</code>, and for a serialized and encoded {@link Throwable} instance output to the stderr stream in case of an error.
    *
-   * @param <T> A type variable implementing the {@link Runnable} and {@link Serializable} interfaces that defines the base class of the
-   * startup tasks of the created {@link JavaProcessManager} instances.
+   * @param <T> The serializable return type variable of the <code>Callable</code>
+   * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
    * @author Viktor Csomor
    */
-  private static class JavaProcessManagerFactory<T extends Runnable & Serializable> implements ProcessManagerFactory {
+  private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable> implements Submission<T> {
 
-    JavaProcessOptions options;
-    T startupTask;
-    Long keepAliveTime;
+    static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessManager.class);
+
+    final S task;
+    final String command;
+    volatile T result;
+    volatile Throwable error;
 
     /**
-     * Constructs an instance based on the specified JVM options and <code>keepAliveTime</code> which are used for the creation of all
-     * processes of the pool.
+     * Creates a submission for the specified {@link Callable}.
      *
-     * @param options The JVM options for starting the Java process.
-     * @param startupTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
-     * <code>null</code>, no taks are executed on startup.
-     * @param keepAliveTime The number of milliseconds after which idle processes are terminated.
-     * @throws IllegalArgumentException If the <code>options</code> is <code>null</code> or contains invalid values.
+     * @param task The task to execute.
+     * @throws IOException If the encoding of the serialized task fails.
      */
-    JavaProcessManagerFactory(JavaProcessOptions options, T startupTask, Long keepAliveTime) {
-      if (options == null) {
-        throw new IllegalArgumentException("The options argument cannot be null");
-      }
-      if (options.getInitHeapSizeMb().isPresent() && options.getInitHeapSizeMb().get() <= 0) {
-        throw new IllegalArgumentException("Initial heap size must be greater than 0");
-      }
-      if (options.getMaxHeapSizeMb().isPresent() && options.getMaxHeapSizeMb().get() <= 0) {
-        throw new IllegalArgumentException("Maximum heap size must be greater than 0");
-      }
-      if (options.getStackSizeKb().isPresent() && options.getStackSizeKb().get() <= 0) {
-        throw new IllegalArgumentException("Stack size must be greater than 0");
-      }
-      if (options.getClassPath().isPresent() && options.getClassPath().get().isEmpty()) {
-        throw new IllegalArgumentException("Class path cannot be an empty string");
-      }
-      this.options = options;
-      this.startupTask = startupTask;
-      this.keepAliveTime = keepAliveTime;
+    JavaSubmission(S task) throws IOException {
+      this.task = task;
+      command = convertToString(task);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Command> getCommands() {
+      return Collections.singletonList(new SimpleCommand(command,
+          (command, outputLine) -> {
+            Object output;
+            try {
+              output = convertToObject(outputLine);
+            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
+              LOGGER.trace(e.getMessage(), e);
+              return false;
+            }
+            if (output instanceof JavaProcess.Response) {
+              JavaProcess.Response response = (JavaProcess.Response) output;
+              if (response.isError()) {
+                error = (Throwable) response.getResult();
+              } else {
+                result = (T) response.getResult();
+              }
+              return true;
+            }
+            return false;
+          },
+          (command, outputLine) -> {
+            // It cannot happen, as stderr is redirected.
+            return true;
+          }));
     }
 
     @Override
-    public ProcessManager newProcessManager() {
-      String javaCommand = options.getJavaLauncherCommand();
-      List<String> javaOptions = new ArrayList<>();
-      options.getClassPath().ifPresent(v -> {
-        javaOptions.add("-cp");
-        javaOptions.add(v);
-      });
-      options.getArch().ifPresent(v -> javaOptions.add(v == JVMArch.BIT_32 ? "-d32" : "-d64"));
-      options.getType().ifPresent(v -> javaOptions.add(v == JVMType.CLIENT ? "-client" : "-server"));
-      options.getInitHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xms%dm", v)));
-      options.getMaxHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xmx%dm", v)));
-      options.getStackSizeKb().ifPresent(v -> javaOptions.add(String.format("-Xss%dk", v)));
-      String className = JavaProcess.class.getName();
-      List<String> args = new ArrayList<>();
-      args.add(javaCommand);
-      args.addAll(javaOptions);
-      args.add(className);
-      ProcessBuilder builder = new ProcessBuilder(args);
-      // Redirect the error stream to reduce the number of used threads per process.
-      builder.redirectErrorStream(true);
-      return new JavaProcessManager<>(builder, keepAliveTime, startupTask);
+    public Optional<T> getResult() throws ExecutionException {
+      if (error != null) {
+        throw new ExecutionException(error);
+      }
+      return Optional.ofNullable(result);
+    }
+
+    @Override
+    public String toString() {
+      return task.toString();
     }
 
   }
@@ -448,74 +450,75 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   /**
-   * An implementation of {@link Submission} for serializable {@link Callable} instances to submit in Java process. It serializes, encodes,
-   * and sends the <code>Callable</code> to the process for execution. It also looks for the serialized and encoded return value of the
-   * <code>Callable</code>, and for a serialized and encoded {@link Throwable} instance output to the stderr stream in case of an error.
+   * An implementation of the {@link ProcessManagerFactory} for the creation of {@link JavaProcessManager} instances using a single
+   * {@link ProcessBuilder} instance.
    *
-   * @param <T> The serializable return type variable of the <code>Callable</code>
-   * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
+   * @param <T> A type variable implementing the {@link Runnable} and {@link Serializable} interfaces that defines the base class of the
+   * startup tasks of the created {@link JavaProcessManager} instances.
    * @author Viktor Csomor
    */
-  private static class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable> implements Submission<T> {
+  private static class JavaProcessManagerFactory<T extends Runnable & Serializable> implements ProcessManagerFactory {
 
-    static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessManager.class);
-
-    final S task;
-    final String command;
-    volatile T result;
-    volatile Throwable error;
+    JavaProcessConfig options;
+    T startupTask;
+    Long keepAliveTime;
 
     /**
-     * Creates a submission for the specified {@link Callable}.
+     * Constructs an instance based on the specified JVM options and <code>keepAliveTime</code> which are used for the creation of all
+     * processes of the pool.
      *
-     * @param task The task to execute.
-     * @throws IOException If the encoding of the serialized task fails.
+     * @param options The JVM options for starting the Java process.
+     * @param startupTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
+     * <code>null</code>, no taks are executed on startup.
+     * @param keepAliveTime The number of milliseconds after which idle processes are terminated.
+     * @throws IllegalArgumentException If the <code>options</code> is <code>null</code> or contains invalid values.
      */
-    JavaSubmission(S task) throws IOException {
-      this.task = task;
-      command = convertToString(task);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public List<Command> getCommands() {
-      return Collections.singletonList(new SimpleCommand(command,
-          (command, outputLine) -> {
-            Object output;
-            try {
-              output = convertToObject(outputLine);
-            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
-              LOGGER.trace(e.getMessage(), e);
-              return false;
-            }
-            if (output instanceof JavaProcess.Response) {
-              JavaProcess.Response response = (JavaProcess.Response) output;
-              if (response.isError()) {
-                error = (Throwable) response.getResult();
-              } else {
-                result = (T) response.getResult();
-              }
-              return true;
-            }
-            return false;
-          },
-          (command, outputLine) -> {
-            // It cannot happen, as stderr is redirected.
-            return true;
-          }));
-    }
-
-    @Override
-    public Optional<T> getResult() throws ExecutionException {
-      if (error != null) {
-        throw new ExecutionException(error);
+    JavaProcessManagerFactory(JavaProcessConfig options, T startupTask, Long keepAliveTime) {
+      if (options == null) {
+        throw new IllegalArgumentException("The options argument cannot be null");
       }
-      return Optional.ofNullable(result);
+      if (options.getJavaLauncherCommand() == null || options.getJavaLauncherCommand().isEmpty()) {
+        throw new IllegalArgumentException("The Java launcher command cannot be null or empty");
+      }
+      if (options.getInitHeapSizeMb().isPresent() && options.getInitHeapSizeMb().get() <= 0) {
+        throw new IllegalArgumentException("Initial heap size must be greater than 0");
+      }
+      if (options.getMaxHeapSizeMb().isPresent() && options.getMaxHeapSizeMb().get() <= 0) {
+        throw new IllegalArgumentException("Maximum heap size must be greater than 0");
+      }
+      if (options.getStackSizeKb().isPresent() && options.getStackSizeKb().get() <= 0) {
+        throw new IllegalArgumentException("Stack size must be greater than 0");
+      }
+      if (options.getClassPath().isPresent() && options.getClassPath().get().isEmpty()) {
+        throw new IllegalArgumentException("Class path cannot be an empty string");
+      }
+      this.options = options;
+      this.startupTask = startupTask;
+      this.keepAliveTime = keepAliveTime;
     }
 
     @Override
-    public String toString() {
-      return task.toString();
+    public ProcessManager newProcessManager() {
+      String javaCommand = options.getJavaLauncherCommand();
+      List<String> javaOptions = new ArrayList<>();
+      options.getClassPath().ifPresent(v -> {
+        javaOptions.add("-cp");
+        javaOptions.add(v);
+      });
+      options.getArch().ifPresent(v -> javaOptions.add(v == JVMArch.BIT_32 ? "-d32" : "-d64"));
+      options.getType().ifPresent(v -> javaOptions.add(v == JVMType.CLIENT ? "-client" : "-server"));
+      options.getInitHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xms%dm", v)));
+      options.getMaxHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xmx%dm", v)));
+      options.getStackSizeKb().ifPresent(v -> javaOptions.add(String.format("-Xss%dk", v)));
+      String className = JavaProcess.class.getName();
+      List<String> args = new ArrayList<>();
+      args.add(javaCommand);
+      args.addAll(javaOptions);
+      args.add(className);
+      ProcessBuilder builder = new ProcessBuilder(args);
+      // Redirect the error stream to reduce the number of used threads per process.
+      builder.redirectErrorStream(true);
+      return new JavaProcessManager<>(builder, keepAliveTime, startupTask);
     }
 
   }
