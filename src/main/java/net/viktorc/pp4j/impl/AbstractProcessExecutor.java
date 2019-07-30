@@ -34,9 +34,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   public static final int UNEXPECTED_TERMINATION_RETURN_CODE = -1;
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractProcessExecutor.class);
+
   protected final ProcessManager manager;
   protected final ExecutorService threadPool;
-  protected final Logger logger;
   protected final Object runLock;
   protected final Object stateLock;
   protected final Lock executeLock;
@@ -66,7 +67,6 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   protected AbstractProcessExecutor(ProcessManager manager, ExecutorService threadPool) {
     this.manager = manager;
     this.threadPool = threadPool;
-    logger = LoggerFactory.getLogger(getClass());
     runLock = new Object();
     stateLock = new Object();
     executeLock = new ReentrantLock(true);
@@ -84,7 +84,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       try {
         stream.close();
       } catch (IOException e) {
-        logger.trace(e.getMessage(), e);
+        LOGGER.trace(e.getMessage(), e);
       }
     }
   }
@@ -97,7 +97,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void listenToProcessStream(BufferedReader reader, boolean error) {
     numOfChildThreads.incrementAndGet();
-    logger.trace("Starting listening to standard {} stream", error ? "error" : "out");
+    LOGGER.trace("Starting listening to standard {} stream", error ? "error" : "out");
     try {
       String line;
       while ((line = reader.readLine()) != null) {
@@ -105,17 +105,17 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         if (line.isEmpty()) {
           continue;
         }
-        logger.trace("Output \"{}\" printed to standard {} stream", line, error ? "error" : "out");
+        LOGGER.trace("Output \"{}\" printed to standard {} stream", line, error ? "error" : "out");
         synchronized (stateLock) {
           if (!startedUp) {
             startedUp = manager.isStartedUp(line, error);
-            logger.trace("Output denotes process start-up completion: {}", startedUp);
+            LOGGER.trace("Output denotes process start-up completion: {}", startedUp);
             if (startedUp) {
               stateLock.notifyAll();
             }
           } else if (command != null && !commandCompleted) {
             commandCompleted = command.isProcessed(line, error);
-            logger.trace("Output denotes command completion: {}", commandCompleted);
+            LOGGER.trace("Output denotes command completion: {}", commandCompleted);
             if (commandCompleted) {
               stateLock.notifyAll();
             }
@@ -123,10 +123,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         }
       }
     } catch (IOException e) {
-      logger.trace("Error while reading from process stream", e);
+      LOGGER.trace("Error while reading from process stream", e);
       terminateForcibly();
     } finally {
-      logger.trace("Stopping listening to standard {} stream", error ? "error" : "out");
+      LOGGER.trace("Stopping listening to standard {} stream", error ? "error" : "out");
       terminationSemaphore.release();
     }
   }
@@ -138,12 +138,12 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void timeIdleProcess(long keepAliveTime) {
     numOfChildThreads.incrementAndGet();
-    logger.trace("Starting idleness timer");
+    LOGGER.trace("Starting idleness timer");
     try {
       synchronized (stateLock) {
         while (isAlive()) {
           idle = true;
-          logger.trace("Process going idle");
+          LOGGER.trace("Process going idle");
           long waitTime = keepAliveTime;
           long startTime = System.currentTimeMillis();
           while (isAlive() && idle && waitTime > 0) {
@@ -152,7 +152,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
           }
           if (isAlive() && idle && executeLock.tryLock()) {
             try {
-              logger.trace("Attempting to terminate process due to prolonged idleness");
+              LOGGER.trace("Attempting to terminate process due to prolonged idleness");
               terminate();
             } finally {
               executeLock.unlock();
@@ -161,11 +161,11 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         }
       }
     } catch (InterruptedException e) {
-      logger.trace("Process keep alive timer interrupted", e);
+      LOGGER.trace("Process keep alive timer interrupted", e);
       terminateForcibly();
       Thread.currentThread().interrupt();
     } finally {
-      logger.trace("Stopping idleness timer");
+      LOGGER.trace("Stopping idleness timer");
       terminationSemaphore.release();
     }
   }
@@ -179,36 +179,36 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void setUpExecutor() throws IOException, InterruptedException {
     executeLock.lock();
-    logger.trace("Setting up executor");
+    LOGGER.trace("Setting up executor");
     try {
       synchronized (stateLock) {
         numOfChildThreads.set(0);
         terminationSemaphore.drainPermits();
         Charset charset = manager.getEncoding();
         process = manager.start();
-        logger.trace("Process launched");
+        LOGGER.trace("Process launched");
         running = true;
         stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), charset));
         stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream(), charset));
         stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), charset));
         threadPool.execute(() -> listenToProcessStream(stdOutReader, false));
         threadPool.execute(() -> listenToProcessStream(stdErrReader, true));
-        logger.trace("Waiting for process to start up");
+        LOGGER.trace("Waiting for process to start up");
         while (!startedUp) {
           if (killed) {
-            logger.trace("Process killed before it could start up");
+            LOGGER.trace("Process killed before it could start up");
             return;
           }
           stateLock.wait();
         }
-        logger.trace("Process started up");
+        LOGGER.trace("Process started up");
         manager.getKeepAliveTime().ifPresent(keepAliveTime -> threadPool.execute(() -> timeIdleProcess(keepAliveTime)));
-        logger.trace("Executing initial submission");
+        LOGGER.trace("Executing initial submission");
         manager.getInitSubmission().ifPresent(this::execute);
-        logger.trace("Invoking start-up call-back methods");
+        LOGGER.trace("Invoking start-up call-back methods");
         manager.onStartup();
         onExecutorStartup();
-        logger.trace("Executor set up");
+        LOGGER.trace("Executor set up");
       }
     } finally {
       executeLock.unlock();
@@ -221,7 +221,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * @param returnCode The return code of the process.
    */
   private void tearDownExecutor(int returnCode) {
-    logger.trace("Tearing down executor");
+    LOGGER.trace("Tearing down executor");
     synchronized (stateLock) {
       killed = false;
       idle = false;
@@ -229,22 +229,22 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       running = false;
       process = null;
       stateLock.notifyAll();
-      logger.trace("Invoking termination call-back methods");
+      LOGGER.trace("Invoking termination call-back methods");
       manager.onTermination(returnCode);
       onExecutorTermination();
     }
-    logger.trace("Closing streams");
+    LOGGER.trace("Closing streams");
     closeStream(stdInWriter);
     closeStream(stdOutReader);
     closeStream(stdErrReader);
-    logger.trace("Waiting for child threads to terminate");
+    LOGGER.trace("Waiting for child threads to terminate");
     try {
       terminationSemaphore.acquire(numOfChildThreads.get());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      logger.trace(e.getMessage(), e);
+      LOGGER.trace(e.getMessage(), e);
     }
-    logger.trace("Executor torn down");
+    LOGGER.trace("Executor torn down");
   }
 
   /**
@@ -261,19 +261,19 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     this.command = command;
     try {
       String instruction = command.getInstruction();
-      logger.trace("Writing instruction \"{}\" to process' standard in", instruction);
+      LOGGER.trace("Writing instruction \"{}\" to process' standard in", instruction);
       stdInWriter.write(instruction);
       stdInWriter.newLine();
       stdInWriter.flush();
       commandCompleted = !command.generatesOutput();
       while (!commandCompleted) {
         if (!isAlive()) {
-          logger.trace("Abort command execution due to process termination");
+          LOGGER.trace("Abort command execution due to process termination");
           return false;
         }
         stateLock.wait();
       }
-      logger.trace("Command completed");
+      LOGGER.trace("Command completed");
       return true;
     } finally {
       this.command = null;
@@ -311,37 +311,37 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * @return Whether the execution of the submission has completed successfully.
    */
   protected boolean execute(Submission<?> submission, boolean terminateProcessAfterwards) {
-    logger.trace("Attempting to execute submission {}", submission);
+    LOGGER.trace("Attempting to execute submission {}", submission);
     if (executeLock.tryLock()) {
       try {
         synchronized (stateLock) {
           if (!isAlive() || !startedUp) {
-            logger.trace("Process not ready for submissions");
+            LOGGER.trace("Process not ready for submissions");
             return false;
           }
           idle = false;
           stateLock.notifyAll();
-          logger.trace("Starting execution of submission");
+          LOGGER.trace("Starting execution of submission");
           submission.onStartedExecution();
           for (Command command : submission.getCommands()) {
             if (!executeCommand(command)) {
               return false;
             }
           }
-          logger.trace("Submission {} executed", submission);
+          LOGGER.trace("Submission {} executed", submission);
           submission.onFinishedExecution();
           if (terminateProcessAfterwards) {
-            logger.trace("Terminating process after successful submission execution");
+            LOGGER.trace("Terminating process after successful submission execution");
             terminate();
           }
           return true;
         }
       } catch (IOException e) {
-        logger.trace("Error while writing to process stream", e);
+        LOGGER.trace("Error while writing to process stream", e);
         terminateForcibly();
         return false;
       } catch (InterruptedException e) {
-        logger.trace("Submission execution interrupted", e);
+        LOGGER.trace("Submission execution interrupted", e);
         terminateForcibly();
         Thread.currentThread().interrupt();
         return false;
@@ -361,7 +361,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * @return Whether the termination submission has been successfully executed.
    */
   protected boolean tryTerminate() {
-    logger.trace("Attempting to terminate process using termination submission");
+    LOGGER.trace("Attempting to terminate process using termination submission");
     if (executeLock.tryLock()) {
       try {
         Optional<Submission<?>> optionalTerminationSubmission = manager.getTerminationSubmission();
@@ -370,14 +370,14 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
             if (isAlive()) {
               return execute(optionalTerminationSubmission.get());
             } else {
-              logger.trace("Cannot execute termination submission as process is already terminated");
+              LOGGER.trace("Cannot execute termination submission as process is already terminated");
             }
           }
         } else {
-          logger.trace("No termination submission found");
+          LOGGER.trace("No termination submission found");
         }
       } catch (Exception e) {
-        logger.trace("Error attempting to terminate process", e);
+        LOGGER.trace("Error attempting to terminate process", e);
       } finally {
         executeLock.unlock();
       }
@@ -389,15 +389,15 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * It sends a kill signal to the currently running process, if there is one.
    */
   public void terminateForcibly() {
-    logger.trace("Terminating process forcibly...");
+    LOGGER.trace("Terminating process forcibly...");
     synchronized (stateLock) {
       if (isAlive()) {
         process.destroyForcibly();
         killed = true;
         stateLock.notifyAll();
-        logger.trace("Process killed");
+        LOGGER.trace("Process killed");
       } else {
-        logger.trace("Cannot terminate process as it is already terminated");
+        LOGGER.trace("Cannot terminate process as it is already terminated");
       }
     }
   }
@@ -423,7 +423,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       try {
         setUpExecutor();
         returnCode = process.waitFor();
-        logger.trace("Process exited with return code {}", returnCode);
+        LOGGER.trace("Process exited with return code {}", returnCode);
       } catch (Exception e) {
         throw new ProcessException(e);
       } finally {

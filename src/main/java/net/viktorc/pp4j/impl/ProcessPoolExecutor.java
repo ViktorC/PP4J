@@ -62,6 +62,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    * and the thread pool respectively.
    */
   private static final long EVICT_TIME = 60L * 1000;
+  
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProcessPoolExecutor.class);
 
   private final ProcessManagerFactory processManagerFactory;
   private final int minPoolSize;
@@ -75,7 +77,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   private final CountDownLatch poolTerminationLatch;
   private final Object mainLock;
   private final Object forceShutdownLock;
-  protected final Logger logger;
 
   private volatile int numOfSubmissions;
   private volatile boolean shutdown;
@@ -124,7 +125,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     poolTerminationLatch = new CountDownLatch(1);
     mainLock = new Object();
     forceShutdownLock = new Object();
-    logger = LoggerFactory.getLogger(getClass());
     synchronized (mainLock) {
       for (int i = 0; i < actualMinSize; i++) {
         startNewProcess();
@@ -132,7 +132,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
     // Wait for the processes in the initial pool to start up.
     poolInitLatch.await();
-    logger.debug("Pool started up");
+    LOGGER.debug("Pool started up");
   }
 
   /**
@@ -206,14 +206,14 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     InternalProcessExecutor executor = new InternalProcessExecutor();
     processExecutorThreadPool.execute(executor);
     processExecutors.add(executor);
-    logger.debug("Process executor {} started{}{}", executor, System.lineSeparator(), getPoolStats());
+    LOGGER.debug("Process executor {} started{}{}", executor, System.lineSeparator(), getPoolStats());
   }
 
   /**
    * Waits until all submissions are completed and calls {@link #syncForceShutdown()}.
    */
   private void syncShutdown() {
-    logger.debug("Waiting for submissions to complete...");
+    LOGGER.debug("Waiting for submissions to complete...");
     try {
       synchronized (mainLock) {
         while (numOfSubmissions > 0) {
@@ -221,7 +221,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         }
       }
     } catch (InterruptedException e) {
-      logger.warn(e.getMessage(), e);
+      LOGGER.warn(e.getMessage(), e);
       Thread.currentThread().interrupt();
       return;
     }
@@ -234,19 +234,19 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   private void syncForceShutdown() {
     synchronized (forceShutdownLock) {
       if (poolTerminationLatch.getCount() == 0) {
-        logger.debug("Process pool had already terminated");
+        LOGGER.debug("Process pool had already terminated");
         return;
       }
       while (poolInitLatch.getCount() != 0) {
         poolInitLatch.countDown();
       }
       synchronized (mainLock) {
-        logger.debug("Shutting down process executors...");
+        LOGGER.debug("Shutting down process executors...");
         for (InternalProcessExecutor executor : processExecutors) {
           executor.terminate();
         }
       }
-      logger.debug("Shutting down thread pools...");
+      LOGGER.debug("Shutting down thread pools...");
       secondaryThreadPool.shutdown();
       processExecutorThreadPool.shutdown();
       try {
@@ -254,16 +254,16 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         processExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        logger.warn(e.getMessage(), e);
+        LOGGER.warn(e.getMessage(), e);
       }
       synchronized (mainLock) {
-        logger.debug("Setting remaining submission future exceptions...");
+        LOGGER.debug("Setting remaining submission future exceptions...");
         for (InternalSubmission<?> submission : submissionQueue) {
           submission.setException(new RejectedExecutionException("The process pool has shut down"));
         }
       }
       poolTerminationLatch.countDown();
-      logger.debug("Process pool terminated");
+      LOGGER.debug("Process pool terminated");
     }
   }
 
@@ -280,7 +280,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     } catch (ExecutionException e) {
       throw new FailedSubmissionExecutionException(e);
     } catch (InterruptedException e) {
-      logger.error(e.getMessage(), e);
+      LOGGER.error(e.getMessage(), e);
       Thread.currentThread().interrupt();
       return false;
     }
@@ -302,7 +302,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       if (doExtendPool()) {
         startNewProcess();
       }
-      logger.debug("Submission {} received{}{}", internalSubmission, System.lineSeparator(), getPoolStats());
+      LOGGER.debug("Submission {} received{}{}", internalSubmission, System.lineSeparator(), getPoolStats());
       // Return a Future holding the total execution time including the submission delay.
       return new InternalSubmissionFuture<>(internalSubmission);
     }
@@ -360,7 +360,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    * @param <T> The return type associated with the submission.
    * @author Viktor Csomor
    */
-  private class InternalSubmission<T> implements Submission<T> {
+  private static class InternalSubmission<T> implements Submission<T> {
 
     final Submission<T> origSubmission;
     final boolean terminateProcessAfterwards;
@@ -478,7 +478,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    * @param <T> The return type associated with the submission.
    * @author Viktor Csomor
    */
-  private class InternalSubmissionFuture<T> implements Future<T> {
+  private static class InternalSubmissionFuture<T> implements Future<T> {
 
     final InternalSubmission<T> submission;
 
@@ -600,7 +600,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         synchronized (mainLock) {
           if (submissionDone) {
             numOfSubmissions--;
-            logger.debug(String.format("Submission %s processed; delay: %.3f; execution time: %.3f.%n%s",
+            LOGGER.debug(String.format("Submission %s processed; delay: %.3f; execution time: %.3f.%n%s",
                 submission,
                 (submission.submittedTime - submission.receivedTime) / 1000000000d,
                 (submission.processedTime - submission.submittedTime) / 1000000000d,
@@ -613,7 +613,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
             // If the execute method failed and there was no exception thrown, put the submission back into the queue at the front.
             submission.setThread(null);
             submissionQueue.addFirst(submission);
-            logger.trace("Submission put back in queue");
+            LOGGER.trace("Submission put back in queue");
           }
         }
       }
@@ -629,9 +629,9 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       boolean submissionDone = false;
       try {
         submission = submissionQueue.takeFirst();
-        logger.trace("Submission {} taken off queue", submission);
+        LOGGER.trace("Submission {} taken off queue", submission);
       } catch (InterruptedException e) {
-        logger.trace("Thread interrupted while waiting for submission", e);
+        LOGGER.trace("Thread interrupted while waiting for submission", e);
         return;
       }
       try {
@@ -639,12 +639,12 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         submissionDone = !submission.isCancelled() && execute(submission, submission.terminateProcessAfterwards);
       } catch (Exception e) {
         submission.setException(e);
-        logger.trace("Exception while executing submission", e);
+        LOGGER.trace("Exception while executing submission", e);
         submissionDone = true;
         terminateForcibly();
       } finally {
         if (submission.isCancelled()) {
-          logger.trace("Submission cancelled");
+          LOGGER.trace("Submission cancelled");
           submissionDone = true;
         }
         updateSubmissionQueue(submission, submissionDone);
@@ -723,7 +723,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       Thread thread = defaultFactory.newThread(r);
       thread.setName(thread.getName().replaceFirst("pool-[0-9]+", poolName));
       thread.setUncaughtExceptionHandler((t, e) -> {
-        logger.error(e.getMessage(), e);
+        LOGGER.error(e.getMessage(), e);
         ProcessPoolExecutor.this.forceShutdown();
       });
       return thread;
@@ -781,7 +781,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       // A process has terminated. Extend the pool if necessary by using the pooled executors.
       synchronized (mainLock) {
         processExecutors.remove(executor);
-        logger.debug("Process executor {} stopped{}{}", executor, System.lineSeparator(), getPoolStats());
+        LOGGER.debug("Process executor {} stopped{}{}", executor, System.lineSeparator(), getPoolStats());
         if (doExtendPool()) {
           startNewProcess();
         }

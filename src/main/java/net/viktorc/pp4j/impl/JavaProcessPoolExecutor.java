@@ -31,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import net.viktorc.pp4j.api.JavaProcessExecutorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A sub-class of {@link ProcessPoolExecutor} that implements the {@link JavaProcessExecutorService} interface. It uses Java processes for
@@ -41,6 +43,8 @@ import net.viktorc.pp4j.api.JavaProcessExecutorService;
  * @author Viktor Csomor
  */
 public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements JavaProcessExecutorService {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessPoolExecutor.class);
 
   /**
    * Constructs a Java process pool executor using the specified parameters.
@@ -132,7 +136,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           f.get();
         }
       } catch (ExecutionException | CancellationException e) {
-        logger.warn(e.getMessage(), e);
+        LOGGER.warn(e.getMessage(), e);
       }
     }
     return futures;
@@ -153,7 +157,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
           f.get(waitTimeNs, TimeUnit.NANOSECONDS);
         }
       } catch (ExecutionException | CancellationException e) {
-        logger.warn(e.getMessage(), e);
+        LOGGER.warn(e.getMessage(), e);
       } catch (TimeoutException e) {
         for (int j = i; j < futures.size(); j++) {
           futures.get(j).cancel(true);
@@ -175,7 +179,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       } catch (ExecutionException e) {
         execException = e;
       } catch (CancellationException e) {
-        logger.warn(e.getMessage(), e);
+        LOGGER.warn(e.getMessage(), e);
       }
     }
     if (execException == null) {
@@ -194,7 +198,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       } catch (ExecutionException e) {
         execException = e;
       } catch (CancellationException e) {
-        logger.warn(e.getMessage(), e);
+        LOGGER.warn(e.getMessage(), e);
       }
     }
     if (execException == null) {
