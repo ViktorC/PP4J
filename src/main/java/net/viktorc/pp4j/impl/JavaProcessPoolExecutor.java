@@ -74,16 +74,18 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @param keepAliveTime The duration of continuous idleness, in milliseconds, after which the processes are to be terminated. A process
    * is considered idle if it is started up and not processing any submission. If the value of this parameter is <code>null</code>, the
    * life spans of the processes will not be limited.
-   * @param startupTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
+   * @param initTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
    * <code>null</code>, no taks are executed on startup.
+   * @param wrapUpTask The task to execute in each process before it is terminated. If it is <code>null</code>, no wrap-up task is
+   * executed.
    * @param <T> The type of the startup task.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    * @throws IllegalArgumentException If <code>options</code> is <code>null</code>, the minimum pool size is less than 0, or the maximum
    * pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
    */
   public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessConfig options, int minPoolSize, int maxPoolSize,
-      int reserveSize, Long keepAliveTime, T startupTask) throws InterruptedException {
-    super(new JavaProcessManagerFactory<>(options, startupTask, keepAliveTime), minPoolSize, maxPoolSize, reserveSize);
+      int reserveSize, Long keepAliveTime, T initTask, T wrapUpTask) throws InterruptedException {
+    super(new JavaProcessManagerFactory<>(options, initTask, wrapUpTask, keepAliveTime), minPoolSize, maxPoolSize, reserveSize);
   }
 
   /**
@@ -369,18 +371,24 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
     static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessManager.class);
 
-    T startupTask;
+    T initTask;
+    T wrapUpTask;
 
     /**
-     * Constructs an instance using the specified <code>builder</code> and <code>keepAliveTime</code>.
+     * Constructs a <code>JavaProcessManager</code> instance using the specified parameters.
      *
      * @param builder The <code>ProcessBuilder</code> to use for starting the Java processes.
+     * @param initTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
+     * <code>null</code>, no taks are executed on startup.
+     * @param wrapUpTask The task to execute in each process before it is terminated. If it is <code>null</code>, no wrap-up task is
+     * executed.
      * @param keepAliveTime The number of milliseconds of idleness after which the processes should be terminated. If it is
      * <code>null</code>, the life-cycle of processes will not be limited based on idleness.
      */
-    JavaProcessManager(ProcessBuilder builder, Long keepAliveTime, T startupTask) {
+    JavaProcessManager(ProcessBuilder builder, T initTask, T wrapUpTask, Long keepAliveTime) {
       super(builder, keepAliveTime);
-      this.startupTask = startupTask;
+      this.initTask = initTask;
+      this.wrapUpTask = wrapUpTask;
     }
 
     @Override
@@ -403,13 +411,13 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
     @Override
     public Optional<Submission<?>> getInitSubmission() {
-      if (startupTask == null) {
+      if (initTask == null) {
         return Optional.empty();
       }
       Optional<Submission<?>> initSubmission;
       try {
         // Avoid having to have the process manager serialized.
-        T startupTask = this.startupTask;
+        T startupTask = this.initTask;
         initSubmission = Optional.of(new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
           startupTask.run();
           return null;
@@ -423,9 +431,22 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
     @Override
     public Optional<Submission<?>> getTerminationSubmission() {
+      List<Command> commands = new ArrayList<>();
+      if (wrapUpTask != null) {
+        T wrapUpTask = this.wrapUpTask;
+        try {
+          Submission<?> wrapUpJavaSubmission = new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
+            wrapUpTask.run();
+            return null;
+          });
+          commands.addAll(wrapUpJavaSubmission.getCommands());
+        } catch (IOException e) {
+          LOGGER.warn(e.getMessage(), e);
+        }
+      }
       try {
         String terminationCommand = convertToString(JavaProcess.Request.TERMINATE);
-        return Optional.of(new SimpleSubmission(new SimpleCommand(terminationCommand,
+        commands.add(new SimpleCommand(terminationCommand,
             (command, outputLine) -> {
               try {
                 Object output = convertToObject(outputLine);
@@ -435,7 +456,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
                 return false;
               }
             },
-            (command, outputLine) -> false)));
+            (command, outputLine) -> false));
+        return Optional.of(new SimpleSubmission(commands));
       } catch (IOException e) {
         LOGGER.warn(e.getMessage(), e);
         return Optional.empty();
@@ -460,7 +482,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   private static class JavaProcessManagerFactory<T extends Runnable & Serializable> implements ProcessManagerFactory {
 
     JavaProcessConfig options;
-    T startupTask;
+    T initTask;
+    T wrapUpTask;
     Long keepAliveTime;
 
     /**
@@ -468,12 +491,14 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
      * processes of the pool.
      *
      * @param options The JVM options for starting the Java process.
-     * @param startupTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
+     * @param initTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
      * <code>null</code>, no taks are executed on startup.
+     * @param wrapUpTask The task to execute in each process before it is terminated. If it is <code>null</code>, no wrap-up task is
+     * executed.
      * @param keepAliveTime The number of milliseconds after which idle processes are terminated.
      * @throws IllegalArgumentException If the <code>options</code> is <code>null</code> or contains invalid values.
      */
-    JavaProcessManagerFactory(JavaProcessConfig options, T startupTask, Long keepAliveTime) {
+    JavaProcessManagerFactory(JavaProcessConfig options, T initTask, T wrapUpTask, Long keepAliveTime) {
       if (options == null) {
         throw new IllegalArgumentException("The options argument cannot be null");
       }
@@ -493,7 +518,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
         throw new IllegalArgumentException("Class path cannot be an empty string");
       }
       this.options = options;
-      this.startupTask = startupTask;
+      this.initTask = initTask;
+      this.wrapUpTask = wrapUpTask;
       this.keepAliveTime = keepAliveTime;
     }
 
@@ -518,7 +544,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
       ProcessBuilder builder = new ProcessBuilder(args);
       // Redirect the error stream to reduce the number of used threads per process.
       builder.redirectErrorStream(true);
-      return new JavaProcessManager<>(builder, keepAliveTime, startupTask);
+      return new JavaProcessManager<>(builder, initTask, wrapUpTask, keepAliveTime);
     }
 
   }
