@@ -16,6 +16,7 @@
 package net.viktorc.pp4j.impl;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Optional;
 import net.viktorc.pp4j.api.ProcessManager;
 
@@ -53,6 +54,11 @@ public abstract class AbstractProcessManager implements ProcessManager {
   @Override
   public Process start() throws IOException {
     return builder.start();
+  }
+
+  @Override
+  public Charset getEncoding() {
+    return Charset.defaultCharset();
   }
 
   @Override

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
@@ -65,6 +66,11 @@ public class SimpleSubmission implements Submission<Object> {
   @Override
   public List<Command> getCommands() {
     return new ArrayList<>(commands);
+  }
+
+  @Override
+  public Optional<Object> getResult() {
+    return Optional.empty();
   }
 
   @Override

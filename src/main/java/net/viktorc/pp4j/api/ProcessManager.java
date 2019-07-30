@@ -38,6 +38,13 @@ public interface ProcessManager {
   Process start() throws IOException;
 
   /**
+   * Returns the character set to use to communicate with the managed process through its standard streams.
+   *
+   * @return The character set to use when reading from and writing to the process' streams.
+   */
+  Charset getEncoding();
+
+  /**
    * A method that denotes whether the process should be considered started up instantly or if it is only started up once a certain output
    * has been printed to its standard out or standard error streams. If it returns <code>true</code>, the  process is instantly considered
    * started up and ready as soon as it is running, and the method {@link #onStartup()} is executed. If it returns <code>false</code>,
@@ -49,26 +56,6 @@ public interface ProcessManager {
   boolean startsUpInstantly();
 
   /**
-   * Returns the character set to use to communicate with the managed process through its standard streams. By default, it returns the
-   * platform-default character set.
-   *
-   * @return The character set to use when reading from and writing to the process' streams.
-   */
-  default Charset getEncoding() {
-    return Charset.defaultCharset();
-  }
-
-  /**
-   * Determines the duration of continuous idleness after which the process is to be terminated. The process is considered idle if it is
-   * started up and not processing a submission.
-   *
-   * @return The number of milliseconds of idleness after which the process is to be terminated.
-   */
-  default Optional<Long> getKeepAliveTime() {
-    return Optional.empty();
-  }
-
-  /**
    * Handles the output of the underlying process after it has been started. The return value of the method determines whether the process
    * is to be considered started up and ready for the execution of the method {@link #onStartup()}. It is only ever called if
    * {@link #startsUpInstantly()} returns <code>false</code>.
@@ -77,15 +64,15 @@ public interface ProcessManager {
    * @param error Whether this line has been output to the standard error or the standard out stream.
    * @return Whether the process is to be considered started up.
    */
-  default boolean isStartedUp(String outputLine, boolean error) {
-    return true;
-  }
+  boolean isStartedUp(String outputLine, boolean error);
 
   /**
-   * A callback method invoked after the process is started up and the initial submission, if there is one, is executed.
+   * Determines the duration of continuous idleness after which the process is to be terminated. The process is considered idle if it is
+   * started up and not processing a submission.
+   *
+   * @return The number of milliseconds of idleness after which the process is to be terminated.
    */
-  default void onStartup() {
-  }
+  Optional<Long> getKeepAliveTime();
 
   /**
    * Returns an optional submission to execute upon starting up the process. No other submissions are to be accepted until this submission
@@ -93,9 +80,7 @@ public interface ProcessManager {
    *
    * @return The optional initial submission that is for setting up the process for later submissions.
    */
-  default Optional<Submission<?>> getInitSubmission() {
-    return Optional.empty();
-  }
+  Optional<Submission<?>> getInitSubmission();
 
   /**
    * Returns an optional submission for terminating the process.  It allows for an opportunity to execute commands to close resources or
@@ -103,8 +88,12 @@ public interface ProcessManager {
    *
    * @return The optional termination submission for shutting down the process.
    */
-  default Optional<Submission<?>> getTerminationSubmission() {
-    return Optional.empty();
+  Optional<Submission<?>> getTerminationSubmission();
+
+  /**
+   * A callback method invoked after the process is started up and the initial submission, if there is one, is executed.
+   */
+  default void onStartup() {
   }
 
   /**

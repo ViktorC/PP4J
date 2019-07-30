@@ -322,14 +322,14 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
           idle = false;
           stateLock.notifyAll();
           logger.trace("Starting execution of submission");
-          submission.onStartedProcessing();
+          submission.onStartedExecution();
           for (Command command : submission.getCommands()) {
             if (!executeCommand(command)) {
               return false;
             }
           }
           logger.trace("Submission {} executed", submission);
-          submission.onFinishedProcessing();
+          submission.onFinishedExecution();
           if (terminateProcessAfterwards) {
             logger.trace("Terminating process after successful submission execution");
             terminate();

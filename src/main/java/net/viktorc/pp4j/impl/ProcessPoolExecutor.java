@@ -445,17 +445,17 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
 
     @Override
-    public void onStartedProcessing() {
+    public void onStartedExecution() {
       // If it is the first time the submission is submitted to a process...
       if (submittedTime == 0) {
         submittedTime = System.nanoTime();
-        origSubmission.onStartedProcessing();
+        origSubmission.onStartedExecution();
       }
     }
 
     @Override
-    public void onFinishedProcessing() {
-      origSubmission.onFinishedProcessing();
+    public void onFinishedExecution() {
+      origSubmission.onFinishedExecution();
       processedTime = System.nanoTime();
       // Notify the future associated with the submission that the submission has been processed.
       synchronized (lock) {

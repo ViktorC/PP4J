@@ -42,20 +42,18 @@ public interface Submission<T> {
    * submission.
    * @throws ExecutionException if an error occurred while executing the submission.
    */
-  default Optional<T> getResult() throws ExecutionException {
-    return Optional.empty();
-  }
+  Optional<T> getResult() throws ExecutionException;
 
   /**
    * A method that is executed once the processing of the submitted commands has begun.
    */
-  default void onStartedProcessing() {
+  default void onStartedExecution() {
   }
 
   /**
    * A method to execute once the processing of the submitted commands has completed.
    */
-  default void onFinishedProcessing() {
+  default void onFinishedExecution() {
   }
 
 }

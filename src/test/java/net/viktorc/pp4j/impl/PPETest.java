@@ -176,7 +176,7 @@ public class PPETest {
           submission = new SimpleSubmission(commands.get(0)) {
 
             @Override
-            public void onFinishedProcessing() {
+            public void onFinishedExecution() {
               times.set(index, System.nanoTime() - times.get(index));
             }
           };
@@ -184,7 +184,7 @@ public class PPETest {
           submission = new SimpleSubmission(commands) {
 
             @Override
-            public void onFinishedProcessing() {
+            public void onFinishedExecution() {
               times.set(index, System.nanoTime() - times.get(index));
             }
           };
