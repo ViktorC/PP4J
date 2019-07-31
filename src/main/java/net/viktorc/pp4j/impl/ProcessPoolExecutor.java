@@ -57,18 +57,14 @@ import org.slf4j.LoggerFactory;
  */
 public class ProcessPoolExecutor implements ProcessExecutorService {
 
-  /**
-   * The number of milliseconds after which idle process executor instances and process executor threads are evicted from the object pool
-   * and the thread pool respectively.
-   */
-  private static final long EVICT_TIME = 60L * 1000;
-  
+  private static final long DEFAULT_THREAD_KEEP_ALIVE_TIME = 60 * 1000;
   private static final Logger LOGGER = LoggerFactory.getLogger(ProcessPoolExecutor.class);
 
   private final ProcessManagerFactory processManagerFactory;
   private final int minPoolSize;
   private final int maxPoolSize;
   private final int reserveSize;
+  private final long threadKeepAliveTime;
   private final InternalProcessExecutorThreadPool processExecutorThreadPool;
   private final ExecutorService secondaryThreadPool;
   private final Queue<InternalProcessExecutor> processExecutors;
@@ -91,12 +87,14 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    * @param minPoolSize The minimum size of the process pool.
    * @param maxPoolSize The maximum size of the process pool.
    * @param reserveSize The number of available processes to keep in the pool.
+   * @param threadKeepAliveTime The number of milliseconds of idleness after which threads are terminated if the sizes of the thread pools
+   * exceed their core sizes.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the maximum pool size is
    * less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
    */
-  public ProcessPoolExecutor(ProcessManagerFactory processManagerFactory, int minPoolSize, int maxPoolSize, int reserveSize)
-      throws InterruptedException {
+  public ProcessPoolExecutor(ProcessManagerFactory processManagerFactory, int minPoolSize, int maxPoolSize, int reserveSize,
+      long threadKeepAliveTime) throws InterruptedException {
     if (processManagerFactory == null) {
       throw new IllegalArgumentException("The process manager factory cannot be null");
     }
@@ -109,16 +107,20 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     if (reserveSize < 0 || reserveSize > maxPoolSize) {
       throw new IllegalArgumentException("The reserve has to be at least 0 and less than the maximum pool size");
     }
+    if (threadKeepAliveTime <= 0) {
+      throw new IllegalArgumentException("The thread keep-alive time must be greater than 0");
+    }
     this.processManagerFactory = processManagerFactory;
     this.minPoolSize = minPoolSize;
     this.maxPoolSize = maxPoolSize;
     this.reserveSize = reserveSize;
+    this.threadKeepAliveTime = threadKeepAliveTime;
     processExecutorThreadPool = new InternalProcessExecutorThreadPool();
     int actualMinSize = Math.max(minPoolSize, reserveSize);
     /* One normal process requires minimum 2 secondary threads (stdout listener, submission handler), 3 if
      * the stderr is not redirected to stdout (stderr listener), and 4 if keepAliveTime is positive (timer). */
-    secondaryThreadPool = new ThreadPoolExecutor(2 * actualMinSize, Integer.MAX_VALUE, EVICT_TIME, TimeUnit.MILLISECONDS,
-        new SynchronousQueue<>(), new CustomizedThreadFactory(this + "-secondaryThreadPool"));
+    secondaryThreadPool = new ThreadPoolExecutor(2 * actualMinSize, Integer.MAX_VALUE, threadKeepAliveTime,
+        TimeUnit.MILLISECONDS, new SynchronousQueue<>(), new CustomizedThreadFactory(this + "-secondaryThreadPool"));
     submissionQueue = new LinkedBlockingDeque<>();
     processExecutors = new LinkedBlockingQueue<>();
     poolInitLatch = new CountDownLatch(actualMinSize);
@@ -133,6 +135,25 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     // Wait for the processes in the initial pool to start up.
     poolInitLatch.await();
     LOGGER.debug("Pool started up");
+  }
+
+  /**
+   * Constructs a pool of processes. The initial size of the pool is the minimum pool size or the reserve size depending on which one is
+   * greater. This constructor blocks until the initial number of processes start up. The size of the pool is dynamically adjusted based on
+   * the pool parameters and the rate of incoming submissions.
+   *
+   * @param processManagerFactory A {@link ProcessManagerFactory} instance that is used to build {@link net.viktorc.pp4j.api.ProcessManager}
+   * instances that manage the processes' life cycle in the pool.
+   * @param minPoolSize The minimum size of the process pool.
+   * @param maxPoolSize The maximum size of the process pool.
+   * @param reserveSize The number of available processes to keep in the pool.
+   * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
+   * @throws IllegalArgumentException If the manager factory is null, or the minimum pool size is less than 0, or the maximum pool size is
+   * less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
+   */
+  public ProcessPoolExecutor(ProcessManagerFactory processManagerFactory, int minPoolSize, int maxPoolSize, int reserveSize)
+      throws InterruptedException {
+    this(processManagerFactory, minPoolSize, maxPoolSize, reserveSize, DEFAULT_THREAD_KEEP_ALIVE_TIME);
   }
 
   /**
@@ -160,6 +181,16 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    */
   public int getReserveSize() {
     return reserveSize;
+  }
+
+  /**
+   * Returns the duration of idleness in milliseconds after which excess threads are terminated.
+   *
+   * @return The number of milliseconds of idleness after which threads are terminated if the sizes of the thread pools exceed their core
+   * sizes.
+   */
+  public long getThreadKeepAliveTime() {
+    return threadKeepAliveTime;
   }
 
   /**
@@ -747,7 +778,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
      * milliseconds.
      */
     InternalProcessExecutorThreadPool() {
-      super(Math.max(minPoolSize, reserveSize), maxPoolSize, EVICT_TIME, TimeUnit.MILLISECONDS,
+      super(Math.max(minPoolSize, reserveSize), maxPoolSize, threadKeepAliveTime, TimeUnit.MILLISECONDS,
           new LinkedTransferQueue<Runnable>() {
 
             private static final long serialVersionUID = 1L;

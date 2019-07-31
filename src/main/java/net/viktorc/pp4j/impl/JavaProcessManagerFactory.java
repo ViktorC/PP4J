@@ -71,8 +71,12 @@ public class JavaProcessManagerFactory<T extends Runnable & Serializable> implem
     this(config, null, null, null);
   }
 
-  @Override
-  public ProcessManager newProcessManager() {
+  /**
+   * Creates a <code>ProcessBuilder</code> instance for launching Java processes using the provided Java process configuration.
+   *
+   * @return A process builder for launching Java processes.
+   */
+  protected ProcessBuilder createProcessBuilder() {
     String javaCommand = config.getJavaLauncherCommand();
     List<String> javaOptions = new ArrayList<>();
     config.getClassPath().ifPresent(v -> {
@@ -92,6 +96,12 @@ public class JavaProcessManagerFactory<T extends Runnable & Serializable> implem
     ProcessBuilder builder = new ProcessBuilder(args);
     // Redirect the error stream to reduce the number of used threads per process.
     builder.redirectErrorStream(true);
+    return builder;
+  }
+
+  @Override
+  public ProcessManager newProcessManager() {
+    ProcessBuilder builder = createProcessBuilder();
     return new JavaProcessManager<>(builder, initTask, wrapUpTask, keepAliveTime);
   }
 

@@ -53,6 +53,25 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * @param minPoolSize The minimum size of the process pool.
    * @param maxPoolSize The maximum size of the process pool.
    * @param reserveSize The number of available processes to keep in the pool.
+   * @param threadKeepAliveTime The number of milliseconds of idleness after which threads are terminated if the sizes of the thread pools
+   * exceed their core sizes.
+   * @param <T> The type of the startup task.
+   * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
+   * @throws IllegalArgumentException If <code>options</code> is <code>null</code>, the minimum pool size is less than 0, or the maximum
+   * pool size is less than the minimum pool size or 1, or the reserve size is less than 0 or greater than the maximum pool size.
+   */
+  public <T extends Runnable & Serializable> JavaProcessPoolExecutor(JavaProcessManagerFactory<T> processManagerFactory, int minPoolSize,
+      int maxPoolSize, int reserveSize, long threadKeepAliveTime) throws InterruptedException {
+    super(processManagerFactory, minPoolSize, maxPoolSize, reserveSize, threadKeepAliveTime);
+  }
+
+  /**
+   * Constructs a Java process pool executor using the specified parameters.
+   *
+   * @param processManagerFactory The java process manager factory.
+   * @param minPoolSize The minimum size of the process pool.
+   * @param maxPoolSize The maximum size of the process pool.
+   * @param reserveSize The number of available processes to keep in the pool.
    * @param <T> The type of the startup task.
    * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
    * @throws IllegalArgumentException If <code>options</code> is <code>null</code>, the minimum pool size is less than 0, or the maximum
