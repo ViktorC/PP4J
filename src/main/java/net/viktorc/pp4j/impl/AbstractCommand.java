@@ -20,7 +20,7 @@ import java.util.List;
 import net.viktorc.pp4j.api.Command;
 
 /**
- * An abstract implementation of the {@link net.viktorc.pp4j.api.Command} interface that stores all lines output to the process' standard
+ * An abstract implementation of the {@link Command} interface that stores all lines output to the process' standard
  * out and standard error in response to the command.
  *
  * @author Viktor Csomor
@@ -48,9 +48,9 @@ public abstract class AbstractCommand implements Command {
    *
    * @param outputLine The new line of output printed to the standard out of the process.
    * @param error Whether this line has been output to the standard error or to the standard out stream.
-   * @return Whether this line of output denotes that the process has finished processing the command.
+   * @return The status of the command given the new output.
    */
-  protected abstract boolean isExecutionComplete(String outputLine, boolean error);
+  protected abstract Status getNewStatus(String outputLine, boolean error);
 
   /**
    * Returns a list of lines output to the standard out of the underlying process after the instruction has been written to the standard in
@@ -104,14 +104,14 @@ public abstract class AbstractCommand implements Command {
   }
 
   @Override
-  public final boolean isProcessed(String outputLine, boolean error) {
-    boolean processed = isExecutionComplete(outputLine, error);
+  public final Status getStatus(String outputLine, boolean error) {
+    Status status = getNewStatus(outputLine, error);
 		if (error) {
       stdErrLines.add(outputLine);
 		} else {
 			stdOutLines.add(outputLine);
 		}
-    return processed;
+    return status;
   }
 
 }

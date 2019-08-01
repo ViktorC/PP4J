@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.Command.Status;
 import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.Submission;
@@ -49,11 +50,11 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private BufferedReader stdOutReader;
   private BufferedReader stdErrReader;
   private Command command;
+  private Status commandStatus;
   private boolean running;
   private boolean startedUp;
   private boolean idle;
   private boolean killed;
-  private boolean commandCompleted;
 
   /**
    * Constructs an executor for the specified process using <code>threadPool</code> to provide the threads required for listening to the
@@ -113,10 +114,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
             if (startedUp) {
               stateLock.notifyAll();
             }
-          } else if (command != null && !commandCompleted) {
-            commandCompleted = command.isProcessed(line, error);
-            LOGGER.trace("Output denotes command completion: {}", commandCompleted);
-            if (commandCompleted) {
+          } else if (command != null && !commandStatus.isTerminal()) {
+            commandStatus = command.getStatus(line, error);
+            LOGGER.trace("Output denotes command status: {}", commandStatus);
+            if (commandStatus.isTerminal()) {
               stateLock.notifyAll();
             }
           }
@@ -265,8 +266,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       stdInWriter.write(instruction);
       stdInWriter.newLine();
       stdInWriter.flush();
-      commandCompleted = !command.generatesOutput();
-      while (!commandCompleted) {
+      commandStatus = command.generatesOutput() ? Status.IN_PROGRESS : Status.SUCCESSFUL;
+      while (!commandStatus.isTerminal()) {
         if (!isAlive()) {
           LOGGER.trace("Abort command execution due to process termination");
           return false;
@@ -277,7 +278,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       return true;
     } finally {
       this.command = null;
-      commandCompleted = false;
+      commandStatus = null;
     }
   }
 

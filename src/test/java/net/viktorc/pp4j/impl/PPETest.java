@@ -28,6 +28,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.Command.Status;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
@@ -155,10 +156,10 @@ public class PPETest {
                 assert "".equals(c.getJointStandardErrLines()) :
                     String.format("Wrongly captured standard output. Expected: \"\"%nActual: \"%s\"", c.getJointStandardOutLines());
                 c.reset();
-                return true;
+                return Status.SUCCESSFUL;
               }
-              return false;
-            }, (c, o) -> true) {
+              return Status.IN_PROGRESS;
+            }, (c, o) -> Status.FAILED) {
 
               @Override
               public boolean generatesOutput() {
@@ -616,7 +617,9 @@ public class PPETest {
     System.out.println(System.lineSeparator() + "Test 39");
     ProcessPoolExecutor pool = getPool(1, 1, 0, null, false, false, false);
     try {
-      SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o), (c, o) -> true);
+      SimpleCommand command = new SimpleCommand("process 3",
+          (c, o) -> "ready".equals(o) ? Status.SUCCESSFUL : Status.IN_PROGRESS,
+          (c, o) -> Status.FAILED);
       long start = System.currentTimeMillis();
       pool.execute(new SimpleSubmission(command));
       long dur = System.currentTimeMillis() - start;
@@ -660,8 +663,8 @@ public class PPETest {
     public ProcessManager newProcessManager() {
       return new SimpleProcessManager(new ProcessBuilder(programLocation), null, null,
           () -> new SimpleSubmission(new SimpleCommand("start",
-              (c, o) -> "ok".equals(o),
-              (c, o) -> true)), null) {
+              (c, o) -> "ok".equals(o) ? Status.SUCCESSFUL : Status.IN_PROGRESS,
+              (c, o) -> Status.FAILED)), null) {
 
         @Override
         public boolean startsUpInstantly() {
@@ -680,8 +683,8 @@ public class PPETest {
         public Optional<Submission<?>> getTerminationSubmission() {
           if (manuallyTerminate) {
             return Optional.of(new SimpleSubmission(new SimpleCommand("stop",
-                (c, o) -> "bye".equals(o),
-                (c, o) -> false)));
+                (c, o) -> "bye".equals(o) ? Status.SUCCESSFUL : Status.IN_PROGRESS,
+                (c, o) -> Status.FAILED)));
           }
           return super.getTerminationSubmission();
         }

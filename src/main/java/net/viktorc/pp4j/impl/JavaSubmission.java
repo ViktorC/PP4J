@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.Command.Status;
 import net.viktorc.pp4j.api.Submission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +61,7 @@ public class JavaSubmission<T extends Serializable, S extends Callable<T> & Seri
             output = JavaObjectCodec.getInstance().decode(outputLine);
           } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
             LOGGER.trace(e.getMessage(), e);
-            return false;
+            return Status.IN_PROGRESS;
           }
           if (output instanceof JavaProcess.Response) {
             JavaProcess.Response response = (JavaProcess.Response) output;
@@ -69,13 +70,13 @@ public class JavaSubmission<T extends Serializable, S extends Callable<T> & Seri
             } else {
               result = (T) response.getResult();
             }
-            return true;
+            return Status.SUCCESSFUL;
           }
-          return false;
+          return Status.IN_PROGRESS;
         },
         (command, outputLine) -> {
           // It cannot happen, as stderr is redirected.
-          return true;
+          return Status.FAILED;
         }));
   }
 

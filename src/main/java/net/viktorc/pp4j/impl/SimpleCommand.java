@@ -15,34 +15,34 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.util.function.BiPredicate;
+import java.util.function.BiFunction;
 
 /**
  * A simple sub-class of the {@link net.viktorc.pp4j.impl.AbstractCommand} abstract class that relies on lambda functions to implement the
- * {@link net.viktorc.pp4j.impl.AbstractCommand#isExecutionComplete(String, boolean) isExecutionComplete} method and assumes that the command should always be
- * executed and that the process generates an output in response to the command.
+ * {@link net.viktorc.pp4j.impl.AbstractCommand#getNewStatus(String, boolean)} method and assumes that the process generates an output in
+ * response to the command.
  *
  * @author Viktor Csomor
  */
 public class SimpleCommand extends AbstractCommand {
 
-  private final BiPredicate<SimpleCommand, String> isProcessedStdOut;
-  private final BiPredicate<SimpleCommand, String> isProcessedErrOut;
+  private final BiFunction<SimpleCommand, String, Status> getStatusStdOut;
+  private final BiFunction<SimpleCommand, String, Status> getStatusStdErr;
 
   /**
    * Constructs an instance according to the specified parameters.
    *
    * @param instruction The instruction to write to the process' standard in.
-   * @param isProcessedStdOut The predicate that allows for the processing of the process' standard output in response to the command and
-   * determines when the command is to be considered processed by returning true.
-   * @param onErrorOutput The predicate that allows for the processing of the process' standard error output in response to the command and
-   * determines when the command is to be considered processed by returning true.
+   * @param getStatusStdOut The predicate that allows for the processing of the process' standard output in response to the command and
+   * determines when the command is to be considered processed by returning the appropriate <code>Status</code>.
+   * @param getStatusStdErr The predicate that allows for the processing of the process' standard error output in response to the command and
+   * determines when the command is to be considered processed by returning the appropriate <code>Status</code>.
    */
-  public SimpleCommand(String instruction, BiPredicate<SimpleCommand, String> isProcessedStdOut,
-      BiPredicate<SimpleCommand, String> onErrorOutput) {
+  public SimpleCommand(String instruction, BiFunction<SimpleCommand, String, Status> getStatusStdOut,
+      BiFunction<SimpleCommand, String, Status> getStatusStdErr) {
     super(instruction);
-    this.isProcessedStdOut = isProcessedStdOut;
-    this.isProcessedErrOut = onErrorOutput;
+    this.getStatusStdOut = getStatusStdOut;
+    this.getStatusStdErr = getStatusStdErr;
   }
 
   @Override
@@ -51,8 +51,8 @@ public class SimpleCommand extends AbstractCommand {
   }
 
   @Override
-  protected boolean isExecutionComplete(String outputLine, boolean error) {
-    return (error ? isProcessedErrOut.test(this, outputLine) : isProcessedStdOut.test(this, outputLine));
+  protected Status getNewStatus(String outputLine, boolean error) {
+    return (error ? getStatusStdErr.apply(this, outputLine) : getStatusStdOut.apply(this, outputLine));
   }
 
 }

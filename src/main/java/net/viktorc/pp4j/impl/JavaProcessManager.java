@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.Command.Status;
 import net.viktorc.pp4j.api.Submission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,13 +103,13 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
           (command, outputLine) -> {
             try {
               Object output = JavaObjectCodec.getInstance().decode(outputLine);
-              return output == JavaProcess.Signal.TERMINATED;
+              return output == JavaProcess.Signal.TERMINATED ? Status.SUCCESSFUL : Status.IN_PROGRESS;
             } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
               LOGGER.trace(e.getMessage(), e);
-              return false;
+              return Status.IN_PROGRESS;
             }
           },
-          (command, outputLine) -> false));
+          (command, outputLine) -> Status.IN_PROGRESS));
       return Optional.of(new SimpleSubmission(commands));
     } catch (IOException e) {
       LOGGER.warn(e.getMessage(), e);
