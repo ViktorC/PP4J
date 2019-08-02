@@ -363,27 +363,13 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   protected boolean tryTerminate() {
     LOGGER.trace("Attempting to terminate process using termination submission");
-    if (executeLock.tryLock()) {
-      try {
-        Optional<Submission<?>> optionalTerminationSubmission = manager.getTerminationSubmission();
-        if (optionalTerminationSubmission.isPresent()) {
-          synchronized (stateLock) {
-            if (isAlive()) {
-              return execute(optionalTerminationSubmission.get());
-            } else {
-              LOGGER.trace("Cannot execute termination submission as process is already terminated");
-            }
-          }
-        } else {
-          LOGGER.trace("No termination submission found");
-        }
-      } catch (Exception e) {
-        LOGGER.trace("Error attempting to terminate process", e);
-      } finally {
-        executeLock.unlock();
-      }
+    Optional<Submission<?>> optionalTerminationSubmission = manager.getTerminationSubmission();
+    if (optionalTerminationSubmission.isPresent()) {
+      return execute(optionalTerminationSubmission.get());
+    } else {
+      LOGGER.trace("No termination submission defined");
+      return false;
     }
-    return false;
   }
 
   /**
