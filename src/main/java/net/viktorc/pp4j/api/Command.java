@@ -17,7 +17,7 @@ package net.viktorc.pp4j.api;
 
 /**
  * An interface that defines methods for providing an instruction string and processing of the outputs of the process in response to the
- * instruction. The {@link #getStatus(String, boolean)} method is invoked every time a new line is output to one the process' standard
+ * instruction. The {@link #isCompleted(String, boolean)} method is invoked every time a new line is output to one the process' standard
  * streams and is responsible for determining when the process finished executing the command.
  *
  * @author Viktor Csomor
@@ -35,7 +35,7 @@ public interface Command {
    * A method called before the issuing of the instruction. It denotes whether the command is expected to generate output. If it returns
    * <code>false</code>, the command is considered successfully processed as soon as it is written to the process' standard in and
    * therefore the process is considered ready for new commands right away. If it returns <code>true</code>, the
-   * {@link #getStatus(String, boolean)} method determines when the command is deemed processed.
+   * {@link #isCompleted(String, boolean)} method determines when the command is deemed processed.
    *
    * @return Whether the executing process is expected to generate output in response to the command.
    */
@@ -43,50 +43,19 @@ public interface Command {
 
   /**
    * A method called every time a new line is printed to the standard out or standard error stream of the process after the command has
-   * been sent to its standard in until the method returns a terminal status.
+   * been sent to its standard in until the method returns <code>true</code> or throws a <code>FailedCommandException</code>.
    *
    * @param outputLine The new line of output printed to the standard out of the process.
    * @param error Whether this line has been output to the standard error or to the standard out stream.
-   * @return The status of the command.
+   * @return Whether this line of output denotes that the process has finished processing the command.
+   * @throws FailedCommandException If the output denotes the process has finished processing the command and the command failed. The
+   * process is to be considered ready for executing new submissions after this exception is thrown.
    */
-  Status getStatus(String outputLine, boolean error);
+  boolean isCompleted(String outputLine, boolean error) throws FailedCommandException;
 
   /**
    * It resets the command, in case it is stateful, to its initial state.
    */
   void reset();
-
-  /**
-   * The states a command can be in during execution.
-   *
-   * @author Viktor Csomor
-   */
-  enum Status {
-
-    IN_PROGRESS(false),
-    SUCCESSFUL(true),
-    FAILED(true);
-
-    private final boolean terminal;
-
-    /**
-     * Creates a <code>Status</code> instance.
-     *
-     * @param terminal Whether the status is terminal or not.
-     */
-    Status(boolean terminal) {
-      this.terminal = terminal;
-    }
-
-    /**
-     * Returns whether the status is terminal or not.
-     *
-     * @return Whether the status is terminal.
-     */
-    public boolean isTerminal() {
-      return terminal;
-    }
-
-  }
 
 }

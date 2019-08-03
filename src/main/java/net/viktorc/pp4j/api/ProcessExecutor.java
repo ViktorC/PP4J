@@ -28,10 +28,11 @@ public interface ProcessExecutor {
    * {@link net.viktorc.pp4j.api.Submission#getResult()} method.
    *
    * @param submission The submission to execute.
-   * @return Whether the submission was executed. If the executor is not running, busy processing an other submission, or stopped before it
-   * could complete the execution of the submission, <code>false</code> is returned; otherwise the submission is processed and
-   * <code>true</code> is returned once it's successfully executed.
+   * @throws FailedCommandException If one of the submission's commands fails.
+   * @throws DisruptedExecutionException If the executor is stopped before it could complete the execution of the submission, or if there
+   * is any other error that is not caused by the submission that leaves the execution of the submission incomplete. Implementations of
+   * the <code>ProcessExecutor</code> are encouraged to terminate the executor when throwing this exception.
    */
-  boolean execute(Submission<?> submission);
+  void execute(Submission<?> submission) throws FailedCommandException, DisruptedExecutionException;
 
 }

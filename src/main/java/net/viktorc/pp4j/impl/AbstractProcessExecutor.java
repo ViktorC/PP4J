@@ -14,7 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import net.viktorc.pp4j.api.Command;
-import net.viktorc.pp4j.api.Command.Status;
+import net.viktorc.pp4j.api.DisruptedExecutionException;
+import net.viktorc.pp4j.api.FailedCommandException;
 import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.Submission;
@@ -50,7 +51,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private BufferedReader stdOutReader;
   private BufferedReader stdErrReader;
   private Command command;
-  private Status commandStatus;
+  private FailedCommandException commandException;
+  private boolean commandCompleted;
   private boolean running;
   private boolean startedUp;
   private boolean idle;
@@ -114,10 +116,15 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
             if (startedUp) {
               stateLock.notifyAll();
             }
-          } else if (command != null && !commandStatus.isTerminal()) {
-            commandStatus = command.getStatus(line, error);
-            LOGGER.trace("Output denotes command status: {}", commandStatus);
-            if (commandStatus.isTerminal()) {
+          } else if (command != null && !commandCompleted) {
+            try {
+              commandCompleted = command.isCompleted(line, error);
+            } catch (FailedCommandException e) {
+              commandCompleted = true;
+              commandException = e;
+            }
+            LOGGER.trace("Output denotes command completion: {}", commandCompleted);
+            if (commandCompleted) {
               stateLock.notifyAll();
             }
           }
@@ -172,15 +179,33 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   }
 
   /**
+   * Executes the initial submission if it is defined.
+   *
+   * @throws FailedCommandException If the initial submission's execution fails due to a command failure.
+   */
+  private void executeInitialSubmission() throws FailedCommandException {
+    Optional<Submission<?>> initSubmission = manager.getInitSubmission();
+    if (initSubmission.isPresent()) {
+      try {
+        LOGGER.trace("Executing initial submission...");
+        execute(initSubmission.get());
+      } catch (DisruptedExecutionException e) {
+        LOGGER.trace(e.getMessage(), e);
+      }
+    }
+  }
+
+  /**
    * Starts up the process, sets up the executor infrastructure, invokes the appropriate callback methods, and executes the start-up
    * submission if there is one.
    *
    * @throws IOException If the process cannot be started.
    * @throws InterruptedException If the executing thread is interrupted while waiting for the process to start up.
+   * @throws FailedCommandException If the initial submission's execution fails due to a command failure.
    */
-  private void setUpExecutor() throws IOException, InterruptedException {
+  private void setUpExecutor() throws IOException, InterruptedException, FailedCommandException {
     executeLock.lock();
-    LOGGER.trace("Setting up executor");
+    LOGGER.trace("Setting up executor...");
     try {
       synchronized (stateLock) {
         numOfChildThreads.set(0);
@@ -194,7 +219,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), charset));
         threadPool.execute(() -> listenToProcessStream(stdOutReader, false));
         threadPool.execute(() -> listenToProcessStream(stdErrReader, true));
-        LOGGER.trace("Waiting for process to start up");
+        LOGGER.trace("Waiting for process to start up...");
         while (!startedUp) {
           if (killed) {
             LOGGER.trace("Process killed before it could start up");
@@ -203,10 +228,9 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
           stateLock.wait();
         }
         LOGGER.trace("Process started up");
+        executeInitialSubmission();
         manager.getKeepAliveTime().ifPresent(keepAliveTime -> threadPool.execute(() -> timeIdleProcess(keepAliveTime)));
-        LOGGER.trace("Executing initial submission");
-        manager.getInitSubmission().ifPresent(this::execute);
-        LOGGER.trace("Invoking start-up call-back methods");
+        LOGGER.trace("Invoking start-up call-back methods...");
         manager.onStartup();
         onExecutorStartup();
         LOGGER.trace("Executor set up");
@@ -253,11 +277,13 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * of the command's execution if the command is expected to produce an output at all.
    *
    * @param command The command to execute.
-   * @return Whether the command's execution was successful.
    * @throws IOException If writing to the process' stream is not possible.
    * @throws InterruptedException If the thread is interrupted while waiting for the command's response output.
+   * @throws FailedCommandException If the command fails.
+   * @throws DisruptedExecutionException If the process terminates during execution.
    */
-  private boolean executeCommand(Command command) throws IOException, InterruptedException {
+  private void executeCommand(Command command)
+      throws IOException, InterruptedException, FailedCommandException, DisruptedExecutionException {
     command.reset();
     this.command = command;
     try {
@@ -266,19 +292,22 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       stdInWriter.write(instruction);
       stdInWriter.newLine();
       stdInWriter.flush();
-      commandStatus = command.generatesOutput() ? Status.IN_PROGRESS : Status.SUCCESSFUL;
-      while (!commandStatus.isTerminal()) {
+      commandCompleted = !command.generatesOutput();
+      while (!commandCompleted) {
         if (!isAlive()) {
-          LOGGER.trace("Abort command execution due to process termination");
-          return false;
+          throw new DisruptedExecutionException("Process terminated during execution");
         }
         stateLock.wait();
       }
-      LOGGER.trace("Command completed");
-      return true;
+      if (commandException != null) {
+        LOGGER.trace("Command failed");
+        throw commandException;
+      }
+      LOGGER.trace("Command succeeded");
     } finally {
       this.command = null;
-      commandStatus = null;
+      commandException = null;
+      commandCompleted = false;
     }
   }
 
@@ -304,30 +333,32 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   }
 
   /**
-   * Executes the specified submission synchronously by delegating its commands to the underlying process serially and processing the
-   * responses of the process.
+   * Attempts to execute the specified submission synchronously by delegating its commands to the underlying process serially and
+   * processing the responses of the process. If the process is already busy executing, it returns <code>false</code>, otherwise it
+   * proceeds to execute the command and returns <code>true</code>.
    *
    * @param submission The submission to process and execute.
    * @param terminateProcessAfterwards Whether the process should be terminated after the execution of the submission.
-   * @return Whether the execution of the submission has completed successfully.
+   * @return Whether the execution of the submission was completed.
+   * @throws FailedCommandException If a command of the submission fails.
+   * @throws DisruptedExecutionException If the process terminates during execution or there is any other error that would disrupt the
+   * execution of the submission.
    */
-  protected boolean execute(Submission<?> submission, boolean terminateProcessAfterwards) {
+  protected boolean tryExecute(Submission<?> submission, boolean terminateProcessAfterwards)
+      throws FailedCommandException, DisruptedExecutionException {
     LOGGER.trace("Attempting to execute submission {}", submission);
     if (executeLock.tryLock()) {
       try {
         synchronized (stateLock) {
           if (!isAlive() || !startedUp) {
-            LOGGER.trace("Process not ready for submissions");
-            return false;
+            throw new DisruptedExecutionException("Process not running and/or started up");
           }
           idle = false;
           stateLock.notifyAll();
           LOGGER.trace("Starting execution of submission");
           submission.onStartedExecution();
           for (Command command : submission.getCommands()) {
-            if (!executeCommand(command)) {
-              return false;
-            }
+            executeCommand(command);
           }
           LOGGER.trace("Submission {} executed", submission);
           submission.onFinishedExecution();
@@ -338,14 +369,14 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
           return true;
         }
       } catch (IOException e) {
-        LOGGER.trace("Error while writing to process stream", e);
+        LOGGER.trace("Error while writing to process stream");
         terminateForcibly();
-        return false;
+        throw new DisruptedExecutionException(e);
       } catch (InterruptedException e) {
-        LOGGER.trace("Submission execution interrupted", e);
+        LOGGER.trace("Submission execution interrupted");
         terminateForcibly();
         Thread.currentThread().interrupt();
-        return false;
+        throw new DisruptedExecutionException(e);
       } finally {
         executeLock.unlock();
       }
@@ -365,11 +396,15 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     LOGGER.trace("Attempting to terminate process using termination submission");
     Optional<Submission<?>> optionalTerminationSubmission = manager.getTerminationSubmission();
     if (optionalTerminationSubmission.isPresent()) {
-      return execute(optionalTerminationSubmission.get());
+      try {
+        return tryExecute(optionalTerminationSubmission.get(), false);
+      } catch (FailedCommandException | DisruptedExecutionException e) {
+        LOGGER.trace(e.getMessage(), e);
+      }
     } else {
       LOGGER.trace("No termination submission defined");
-      return false;
     }
+    return false;
   }
 
   /**
@@ -399,8 +434,13 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   }
 
   @Override
-  public boolean execute(Submission<?> submission) {
-    return execute(submission, false);
+  public void execute(Submission<?> submission) throws FailedCommandException, DisruptedExecutionException {
+    executeLock.lock();
+    try {
+      tryExecute(submission, false);
+    } finally {
+      executeLock.unlock();
+    }
   }
 
   @Override
@@ -417,6 +457,24 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         tearDownExecutor(returnCode);
       }
     }
+  }
+
+  /**
+   * An exception thrown if an unexpected error occurs while running or interacting with a process.
+   *
+   * @author Viktor Csomor
+   */
+  public static class ProcessException extends RuntimeException {
+
+    /**
+     * Constructs a wrapper for the specified exception.
+     *
+     * @param e The source exception.
+     */
+    protected ProcessException(Exception e) {
+      super(e);
+    }
+
   }
 
 }

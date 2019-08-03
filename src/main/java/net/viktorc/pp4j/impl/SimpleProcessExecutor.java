@@ -61,16 +61,6 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
   }
 
   @Override
-  public boolean execute(Submission<?> submission) {
-    executeLock.lock();
-    try {
-      return super.execute(submission);
-    } finally {
-      executeLock.unlock();
-    }
-  }
-
-  @Override
   protected void onExecutorStartup() {
     synchronized (stateLock) {
       stateLock.notifyAll();

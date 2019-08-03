@@ -17,7 +17,7 @@ package net.viktorc.pp4j.impl;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import net.viktorc.pp4j.api.Command.Status;
+import net.viktorc.pp4j.api.FailedCommandException;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -38,8 +38,10 @@ public class SPETest {
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
         TestUtils.createTestProcessManagerFactory().newProcessManager())) {
       SimpleCommand command = new SimpleCommand("process 3",
-          (c, o) -> "ready".equals(o) ? Status.SUCCESSFUL : Status.IN_PROGRESS,
-          (c, o) -> Status.FAILED);
+          (c, o) -> "ready".equals(o),
+          (c, o) -> {
+            throw new FailedCommandException(c, o);
+          });
       executor.start();
       executor.execute(new SimpleSubmission(command));
       Assert.assertFalse(executor.tryTerminate());

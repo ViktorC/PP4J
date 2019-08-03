@@ -102,13 +102,15 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
   @Override
   public void execute(Runnable command) {
+    Future<?> future = submit(command);
     try {
-      submit(command).get();
+      future.get();
     } catch (ExecutionException e) {
-      throw new FailedSubmissionExecutionException(e);
+      throw new UncheckedExecutionException(e);
     } catch (InterruptedException e) {
+      future.cancel(true);
       Thread.currentThread().interrupt();
-      throw new FailedSubmissionExecutionException(e);
+      throw new UncheckedExecutionException(e);
     }
   }
 
@@ -330,6 +332,24 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     @Override
     public T call() throws Exception {
       return callable.call();
+    }
+
+  }
+
+  /**
+   * An exception thrown if the execution of Java task fails is or interrupted.
+   *
+   * @author Viktor Csomor
+   */
+  public static class UncheckedExecutionException extends RuntimeException {
+
+    /**
+     * Constructs a wrapper for the specified exception.
+     *
+     * @param e The source exception.
+     */
+    private UncheckedExecutionException(Throwable e) {
+      super(e);
     }
 
   }

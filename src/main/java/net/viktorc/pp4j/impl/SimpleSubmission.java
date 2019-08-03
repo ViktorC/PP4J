@@ -25,8 +25,8 @@ import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
 
 /**
- * A simple implementation of the {@link net.viktorc.pp4j.api.Submission} interface that allows for the specification of the commands to
- * execute and whether the process is to be terminated after the execution of the commands.
+ * A simple implementation of the {@link net.viktorc.pp4j.api.Submission} interface that only allows for the specification of the commands
+ * to execute and does not return anything.
  *
  * @author Viktor Csomor
  */

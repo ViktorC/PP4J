@@ -6,9 +6,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import net.viktorc.pp4j.api.Command;
-import net.viktorc.pp4j.api.Command.Status;
+import net.viktorc.pp4j.api.FailedCommandException;
 import net.viktorc.pp4j.api.Submission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +28,6 @@ public class JavaSubmission<T extends Serializable, S extends Callable<T> & Seri
   private final S task;
   private final String command;
   private volatile T result;
-  private volatile Throwable error;
 
   /**
    * Creates a submission for the specified {@link Callable}.
@@ -61,30 +59,26 @@ public class JavaSubmission<T extends Serializable, S extends Callable<T> & Seri
             output = JavaObjectCodec.getInstance().decode(outputLine);
           } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
             LOGGER.trace(e.getMessage(), e);
-            return Status.IN_PROGRESS;
+            return false;
           }
           if (output instanceof JavaProcess.Response) {
             JavaProcess.Response response = (JavaProcess.Response) output;
             if (response.isError()) {
-              error = (Throwable) response.getResult();
-            } else {
-              result = (T) response.getResult();
+              throw new FailedCommandException(command, (Throwable) response.getResult());
             }
-            return Status.SUCCESSFUL;
+            result = (T) response.getResult();
+            return true;
           }
-          return Status.IN_PROGRESS;
+          return false;
         },
         (command, outputLine) -> {
           // It cannot happen, as stderr is redirected.
-          return Status.FAILED;
+          throw new FailedCommandException(command, outputLine);
         }));
   }
 
   @Override
-  public Optional<T> getResult() throws ExecutionException {
-    if (error != null) {
-      throw new ExecutionException(error);
-    }
+  public Optional<T> getResult() {
     return Optional.ofNullable(result);
   }
 

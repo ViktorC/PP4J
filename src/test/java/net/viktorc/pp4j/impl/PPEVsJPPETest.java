@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import net.viktorc.pp4j.api.Command.Status;
+import net.viktorc.pp4j.api.FailedCommandException;
 import org.junit.Assume;
 import org.junit.Test;
 
@@ -116,8 +116,10 @@ public class PPEVsJPPETest {
    */
   private SimpleSubmission getNativeSubmission(int taskTime) {
     return new SimpleSubmission(new SimpleCommand("process " + taskTime,
-        (c, o) -> "ready".equals(o) ? Status.SUCCESSFUL : Status.IN_PROGRESS,
-        (c, o) -> Status.FAILED));
+        (c, o) -> "ready".equals(o),
+        (c, o) -> {
+          throw new FailedCommandException(c, o);
+        }));
   }
 
   /**

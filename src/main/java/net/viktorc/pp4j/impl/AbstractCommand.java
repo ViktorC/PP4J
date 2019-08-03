@@ -18,10 +18,11 @@ package net.viktorc.pp4j.impl;
 import java.util.ArrayList;
 import java.util.List;
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.FailedCommandException;
 
 /**
- * An abstract implementation of the {@link Command} interface that stores all lines output to the process' standard
- * out and standard error in response to the command.
+ * An abstract implementation of the {@link Command} interface that stores all lines output to the process' standard out and standard
+ * error in response to the command.
  *
  * @author Viktor Csomor
  */
@@ -48,9 +49,10 @@ public abstract class AbstractCommand implements Command {
    *
    * @param outputLine The new line of output printed to the standard out of the process.
    * @param error Whether this line has been output to the standard error or to the standard out stream.
-   * @return The status of the command given the new output.
+   * @return Whether the output denotes the completion of the command's execution.
+   * @throws FailedCommandException If the output denotes the process has finished processing the command and the command failed.
    */
-  protected abstract Status getNewStatus(String outputLine, boolean error);
+  protected abstract boolean isExecutionCompleted(String outputLine, boolean error) throws FailedCommandException;
 
   /**
    * Returns a list of lines output to the standard out of the underlying process after the instruction has been written to the standard in
@@ -104,14 +106,14 @@ public abstract class AbstractCommand implements Command {
   }
 
   @Override
-  public final Status getStatus(String outputLine, boolean error) {
-    Status status = getNewStatus(outputLine, error);
-		if (error) {
+  public final boolean isCompleted(String outputLine, boolean error) throws FailedCommandException {
+    boolean completed = isExecutionCompleted(outputLine, error);
+    if (error) {
       stdErrLines.add(outputLine);
-		} else {
-			stdOutLines.add(outputLine);
-		}
-    return status;
+    } else {
+      stdOutLines.add(outputLine);
+    }
+    return completed;
   }
 
 }

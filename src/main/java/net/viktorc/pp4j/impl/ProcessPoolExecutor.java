@@ -36,6 +36,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import net.viktorc.pp4j.api.Command;
+import net.viktorc.pp4j.api.DisruptedExecutionException;
+import net.viktorc.pp4j.api.FailedCommandException;
 import net.viktorc.pp4j.api.ProcessExecutorService;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
@@ -304,16 +306,16 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   }
 
   @Override
-  public boolean execute(Submission<?> submission) {
+  public void execute(Submission<?> submission) throws FailedCommandException, DisruptedExecutionException {
+    Future<?> future = submit(submission);
     try {
-      submit(submission).get();
-      return true;
+      future.get();
     } catch (ExecutionException e) {
-      throw new FailedSubmissionExecutionException(e);
+      throw (FailedCommandException) e.getCause();
     } catch (InterruptedException e) {
-      LOGGER.error(e.getMessage(), e);
+      future.cancel(true);
       Thread.currentThread().interrupt();
-      return false;
+      throw new DisruptedExecutionException(e);
     }
   }
 
@@ -471,7 +473,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
 
     @Override
-    public Optional<T> getResult() throws ExecutionException {
+    public Optional<T> getResult() {
       return origSubmission.getResult();
     }
 
@@ -667,12 +669,13 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       }
       try {
         submission.setThread(submissionThread);
-        submissionDone = !submission.isCancelled() && execute(submission, submission.terminateProcessAfterwards);
-      } catch (Exception e) {
-        submission.setException(e);
+        submissionDone = !submission.isCancelled() && tryExecute(submission, submission.terminateProcessAfterwards);
+      } catch (FailedCommandException e) {
         LOGGER.trace("Exception while executing submission", e);
+        submission.setException(e);
         submissionDone = true;
-        terminateForcibly();
+      } catch (DisruptedExecutionException e) {
+        // The submission is not assumed to be at fault.
       } finally {
         if (submission.isCancelled()) {
           LOGGER.trace("Submission cancelled");

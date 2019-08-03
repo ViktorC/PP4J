@@ -28,7 +28,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import net.viktorc.pp4j.api.Command;
-import net.viktorc.pp4j.api.Command.Status;
+import net.viktorc.pp4j.api.FailedCommandException;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
@@ -107,7 +107,7 @@ public class PPETest {
    * multiple elements, the commands will be chained.
    * @param requests The number of commands to submit.
    * @param timeSpan The number of milliseconds in which the uniformly distributed requests should be submitted.
-   * @param throwExecutionException Whether a process exception should be thrown by the submitted command.
+   * @param throwExecutionException Whether an exception should be thrown by the submitted command.
    * @param cancelTime The number of milliseconds after which the futures should be cancelled. If it is 0 or less, the futures are not
    * cancelled.
    * @param forcedCancel If the command should be interrupted if it is already being processed. If
@@ -142,6 +142,9 @@ public class PPETest {
           commands = new ArrayList<>();
           for (int procTime : procTimes) {
             commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
+              if (throwExecutionException) {
+                throw new FailedCommandException(c, "test");
+              }
               if ("ready".equals(o)) {
                 // Output line caching check.
                 assert c.getStandardOutLines().size() == procTime - 1 && c.getStandardErrLines().size() == 0 :
@@ -156,19 +159,12 @@ public class PPETest {
                 assert "".equals(c.getJointStandardErrLines()) :
                     String.format("Wrongly captured standard output. Expected: \"\"%nActual: \"%s\"", c.getJointStandardOutLines());
                 c.reset();
-                return Status.SUCCESSFUL;
+                return true;
               }
-              return Status.IN_PROGRESS;
-            }, (c, o) -> Status.FAILED) {
-
-              @Override
-              public boolean generatesOutput() {
-                if (throwExecutionException) {
-                  throw new RuntimeException("Test execution exception.");
-                }
-                return super.generatesOutput();
-              }
-            });
+              return false;
+            }, (c, o) -> {
+              throw new FailedCommandException(c, o);
+            }));
           }
         }
         int index = i;
@@ -588,7 +584,7 @@ public class PPETest {
     System.out.println(System.lineSeparator() + "Test 36");
     ProcessPoolExecutor pool = getPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
     exceptionRule.expect(ExecutionException.class);
-    exceptionRule.expectMessage("Test execution exception.");
+    exceptionRule.expectMessage("test");
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 4000, true, 0, false, false,
         false, 0, 4995, 6200));
   }
@@ -598,7 +594,7 @@ public class PPETest {
     System.out.println(System.lineSeparator() + "Test 37");
     ProcessPoolExecutor pool = getPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
     exceptionRule.expect(ExecutionException.class);
-    exceptionRule.expectMessage("Test execution exception.");
+    exceptionRule.expectMessage("test");
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 4000, true, 0, false, false,
         false, 1000, 4995, 6200));
   }
@@ -618,8 +614,10 @@ public class PPETest {
     ProcessPoolExecutor pool = getPool(1, 1, 0, null, false, false, false);
     try {
       SimpleCommand command = new SimpleCommand("process 3",
-          (c, o) -> "ready".equals(o) ? Status.SUCCESSFUL : Status.IN_PROGRESS,
-          (c, o) -> Status.FAILED);
+          (c, o) -> "ready".equals(o),
+          (c, o) -> {
+            throw new FailedCommandException(c, o);
+          });
       long start = System.currentTimeMillis();
       pool.execute(new SimpleSubmission(command));
       long dur = System.currentTimeMillis() - start;
@@ -663,8 +661,10 @@ public class PPETest {
     public ProcessManager newProcessManager() {
       return new SimpleProcessManager(new ProcessBuilder(programLocation), null, null,
           () -> new SimpleSubmission(new SimpleCommand("start",
-              (c, o) -> "ok".equals(o) ? Status.SUCCESSFUL : Status.IN_PROGRESS,
-              (c, o) -> Status.FAILED)), null) {
+              (c, o) -> "ok".equals(o),
+              (c, o) -> {
+                throw new FailedCommandException(c, o);
+              })), null) {
 
         @Override
         public boolean startsUpInstantly() {
@@ -683,8 +683,10 @@ public class PPETest {
         public Optional<Submission<?>> getTerminationSubmission() {
           if (manuallyTerminate) {
             return Optional.of(new SimpleSubmission(new SimpleCommand("stop",
-                (c, o) -> "bye".equals(o) ? Status.SUCCESSFUL : Status.IN_PROGRESS,
-                (c, o) -> Status.FAILED)));
+                (c, o) -> "bye".equals(o),
+                (c, o) -> {
+                  throw new FailedCommandException(c, o);
+                })));
           }
           return super.getTerminationSubmission();
         }

@@ -17,7 +17,6 @@ package net.viktorc.pp4j.api;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 
 /**
  * An interface that defines methods necessary for the submission and execution of commands in {@link net.viktorc.pp4j.api.ProcessExecutor}
@@ -40,9 +39,8 @@ public interface Submission<T> {
    *
    * @return The optional object representing the result of the submission which may be empty if no result is associated with the
    * submission.
-   * @throws ExecutionException if an error occurred while executing the submission.
    */
-  Optional<T> getResult() throws ExecutionException;
+  Optional<T> getResult();
 
   /**
    * A method that is executed once the processing of the submitted commands has begun.
