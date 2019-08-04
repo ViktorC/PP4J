@@ -301,8 +301,6 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   private static class SerializableCallable<T extends Serializable, S extends Callable<? super T> & Serializable>
       implements Callable<T>, Serializable {
 
-    static final long serialVersionUID = -5418713087898561239L;
-
     final Callable<T> callable;
     final Runnable runnablePart;
 
