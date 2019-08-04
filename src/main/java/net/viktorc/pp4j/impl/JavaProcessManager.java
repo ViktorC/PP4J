@@ -86,7 +86,7 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
     try {
       // Avoid having to have the process manager serialized.
       T initTask = this.initTask;
-      initSubmission = Optional.of(new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
+      initSubmission = Optional.of(new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
         initTask.run();
         return null;
       }));
@@ -103,7 +103,7 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
     if (wrapUpTask != null) {
       T wrapUpTask = this.wrapUpTask;
       try {
-        Submission<?> wrapUpJavaSubmission = new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
+        Submission<?> wrapUpJavaSubmission = new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
           wrapUpTask.run();
           return null;
         });
