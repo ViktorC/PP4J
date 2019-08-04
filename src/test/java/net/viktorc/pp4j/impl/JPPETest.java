@@ -30,7 +30,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.viktorc.pp4j.api.JavaProcessConfig;
 import net.viktorc.pp4j.api.JavaProcessConfig.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessConfig.JVMType;
 import net.viktorc.pp4j.impl.JavaProcess.Request;
