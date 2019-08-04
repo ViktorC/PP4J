@@ -85,7 +85,7 @@ public class SPETest {
       });
       t.start();
       Assert.assertTrue(t.isAlive());
-      executor.terminateForcibly();
+      executor.terminate();
       future.get();
       Thread.sleep(20);
       Assert.assertFalse(t.isAlive());

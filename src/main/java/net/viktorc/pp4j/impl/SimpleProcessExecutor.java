@@ -73,7 +73,7 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
 
   @Override
   public void close() throws Exception {
-    terminateForcibly();
+    terminate();
     threadPool.shutdown();
     threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
   }

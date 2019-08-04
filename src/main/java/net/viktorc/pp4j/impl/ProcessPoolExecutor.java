@@ -657,7 +657,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
      * unsuccessful or interrupted without any other exceptions thrown, the submission is put back into the queue. If an exception is
      * thrown during its execution, the submission is deemed completed and the process is terminated.
      */
-    void takeAndExecuteSubmission() {
+    void waitForAndExecuteAvailableSubmission() {
       InternalSubmission<?> submission;
       boolean submissionDone = false;
       try {
@@ -688,14 +688,14 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     /**
      * Waits on the blocking queue of submissions executing available ones one at a time.
      */
-    void startHandlingSubmissions() {
+    void takeAndExecuteSubmissions() {
       numOfChildThreads.incrementAndGet();
       synchronized (stateLock) {
         submissionThread = Thread.currentThread();
       }
       try {
         while (isAlive()) {
-          takeAndExecuteSubmission();
+          waitForAndExecuteAvailableSubmission();
         }
       } finally {
         synchronized (stateLock) {
@@ -707,7 +707,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
 
     @Override
     protected void onExecutorStartup() {
-      threadPool.submit(this::startHandlingSubmissions);
+      threadPool.submit(this::takeAndExecuteSubmissions);
       poolInitLatch.countDown();
     }
 

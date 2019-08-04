@@ -19,18 +19,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Collectors;
 import net.viktorc.pp4j.api.Command;
-import net.viktorc.pp4j.api.Submission;
 
 /**
- * A simple implementation of the {@link net.viktorc.pp4j.api.Submission} interface that only allows for the specification of the commands
- * to execute and does not return anything.
+ * A simple sub-class of the {@link AbstractSubmission} interface that only allows for the specification of the commands to execute and
+ * does not return anything.
  *
  * @author Viktor Csomor
  */
-public class SimpleSubmission implements Submission<Object> {
+public class SimpleSubmission extends AbstractSubmission<Object> {
 
   private final List<Command> commands;
 
@@ -66,18 +63,6 @@ public class SimpleSubmission implements Submission<Object> {
   @Override
   public List<Command> getCommands() {
     return new ArrayList<>(commands);
-  }
-
-  @Override
-  public Optional<Object> getResult() {
-    return Optional.empty();
-  }
-
-  @Override
-  public String toString() {
-    return String.format("{commands:[%s]}", commands.stream()
-        .map(c -> "\"" + c.getInstruction() + "\"")
-        .collect(Collectors.joining(",")));
   }
 
 }
