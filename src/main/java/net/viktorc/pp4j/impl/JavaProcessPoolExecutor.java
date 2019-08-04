@@ -243,11 +243,11 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   /**
-   * An implementation of the {@link Future} interface for wrapping a <code>Future</code> instance into a <code>Future</code> object with
-   * a return type that is a sub-type of that of the wrapped instance.
+   * An implementation of the {@link Future} interface for wrapping a <code>Future</code> instance into one with a return type that is a
+   * sub-type of that of the wrapped instance.
    *
    * @param <T> The return type of the original <code>Future</code> instance.
-   * @param <S> A subtype of <code>T</code>; the return type of the wrapper <code>Future</code> instance.
+   * @param <S> A subtype of <code>T</code>, the return type of the wrapper <code>Future</code> instance.
    * @author Viktor Csomor
    */
   private static class CastFuture<T, S extends T> implements Future<T> {
@@ -257,7 +257,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     /**
      * Constructs the wrapper object for the specified <code>Future</code> instance.
      *
-     * @param origFuture The  <code>Future</code> instance to wrap.
+     * @param origFuture The <code>Future</code> instance to wrap.
      */
     CastFuture(Future<S> origFuture) {
       this.origFuture = origFuture;
@@ -292,7 +292,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
   /**
    * A wrapper class implementing the {@link Callable} interface for turning a serializable <code>Callable</code> instance with a not
-   * explicitly serializable return type into a serializable <code>Callable</code> instance with an explicitly serializable return type.
+   * explicitly serializable return type into a serializable instance with an explicitly serializable return type.
    *
    * @param <T> The serializable return type.
    * @param <S> The serializable <code>Callable</code> implementation with a not explicitly serializable return type.
