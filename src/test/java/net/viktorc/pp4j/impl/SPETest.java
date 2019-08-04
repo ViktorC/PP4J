@@ -37,11 +37,7 @@ public class SPETest {
   public void test01() throws Exception {
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
         TestUtils.createTestProcessManagerFactory().newProcessManager())) {
-      SimpleCommand command = new SimpleCommand("process 3",
-          (c, o) -> "ready".equals(o),
-          (c, o) -> {
-            throw new FailedCommandException(c, o);
-          });
+      SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o));
       executor.start();
       executor.execute(new SimpleSubmission(command));
       Assert.assertFalse(executor.tryTerminate());

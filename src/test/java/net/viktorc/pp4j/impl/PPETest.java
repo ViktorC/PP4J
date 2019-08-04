@@ -162,8 +162,6 @@ public class PPETest {
                 return true;
               }
               return false;
-            }, (c, o) -> {
-              throw new FailedCommandException(c, o);
             }));
           }
         }
@@ -613,11 +611,7 @@ public class PPETest {
     System.out.println(System.lineSeparator() + "Test 39");
     ProcessPoolExecutor pool = getPool(1, 1, 0, null, false, false, false);
     try {
-      SimpleCommand command = new SimpleCommand("process 3",
-          (c, o) -> "ready".equals(o),
-          (c, o) -> {
-            throw new FailedCommandException(c, o);
-          });
+      SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o));
       long start = System.currentTimeMillis();
       pool.execute(new SimpleSubmission(command));
       long dur = System.currentTimeMillis() - start;
@@ -660,11 +654,7 @@ public class PPETest {
     @Override
     public ProcessManager newProcessManager() {
       return new SimpleProcessManager(new ProcessBuilder(programLocation), null, null,
-          () -> new SimpleSubmission(new SimpleCommand("start",
-              (c, o) -> "ok".equals(o),
-              (c, o) -> {
-                throw new FailedCommandException(c, o);
-              })), null) {
+          () -> new SimpleSubmission(new SimpleCommand("start", (c, o) -> "ok".equals(o))), null) {
 
         @Override
         public boolean startsUpInstantly() {
@@ -682,11 +672,7 @@ public class PPETest {
         @Override
         public Optional<Submission<?>> getTerminationSubmission() {
           if (manuallyTerminate) {
-            return Optional.of(new SimpleSubmission(new SimpleCommand("stop",
-                (c, o) -> "bye".equals(o),
-                (c, o) -> {
-                  throw new FailedCommandException(c, o);
-                })));
+            return Optional.of(new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o))));
           }
           return super.getTerminationSubmission();
         }

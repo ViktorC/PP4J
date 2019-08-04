@@ -82,10 +82,6 @@ public class JavaSubmission<T extends Serializable, S extends Callable<T> & Seri
             return true;
           }
           return false;
-        },
-        (command, outputLine) -> {
-          // It cannot happen, as stderr is redirected.
-          throw new FailedCommandException(command, outputLine);
         }));
   }
 

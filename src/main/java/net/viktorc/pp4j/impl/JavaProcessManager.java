@@ -123,9 +123,6 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
               LOGGER.trace(e.getMessage(), e);
               return false;
             }
-          },
-          (command, outputLine) -> {
-            throw new FailedCommandException(command, outputLine);
           }));
       return Optional.of(new SimpleSubmission(commands));
     } catch (IOException e) {

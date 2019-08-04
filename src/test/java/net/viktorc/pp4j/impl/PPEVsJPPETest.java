@@ -115,11 +115,7 @@ public class PPEVsJPPETest {
    * @return A native process submission.
    */
   private SimpleSubmission getNativeSubmission(int taskTime) {
-    return new SimpleSubmission(new SimpleCommand("process " + taskTime,
-        (c, o) -> "ready".equals(o),
-        (c, o) -> {
-          throw new FailedCommandException(c, o);
-        }));
+    return new SimpleSubmission(new SimpleCommand("process " + taskTime, (c, o) -> "ready".equals(o)));
   }
 
   /**

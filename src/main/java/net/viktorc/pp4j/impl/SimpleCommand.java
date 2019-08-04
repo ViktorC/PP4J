@@ -18,7 +18,7 @@ package net.viktorc.pp4j.impl;
 import net.viktorc.pp4j.api.FailedCommandException;
 
 /**
- * A simple sub-class of the {@link AbstractCommand} abstract class that relies on lambda functions to implement the
+ * A simple sub-class of the {@link AbstractCommand} abstract class that relies on a functional interface to implement the
  * {@link AbstractCommand#isExecutionCompleted(String, boolean)} method.
  *
  * @author Viktor Csomor
@@ -26,8 +26,8 @@ import net.viktorc.pp4j.api.FailedCommandException;
 public class SimpleCommand extends AbstractCommand {
 
   private final boolean generatesOutput;
-  private final CommandOutputPredicate isCompletedStdOut;
-  private final CommandOutputPredicate isCompletedStdErr;
+  private final CommandCompletionPredicate isCompletedStdOut;
+  private final CommandCompletionPredicate isCompletedStdErr;
 
   /**
    * Constructs a <code>SimpleCommand</code> according to the specified parameters assuming that the command generates some output.
@@ -38,11 +38,25 @@ public class SimpleCommand extends AbstractCommand {
    * @param isCompletedStdErr The predicate that allows for the processing of the process' standard error output in response to the command and
    * determines when the command is to be considered processed.
    */
-  public SimpleCommand(String instruction, CommandOutputPredicate isCompletedStdOut, CommandOutputPredicate isCompletedStdErr) {
+  public SimpleCommand(String instruction, CommandCompletionPredicate isCompletedStdOut, CommandCompletionPredicate isCompletedStdErr) {
     super(instruction);
     this.isCompletedStdOut = isCompletedStdOut;
     this.isCompletedStdErr = isCompletedStdErr;
     generatesOutput = true;
+  }
+
+  /**
+   * Constructs a <code>SimpleCommand</code> according to the specified parameters assuming that the command generates some output and if
+   * there is anything output to the process' standard error stream, a <code>FailedCommandException</code> is to be thrown.
+   *
+   * @param instruction The instruction to write to the process' standard in.
+   * @param isCompletedStdOut The predicate that allows for the processing of the process' standard output in response to the command and
+   * determines when the command is to be considered processed.
+   */
+  public SimpleCommand(String instruction, CommandCompletionPredicate isCompletedStdOut) {
+    this(instruction, isCompletedStdOut, ((command, outputLine) -> {
+      throw new FailedCommandException(command, outputLine);
+    }));
   }
 
   /**
@@ -69,9 +83,23 @@ public class SimpleCommand extends AbstractCommand {
         isCompletedStdOut == null || isCompletedStdOut.isCompleted(this, outputLine));
   }
 
+  /**
+   * A bi-predicate that may throw {@link FailedCommandException} for determining when a command's execution is complete based on the
+   * executing process' output.
+   *
+   * @author Viktor Csomor
+   */
   @FunctionalInterface
-  public interface CommandOutputPredicate {
+  public interface CommandCompletionPredicate {
 
+    /**
+     * Returns whether the command's execution is complete based on the latest line of output.
+     *
+     * @param command The command that owns the predicate and is being executed.
+     * @param outputLine The latest line output by the process executing the command.
+     * @return Whether the latest line of output denotes command completion.
+     * @throws FailedCommandException If the command's execution is completed but the command failed.
+     */
     boolean isCompleted(SimpleCommand command, String outputLine) throws FailedCommandException;
 
   }
