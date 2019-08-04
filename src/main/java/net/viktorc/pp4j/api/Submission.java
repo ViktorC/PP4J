@@ -19,8 +19,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * An interface that defines methods necessary for the submission and execution of commands in {@link net.viktorc.pp4j.api.ProcessExecutor}
- * instances. It also defines methods to call once the processing of the submitted commands has started or finished.
+ * An interface that defines methods necessary for the submission and execution of commands in {@link ProcessExecutor} instances. It also
+ * defines methods to call once the processing of the submitted commands has started or finished.
  *
  * @param <T> The return type associated with the submission.
  * @author Viktor Csomor

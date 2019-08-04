@@ -20,8 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
- * An interface for Java process pools that extends both the {@link net.viktorc.pp4j.api.ProcessExecutorService} and {@link
- * java.util.concurrent.ExecutorService} interfaces.
+ * An interface for Java process pools that extends both the {@link ProcessExecutorService} and {@link ExecutorService} interfaces.
  *
  * @author Viktor Csomor
  */

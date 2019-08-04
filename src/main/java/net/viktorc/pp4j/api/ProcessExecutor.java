@@ -25,7 +25,7 @@ public interface ProcessExecutor {
   /**
    * It has the process sequentially execute the commands contained in the submission and blocks until the execution of every command is
    * complete. The result of the submission, if there is one, can be subsequently accessed by calling the
-   * {@link net.viktorc.pp4j.api.Submission#getResult()} method.
+   * {@link Submission#getResult()} method.
    *
    * @param submission The submission to execute.
    * @throws FailedCommandException If one of the submission's commands fails.

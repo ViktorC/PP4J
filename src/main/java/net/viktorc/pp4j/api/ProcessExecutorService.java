@@ -20,33 +20,33 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
- * An interface that outlines an executing mechanism for {@link net.viktorc.pp4j.api.Submission} instances in separate processes and allows
- * for the tracking of the progress of the execution via {@link java.util.concurrent.Future} instances. It also defines the same
- * shutdown-related methods as the {@link java.util.concurrent.ExecutorService} interface to conform to its behaviour specifications.
+ * An interface that outlines an executing mechanism for {@link Submission} instances in separate processes and allows for the tracking of
+ * the progress of the execution via {@link Future} instances. It also defines the same shutdown-related methods as the
+ * {@link java.util.concurrent.ExecutorService} interface to conform to its behaviour specifications.
  *
  * @author Viktor Csomor
  */
 public interface ProcessExecutorService extends ProcessExecutor {
 
   /**
-   * Returns the {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance responsible for creating instances of an implementation of the
-   * {@link net.viktorc.pp4j.api.ProcessManager} interface for managing the processes of the pool.
+   * Returns the {@link ProcessManagerFactory} instance responsible for creating instances of an implementation of the
+   * {@link ProcessManager} interface for managing the processes of the pool.
    *
    * @return The process manager factory of the process pool.
    */
   ProcessManagerFactory getProcessManagerFactory();
 
   /**
-   * Submits the specified submission for execution and returns a {@link java.util.concurrent.Future} instance which allows for the
-   * cancellation of the submission. It does not block until the submission is processed. The termination of the executing process after the
-   * execution may be requested.
+   * Submits the specified submission for execution and returns a {@link Future} instance which allows for the cancellation of the
+   * submission. It does not block until the submission is processed. The termination of the executing process after the execution may be
+   * requested.
    *
    * @param submission The submission to execute.
    * @param terminateProcessAfterwards Whether the process to which the submission is delegated should be terminated after the execution of
    * the submission.
    * @param <T> The type variable of the submission.
-   * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of the execution, the
-   * cancellation thereof, or the retrieval of its optional result.
+   * @return A <code>Future</code> instance that allows for the waiting for the completion of the execution, the cancellation thereof, or
+   * the retrieval of its optional result.
    */
   <T> Future<T> submit(Submission<T> submission, boolean terminateProcessAfterwards);
 
@@ -91,13 +91,13 @@ public interface ProcessExecutorService extends ProcessExecutor {
   boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
 
   /**
-   * Submits the specified submission for execution and returns a {@link java.util.concurrent.Future} instance which allows for the
-   * cancellation of the submission. It does not block until the submission is processed. It is equivalent to calling {@link
-   * #submit(Submission, boolean)} with <code>terminateProcessAfterwards</code> set to <code>false</code>.
+   * Submits the specified submission for execution and returns a {@link Future} instance which allows for the cancellation of the
+   * submission. It does not block until the submission is processed. It is equivalent to calling {@link #submit(Submission, boolean)}
+   * with <code>terminateProcessAfterwards</code> set to <code>false</code>.
    *
    * @param submission The submission to execute.
    * @param <T> The type variable of the submission.
-   * @return A {@link java.util.concurrent.Future} instance that allows for the waiting for the completion of the execution, the
+   * @return A <code>Future</code> instance that allows for the waiting for the completion of the execution, the
    * cancellation thereof, or the retrieval of its optional result.
    */
   default <T> Future<T> submit(Submission<T> submission) {
