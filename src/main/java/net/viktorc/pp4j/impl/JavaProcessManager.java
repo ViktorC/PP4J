@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import net.viktorc.pp4j.api.Command;
-import net.viktorc.pp4j.api.FailedCommandException;
 import net.viktorc.pp4j.api.Submission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

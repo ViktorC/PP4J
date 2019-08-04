@@ -42,7 +42,7 @@ import org.junit.rules.ExpectedException;
  *
  * @author Viktor Csomor
  */
-public class PPETest {
+public class PPEIntegrationTest {
 
   @Rule
   public final ExpectedException exceptionRule = ExpectedException.none();
@@ -52,7 +52,7 @@ public class PPETest {
   /**
    * Resolves the path to the test program and ensures that it is executable.
    */
-  public PPETest() {
+  public PPEIntegrationTest() {
     programLocation = TestUtils.getExecutable().getAbsolutePath();
   }
 

@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import net.viktorc.pp4j.api.FailedCommandException;
 import org.junit.Assume;
 import org.junit.Test;
 
@@ -30,7 +29,7 @@ import org.junit.Test;
  *
  * @author Viktor Csomor
  */
-public class PPEVsJPPETest {
+public class PPEvsJPPEIntegrationTest {
 
   private static final int WARMUP_SUBMISSIONS = 5;
 

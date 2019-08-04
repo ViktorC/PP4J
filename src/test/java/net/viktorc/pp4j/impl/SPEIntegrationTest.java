@@ -17,7 +17,6 @@ package net.viktorc.pp4j.impl;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import net.viktorc.pp4j.api.FailedCommandException;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -28,7 +27,7 @@ import org.junit.rules.ExpectedException;
  *
  * @author Viktor
  */
-public class SPETest {
+public class SPEIntegrationTest {
 
   @Rule
   public final ExpectedException exceptionRule = ExpectedException.none();

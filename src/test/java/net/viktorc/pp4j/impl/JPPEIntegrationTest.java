@@ -45,7 +45,7 @@ import org.junit.rules.ExpectedException;
  *
  * @author Viktor Csomor
  */
-public class JPPETest {
+public class JPPEIntegrationTest {
 
   @Rule
   public final ExpectedException exceptionRule = ExpectedException.none();
@@ -262,7 +262,7 @@ public class JPPETest {
         }
       });
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 5300 && time > 4995;
+      boolean success = time < 5600 && time > 4995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -291,7 +291,7 @@ public class JPPETest {
       long start = System.currentTimeMillis();
       List<Future<Integer>> results = exec.invokeAll(tasks);
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 4300 && time > 3995;
+      boolean success = time < 4600 && time > 3995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
