@@ -59,7 +59,7 @@ public class JPPEIntegrationTest {
         1, 1, 0);
     try {
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 1000;
+      boolean success = time < 1500;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -77,7 +77,7 @@ public class JPPEIntegrationTest {
         1, 1, 0);
     try {
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 500;
+      boolean success = time < 750;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -95,7 +95,7 @@ public class JPPEIntegrationTest {
         1, 1, 0);
     try {
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 500;
+      boolean success = time < 750;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -112,7 +112,7 @@ public class JPPEIntegrationTest {
         10, 15, 5);
     try {
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 2000;
+      boolean success = time < 2500;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -130,7 +130,7 @@ public class JPPEIntegrationTest {
         10, 15, 5);
     try {
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 2000;
+      boolean success = time < 2500;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -148,7 +148,7 @@ public class JPPEIntegrationTest {
         10, 15, 5);
     try {
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 2000;
+      boolean success = time < 2500;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -601,7 +601,7 @@ public class JPPEIntegrationTest {
         res.get();
       }
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 13550 && time > 7495;
+      boolean success = time < 15550 && time > 7495;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
