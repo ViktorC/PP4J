@@ -262,7 +262,7 @@ public class JPPEIntegrationTest {
         }
       });
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 5600 && time > 4995;
+      boolean success = time < 5650 && time > 4995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -291,7 +291,7 @@ public class JPPEIntegrationTest {
       long start = System.currentTimeMillis();
       List<Future<Integer>> results = exec.invokeAll(tasks);
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 4600 && time > 3995;
+      boolean success = time < 4650 && time > 3995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
@@ -321,7 +321,7 @@ public class JPPEIntegrationTest {
       long start = System.currentTimeMillis();
       List<Future<Integer>> results = exec.invokeAll(tasks);
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 6300 && time > 5995;
+      boolean success = time < 6350 && time > 5995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
@@ -351,7 +351,7 @@ public class JPPEIntegrationTest {
       long start = System.currentTimeMillis();
       List<Future<Integer>> results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 3300 && time > 2995;
+      boolean success = time < 3350 && time > 2995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
@@ -382,7 +382,7 @@ public class JPPEIntegrationTest {
       long start = System.currentTimeMillis();
       List<Future<Integer>> results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 3300 && time > 2995;
+      boolean success = time < 3350 && time > 2995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
@@ -416,7 +416,7 @@ public class JPPEIntegrationTest {
       long start = System.currentTimeMillis();
       int result = exec.invokeAny(tasks);
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 4300 && time > 3995;
+      boolean success = time < 4350 && time > 3995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertTrue(result == 169 || result == 2197);
@@ -444,7 +444,7 @@ public class JPPEIntegrationTest {
       long start = System.currentTimeMillis();
       int result = exec.invokeAny(tasks);
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 2300 && time > 1995;
+      boolean success = time < 2350 && time > 1995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertEquals(169, result);
@@ -473,7 +473,7 @@ public class JPPEIntegrationTest {
       long start = System.currentTimeMillis();
       int result = exec.invokeAny(tasks, 3000, TimeUnit.MILLISECONDS);
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 3300 && time > 2995;
+      boolean success = time < 3350 && time > 2995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertEquals(169, result);
@@ -571,7 +571,7 @@ public class JPPEIntegrationTest {
         return new AtomicInteger(13);
       }).get();
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 2300 && time > 1995;
+      boolean success = time < 2350 && time > 1995;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
       Assert.assertEquals(13, res.get());
@@ -601,7 +601,7 @@ public class JPPEIntegrationTest {
         res.get();
       }
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 13500 && time > 7495;
+      boolean success = time < 13550 && time > 7495;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
@@ -630,7 +630,7 @@ public class JPPEIntegrationTest {
         res.get();
       }
       long time = System.currentTimeMillis() - start;
-      boolean success = time < 20500 && time > 7500;
+      boolean success = time < 20550 && time > 7500;
       System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
       Assert.assertTrue(success);
     } finally {
