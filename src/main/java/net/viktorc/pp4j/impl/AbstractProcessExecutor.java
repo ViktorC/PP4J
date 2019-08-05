@@ -240,6 +240,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         threadPool.execute(() -> readStreamAndProcessOutput(stdErrReader, true));
         manager.getKeepAliveTime().ifPresent(keepAliveTime -> threadPool.execute(() -> timeIdlenessAndTerminateProcess(keepAliveTime)));
         LOGGER.trace("Waiting for process to start up...");
+        startedUp = manager.startsUpInstantly();
         while (!startedUp) {
           if (killed) {
             LOGGER.trace("Process killed before it could start up");
