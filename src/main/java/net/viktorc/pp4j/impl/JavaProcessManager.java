@@ -78,22 +78,19 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
 
   @Override
   public Optional<Submission<?>> getInitSubmission() {
-    if (initTask == null) {
-      return Optional.empty();
+    if (initTask != null) {
+      try {
+        // Avoid having to have the process manager serialized.
+        T initTask = this.initTask;
+        return Optional.of(new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
+          initTask.run();
+          return null;
+        }));
+      } catch (IOException e) {
+        LOGGER.warn(e.getMessage(), e);
+      }
     }
-    Optional<Submission<?>> initSubmission;
-    try {
-      // Avoid having to have the process manager serialized.
-      T initTask = this.initTask;
-      initSubmission = Optional.of(new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
-        initTask.run();
-        return null;
-      }));
-    } catch (IOException e) {
-      LOGGER.warn(e.getMessage(), e);
-      return Optional.empty();
-    }
-    return initSubmission;
+    return Optional.empty();
   }
 
   @Override

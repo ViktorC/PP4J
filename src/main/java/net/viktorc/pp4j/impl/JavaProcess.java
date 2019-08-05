@@ -30,32 +30,6 @@ import java.util.concurrent.Callable;
 public class JavaProcess {
 
   /**
-   * Redirects the process' standard out stream.
-   *
-   * @param outputStream The stream the standard output should be redirected to.
-   */
-  private static void redirectStdOut(PrintStream outputStream) {
-    try {
-      System.setOut(outputStream);
-    } catch (SecurityException e) {
-      // Ignore it.
-    }
-  }
-
-  /**
-   * Redirects the process' standard error stream.
-   *
-   * @param errorStream The stream the standard error should be redirected to.
-   */
-  private static void redirectStdErr(PrintStream errorStream) {
-    try {
-      System.setErr(errorStream);
-    } catch (SecurityException e) {
-      // Ignore it.
-    }
-  }
-
-  /**
    * The method executed as a separate process. It listens to its standard in for encoded and serialized {@link Callable} instances,
    * which it decodes, deserializes, and executes on receipt. The return value is normally output to its stdout stream in the form of the
    * serialized and encoded return values of the <code>Callable</code> instances. If an exception occurs, it is serialized, encoded, and
@@ -114,6 +88,32 @@ public class JavaProcess {
       } catch (Exception e1) {
         // Give up all hope.
       }
+    }
+  }
+
+  /**
+   * Redirects the process' standard out stream.
+   *
+   * @param outputStream The stream the standard output should be redirected to.
+   */
+  private static void redirectStdOut(PrintStream outputStream) {
+    try {
+      System.setOut(outputStream);
+    } catch (SecurityException e) {
+      // Ignore it.
+    }
+  }
+
+  /**
+   * Redirects the process' standard error stream.
+   *
+   * @param errorStream The stream the standard error should be redirected to.
+   */
+  private static void redirectStdErr(PrintStream errorStream) {
+    try {
+      System.setErr(errorStream);
+    } catch (SecurityException e) {
+      // Ignore it.
     }
   }
 
