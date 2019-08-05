@@ -58,7 +58,7 @@ public class FailedCommandException extends Exception {
    * @return The base error message.
    */
   private static String getBaseErrorMessage(Command command) {
-    return String.format("Execution of command \"%s\" failed with", command.getInstruction());
+    return String.format("Execution of command \"%s\" failed", command.getInstruction());
   }
 
 }
