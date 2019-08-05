@@ -16,24 +16,23 @@
 package net.viktorc.pp4j.api;
 
 /**
- * An interface that defines an executor that encapsulates a process and serves as a handle for having the process 
- * execute submissions.
- * 
- * @author Viktor Csomor
+ * An interface that defines an executor that encapsulates a process and serves as a handle for having the process execute submissions.
  *
+ * @author Viktor Csomor
  */
 public interface ProcessExecutor {
 
-	/**
-	 * Sequentially writes the specified commands to the process and blocks until they are processed. The result of 
-	 * the submission, if there is one, can be subsequently  accessed by calling the 
-	 * {@link net.viktorc.pp4j.api.Submission#getResult()} method.
-	 * 
-	 * @param submission The submission to execute.
-	 * @return Whether the submission was executed. If the executor is not running, busy processing an other 
-	 * submission, or stopped before it could complete the execution of the submission, <code>false</code> is returned; 
-	 * otherwise the submission is processed and <code>true</code> is returned once it's successfully executed.
-	 */
-	boolean execute(Submission<?> submission);
+  /**
+   * It has the process sequentially execute the commands contained in the submission and blocks until the execution of every command is
+   * complete. The result of the submission, if there is one, can be subsequently accessed by calling the
+   * {@link Submission#getResult()} method.
+   *
+   * @param submission The submission to execute.
+   * @throws FailedCommandException If one of the submission's commands fails.
+   * @throws DisruptedExecutionException If the executor is stopped before it could complete the execution of the submission, or if there
+   * is any other error that is not caused by the submission that leaves the execution of the submission incomplete. Implementations of
+   * the <code>ProcessExecutor</code> are encouraged to terminate the executor when throwing this exception.
+   */
+  void execute(Submission<?> submission) throws FailedCommandException, DisruptedExecutionException;
 
 }

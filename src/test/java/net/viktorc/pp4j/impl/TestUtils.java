@@ -17,106 +17,109 @@ package net.viktorc.pp4j.impl;
 
 import java.io.File;
 import java.net.URISyntaxException;
-
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
-import net.viktorc.pp4j.impl.SimpleProcessManager;
 
 /**
  * A utility class for testing.
- * 
- * @author Viktor Csomor
  *
+ * @author Viktor Csomor
  */
-public class TestUtils {
+class TestUtils {
 
-	public static final String TEST_TITLE_FORMAT = "%nTest %d%n" +
-			"-------------------------------------------------%n";
-	
-	/**
-	 * Not initializable.
-	 */
-	private TestUtils() { }
-	/**
-	 * Returns a {@link java.io.File} instance representing the test executable.
-	 * 
-	 * @return A <code>File</code> pointing to the test executable.
-	 */
-	public static File getExecutable() {
-		// Support testing both on Linux and Windows.
-		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-		try {
-			File file = new File(ClassLoader.getSystemClassLoader()
-					.getResource(windows ? "win/testwrapper.exe" : "linux/testwrapper")
-					.toURI().getPath());
-			file.setExecutable(true);
-			return file;
-		} catch (URISyntaxException e) {
-			throw new RuntimeException(e);
-		}
-	}
-	/**
-	 * Returns a {@link java.io.File} instance representing the test library.
-	 * 
-	 * @return A <code>File</code> pointing to the test library.
-	 */
-	public static File getLibrary() {
-		// Support testing both on Linux and Windows.
-		boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-		try {
-			File file = new File(ClassLoader.getSystemClassLoader()
-					.getResource(windows ? "win/test.dll" : "linux/libtest.so")
-					.toURI().getPath());
-			file.setExecutable(true);
-			return file;
-		} catch (URISyntaxException e) {
-			throw new RuntimeException(e);
-		}
-	}
-	/**
-	 * Returns a test {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance.
-	 * 
-	 * @return A test <code>ProcessManagerFactory</code> instance.
-	 * @throws URISyntaxException If the path to the executable cannot be resolved.
-	 */
-	public static ProcessManagerFactory createTestProcessManagerFactory()
-			throws URISyntaxException {
-		return new TestProcessManagerFactory();
-	}
-	
-	/**
-	 * A simple test process manager factory for starting process managers for the test program.
-	 * 
-	 * @author Viktor Csomor
-	 *
-	 */
-	private static class TestProcessManagerFactory implements ProcessManagerFactory {
+  static final String TEST_TITLE_FORMAT = "%nTest %d%n-------------------------------------------------%n";
 
-		ProcessBuilder builder;
-		
-		/**
-		 * Constructs an instance for creating process managers.
-		 * 
-		 * @throws URISyntaxException If the path to the test executable cannot be resolved.
-		 */
-		TestProcessManagerFactory() throws URISyntaxException {
-			builder = new ProcessBuilder(getExecutable().getAbsolutePath());
-		}
-		@Override
-		public ProcessManager newProcessManager() {
-			return new SimpleProcessManager(builder) {
-				
-				@Override
-				public boolean startsUpInstantly() {
-					return false;
-				}
-				@Override
-				public boolean isStartedUp(String outputLine, boolean standard) {
-					return standard && "hi".equals(outputLine);
-				}
-			};
-		}
-		
-	}
-	
+  private static final String EXECUTABLE_PATH;
+  private static final String LIBRARY_PATH;
+  static {
+    // Support testing on Linux, Windows, and Mac.
+    String osName = System.getProperty("os.name").toLowerCase();
+    if ("mac os x".equals(osName)) {
+      EXECUTABLE_PATH = "osx/testwrapper";
+      LIBRARY_PATH = "osx/libtest.so";
+    } else if (osName.contains("win")) {
+      EXECUTABLE_PATH = "win/testwrapper.exe";
+      LIBRARY_PATH = "win/test.dll";
+    } else {
+      EXECUTABLE_PATH = "linux/testwrapper";
+      LIBRARY_PATH = "linux/libtest.so";
+    }
+  }
+
+  private TestUtils() {
+  }
+
+  private static File getFileResource(String path) {
+    try {
+      File file = new File(ClassLoader.getSystemClassLoader()
+          .getResource(path)
+          .toURI().getPath());
+      file.setExecutable(true);
+      return file;
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Returns a {@link java.io.File} instance representing the test executable.
+   *
+   * @return A <code>File</code> pointing to the test executable.
+   */
+  static File getExecutable() {
+    return getFileResource(EXECUTABLE_PATH);
+  }
+
+  /**
+   * Returns a {@link java.io.File} instance representing the test library.
+   *
+   * @return A <code>File</code> pointing to the test library.
+   */
+  static File getLibrary() {
+    return getFileResource(LIBRARY_PATH);
+  }
+
+  /**
+   * Returns a test {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance.
+   *
+   * @return A test <code>ProcessManagerFactory</code> instance.
+   */
+  static ProcessManagerFactory createTestProcessManagerFactory() {
+    return new TestProcessManagerFactory();
+  }
+
+  /**
+   * A simple test process manager factory for starting process managers for the test program.
+   *
+   * @author Viktor Csomor
+   */
+  private static class TestProcessManagerFactory implements ProcessManagerFactory {
+
+    ProcessBuilder builder;
+
+    /**
+     * Constructs an instance for creating process managers.
+     */
+    TestProcessManagerFactory() {
+      builder = new ProcessBuilder(getExecutable().getAbsolutePath());
+    }
+
+    @Override
+    public ProcessManager newProcessManager() {
+      return new SimpleProcessManager(builder) {
+
+        @Override
+        public boolean startsUpInstantly() {
+          return false;
+        }
+
+        @Override
+        public boolean isStartedUp(String outputLine, boolean error) {
+          return !error && "hi".equals(outputLine);
+        }
+      };
+    }
+
+  }
+
 }

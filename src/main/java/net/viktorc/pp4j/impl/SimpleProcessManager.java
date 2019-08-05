@@ -15,81 +15,99 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.util.function.Consumer;
-
-import net.viktorc.pp4j.api.ProcessExecutor;
+import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.Supplier;
+import net.viktorc.pp4j.api.Submission;
 
 /**
- * A simple sub-class of the {@link net.viktorc.pp4j.impl.AbstractProcessManager} abstract class. It assumes 
- * that the process is immediately started up as soon as it is launched (without having to wait for a certain output 
- * denoting that the process is ready), it has the process forcibly killed every time it needs to be terminated due 
- * to timing out or not being reusable, and it implements no callback for when the process terminates.
- * 
- * @author Viktor Csomor
+ * A simple sub-class of the {@link net.viktorc.pp4j.impl.AbstractProcessManager} abstract class. It assumes that the process is immediately
+ * started up as soon as it is launched (without having to wait for a certain output denoting that the process is ready), it has the process
+ * forcibly killed every time it needs to be terminated due to timing out or not being reusable, and it implements no callback for when the
+ * process terminates.
  *
+ * @author Viktor Csomor
  */
 public class SimpleProcessManager extends AbstractProcessManager {
 
-	private final Consumer<ProcessExecutor> onStartup;
-	
-	/**
-	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with the 
-	 * specified maximum life span.
-	 * 
-	 * @param builder The instance to build the processes with.
-	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 
-	 * <code>0</code> or less, the life span of the process will not be limited.
-	 * @param onStartup A consumer that is called after the process started up to allow for the execution 
-	 * of commands to 'prepare' the process for the pool. If it is null, no preprocessing is performed.
-	 */
-	public SimpleProcessManager(ProcessBuilder builder, long keepAliveTime,
-			Consumer<ProcessExecutor> onStartup) {
-		super(builder, keepAliveTime);
-		this.onStartup = onStartup;
-	}
-	/**
-	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with the 
-	 * specified maximum life span.
-	 * 
-	 * @param builder The instance to build the processes with.
-	 * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is 
-	 * <code>0</code> or less, the life span of the process will not be limited.
-	 */
-	public SimpleProcessManager(ProcessBuilder builder, long keepAliveTime) {
-		this(builder, keepAliveTime, null);
-	}
-	/**
-	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder}.
-	 * 
-	 * @param builder The instance to build the processes with.
-	 * @param onStartup A consumer that is called after the process started up to allow for the execution 
-	 * of commands to 'prepare' the process for the pool.
-	 */
-	public SimpleProcessManager(ProcessBuilder builder, Consumer<ProcessExecutor> onStartup) {
-		this(builder, 0, onStartup);
-	}
-	/**
-	 * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder}.
-	 * 
-	 * @param builder The instance to build the processes with.
-	 */
-	public SimpleProcessManager(ProcessBuilder builder) {
-		this(builder, 0);
-	}
-	@Override
-	public boolean startsUpInstantly() {
-		return true;
-	}
-	@Override
-	public boolean isStartedUp(String outputLine, boolean standard) {
-		return true;
-	}
-	@Override
-	public void onStartup(ProcessExecutor executor) {
-		if (onStartup != null)
-			onStartup.accept(executor);
-		else
-			super.onStartup(executor);
-	}
+  private final BiPredicate<String, Boolean> startupPredicate;
+  private final Supplier<Submission<?>> initSubmissionSupplier;
+  private final Supplier<Submission<?>> terminationSubmissionSupplier;
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder}.
+   *
+   * @param builder The instance to build the processes with.
+   * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
+   * of the process will not be limited.
+   * @param startupPredicate The predicate to use to determine when the process can be considered started up. The two parameters are the
+   * line output to the process' stream and whether that stream is the standard error or the standard out stream. If it is
+   * <code>null</code>, the process is assumed to start up instantaneously.
+   * @param initSubmissionSupplier The optional initial submission supplier for generating the submission to submit to the process right
+   * after it started up.
+   * @param terminationSubmissionSupplier The optional termination submission supplier to use to generate the submission to terminate the
+   * process.
+   */
+  public SimpleProcessManager(ProcessBuilder builder, Long keepAliveTime, BiPredicate<String, Boolean> startupPredicate,
+      Supplier<Submission<?>> initSubmissionSupplier, Supplier<Submission<?>> terminationSubmissionSupplier) {
+    super(builder, keepAliveTime);
+    this.startupPredicate = startupPredicate;
+    this.initSubmissionSupplier = initSubmissionSupplier;
+    this.terminationSubmissionSupplier = terminationSubmissionSupplier;
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder}.
+   *
+   * @param builder The instance to build the processes with.
+   * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
+   * of the process will not be limited.
+   * @param startupPredicate The predicate to use to determine when the process can be considered started up. The two parameters are the
+   * line output to the process' stream and whether that stream is the standard error or the standard out stream. If it is
+   * <code>null</code>, the process is assumed to start up instantaneously.
+   */
+  public SimpleProcessManager(ProcessBuilder builder, Long keepAliveTime, BiPredicate<String, Boolean> startupPredicate) {
+    this(builder, keepAliveTime, startupPredicate, null, null);
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder}.
+   *
+   * @param builder The instance to build the processes with.
+   * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
+   * of the process will not be limited.
+   */
+  public SimpleProcessManager(ProcessBuilder builder, Long keepAliveTime) {
+    this(builder, keepAliveTime, null, null, null);
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder}.
+   *
+   * @param builder The instance to build the processes with.
+   */
+  public SimpleProcessManager(ProcessBuilder builder) {
+    this(builder, null, null, null, null);
+  }
+
+  @Override
+  public boolean startsUpInstantly() {
+    return startupPredicate == null;
+  }
+
+  @Override
+  public boolean isStartedUp(String outputLine, boolean error) {
+    return startupPredicate == null || startupPredicate.test(outputLine, error);
+  }
+
+  @Override
+  public Optional<Submission<?>> getInitSubmission() {
+    return Optional.ofNullable(initSubmissionSupplier == null ? null : initSubmissionSupplier.get());
+  }
+
+  @Override
+  public Optional<Submission<?>> getTerminationSubmission() {
+    return Optional.ofNullable(terminationSubmissionSupplier == null ? null : terminationSubmissionSupplier.get());
+  }
 
 }

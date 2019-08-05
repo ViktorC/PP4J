@@ -16,17 +16,28 @@
 package net.viktorc.pp4j.api;
 
 /**
- * A functional interface that defines a method for creating new instances of an implementation of the {@link ProcessManager} interface.
+ * An exception thrown when the execution of a submission is disrupted by an error beyond the submission.
  *
  * @author Viktor Csomor
  */
-public interface ProcessManagerFactory {
+public class DisruptedExecutionException extends Exception {
 
   /**
-   * Constructs and returns a new instance of the {@link ProcessManager} interface.
+   * Wraps the provided exception in a <code>DisruptedExecutionException</code>.
    *
-   * @return A new instance of the <code>ProcessManager</code> interface.
+   * @param e The cause exception.
    */
-  ProcessManager newProcessManager();
+  public DisruptedExecutionException(Throwable e) {
+    super(e);
+  }
+
+  /**
+   * Creates a <code>DisruptedExecutionException</code> with the provided error message.
+   *
+   * @param message The error message describing the cause of the exception.
+   */
+  public DisruptedExecutionException(String message) {
+    super(message);
+  }
 
 }
