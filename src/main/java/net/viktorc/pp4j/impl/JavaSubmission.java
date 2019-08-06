@@ -82,7 +82,8 @@ public class JavaSubmission<T extends Serializable, S extends Callable<T> & Seri
             return true;
           }
           return false;
-        }));
+        },
+        (command, outputLine) -> false));
   }
 
   @Override
