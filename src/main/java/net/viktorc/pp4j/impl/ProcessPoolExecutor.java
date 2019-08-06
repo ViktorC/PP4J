@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProcessPoolExecutor implements ProcessExecutorService {
 
-  private static final long DEFAULT_THREAD_KEEP_ALIVE_TIME = 60 * 1000;
+  private static final long DEFAULT_THREAD_KEEP_ALIVE_TIME = 60L * 1000L;
   private static final Logger LOGGER = LoggerFactory.getLogger(ProcessPoolExecutor.class);
 
   private final ProcessManagerFactory processManagerFactory;
