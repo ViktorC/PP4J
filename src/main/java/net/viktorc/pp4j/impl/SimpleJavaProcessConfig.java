@@ -29,6 +29,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.viktorc.pp4j.api.JavaProcessConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A simple implementation of the {@link JavaProcessConfig} interface for the definition of JVM options.
@@ -38,6 +40,7 @@ import net.viktorc.pp4j.api.JavaProcessConfig;
 public class SimpleJavaProcessConfig implements JavaProcessConfig {
 
   private static final String DEFAULT_JAVA_LAUNCHER_COMMAND = "java";
+  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleJavaProcessConfig.class);
 
   private final String javaLauncherCommand;
   private final JVMArch arch;
@@ -132,7 +135,7 @@ public class SimpleJavaProcessConfig implements JavaProcessConfig {
         try {
           classPathEntries.add(Paths.get(url.toURI()).toAbsolutePath().toString());
         } catch (FileSystemNotFoundException | URISyntaxException e) {
-          // Ignore it.
+          LOGGER.warn(e.getMessage(), e);
         }
       }
       classPathEntries.removeIf(String::isEmpty);
