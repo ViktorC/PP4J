@@ -190,11 +190,9 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void waitForIdleness() throws InterruptedException {
     synchronized (stateLock) {
-      while (isAlive()) {
-        LOGGER.trace("Waiting for process to go idle");
-        while (isAlive() && !idle) {
-          stateLock.wait();
-        }
+      LOGGER.trace("Waiting for process to go idle");
+      while (isAlive() && !idle) {
+        stateLock.wait();
       }
     }
   }
