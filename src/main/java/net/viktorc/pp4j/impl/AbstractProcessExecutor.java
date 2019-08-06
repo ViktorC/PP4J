@@ -305,30 +305,32 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void executeCommand(Command command)
       throws IOException, InterruptedException, FailedCommandException, DisruptedExecutionException {
-    command.reset();
-    this.command = command;
-    try {
-      String instruction = command.getInstruction();
-      LOGGER.trace("Writing instruction \"{}\" to process' standard in", instruction);
-      stdInWriter.write(instruction);
-      stdInWriter.newLine();
-      stdInWriter.flush();
-      commandCompleted = !command.generatesOutput();
-      while (!commandCompleted) {
-        if (!isAlive()) {
-          throw new DisruptedExecutionException("Process terminated during execution");
+    synchronized (stateLock) {
+      command.reset();
+      this.command = command;
+      try {
+        String instruction = command.getInstruction();
+        LOGGER.trace("Writing instruction \"{}\" to process' standard in", instruction);
+        stdInWriter.write(instruction);
+        stdInWriter.newLine();
+        stdInWriter.flush();
+        commandCompleted = !command.generatesOutput();
+        while (!commandCompleted) {
+          if (!isAlive()) {
+            throw new DisruptedExecutionException("Process terminated during execution");
+          }
+          stateLock.wait();
         }
-        stateLock.wait();
+        if (commandException != null) {
+          LOGGER.trace("Command failed");
+          throw commandException;
+        }
+        LOGGER.trace("Command succeeded");
+      } finally {
+        this.command = null;
+        commandException = null;
+        commandCompleted = false;
       }
-      if (commandException != null) {
-        LOGGER.trace("Command failed");
-        throw commandException;
-      }
-      LOGGER.trace("Command succeeded");
-    } finally {
-      this.command = null;
-      commandException = null;
-      commandCompleted = false;
     }
   }
 
@@ -343,13 +345,15 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void executeSubmission(Submission<?> submission)
       throws IOException, InterruptedException, FailedCommandException, DisruptedExecutionException {
-    LOGGER.trace("Starting execution of submission");
-    submission.onStartedExecution();
-    for (Command command : submission.getCommands()) {
-      executeCommand(command);
+    synchronized (stateLock) {
+      LOGGER.trace("Starting execution of submission");
+      submission.onStartedExecution();
+      for (Command command : submission.getCommands()) {
+        executeCommand(command);
+      }
+      LOGGER.trace("Submission {} executed", submission);
+      submission.onFinishedExecution();
     }
-    LOGGER.trace("Submission {} executed", submission);
-    submission.onFinishedExecution();
   }
 
   /**
