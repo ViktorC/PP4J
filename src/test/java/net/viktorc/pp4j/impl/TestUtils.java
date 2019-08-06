@@ -16,7 +16,9 @@
 package net.viktorc.pp4j.impl;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 
@@ -32,33 +34,46 @@ class TestUtils {
   private static final String EXECUTABLE_PATH;
   private static final String LIBRARY_PATH;
   static {
-    // Support testing on Linux, Windows, and Mac.
+    String basePath = "net/viktorc/pp4j/impl/";
     String osName = System.getProperty("os.name").toLowerCase();
     if ("mac os x".equals(osName)) {
-      EXECUTABLE_PATH = "osx/testwrapper";
-      LIBRARY_PATH = "osx/libtest.so";
+      EXECUTABLE_PATH = basePath + "osx/testwrapper";
+      LIBRARY_PATH = basePath + "osx/libtest.so";
     } else if (osName.contains("win")) {
-      EXECUTABLE_PATH = "win/testwrapper.exe";
-      LIBRARY_PATH = "win/test.dll";
+      EXECUTABLE_PATH = basePath + "win/testwrapper.exe";
+      LIBRARY_PATH = basePath + "win/test.dll";
     } else {
-      EXECUTABLE_PATH = "linux/testwrapper";
-      LIBRARY_PATH = "linux/libtest.so";
+      EXECUTABLE_PATH = basePath + "linux/testwrapper";
+      LIBRARY_PATH = basePath + "linux/libtest.so";
     }
   }
 
+  /**
+   * All static.
+   */
   private TestUtils() {
   }
 
+  /**
+   * It returns a file resource given the file path.
+   *
+   * @param path The file path.
+   * @return The file or <code>null</code> if the path is invalid.
+   */
   private static File getFileResource(String path) {
     try {
-      File file = new File(ClassLoader.getSystemClassLoader()
-          .getResource(path)
-          .toURI().getPath());
-      file.setExecutable(true);
-      return file;
+      URL resourceUrl = ClassLoader.getSystemClassLoader().getResource(path);
+      if (resourceUrl != null) {
+        URI resourceUri = resourceUrl.toURI();
+        File file = new File(resourceUri.getPath());
+        if (file.setExecutable(true)) {
+          return file;
+        }
+      }
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);
     }
+    return null;
   }
 
   /**
