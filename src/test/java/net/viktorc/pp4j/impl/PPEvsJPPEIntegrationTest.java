@@ -15,23 +15,94 @@
  */
 package net.viktorc.pp4j.impl;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import net.viktorc.pp4j.api.JavaProcessConfig;
+import net.viktorc.pp4j.api.ProcessManagerFactory;
+import net.viktorc.pp4j.api.Submission;
+import net.viktorc.pp4j.impl.TestUtils.TestProcessManagerFactory;
 import org.junit.Assume;
 import org.junit.Test;
 
 /**
- * A test class for comparing the performance of {@link net.viktorc.pp4j.impl.ProcessPoolExecutor} using a native executable wrapper program
- * and {@link JavaProcessPoolExecutor} using JNI.
+ * An integration test class for comparing the performance of {@link ProcessPoolExecutor} using a native executable wrapper program and
+ * {@link JavaProcessPoolExecutor} using JNI/JNA.
  *
  * @author Viktor Csomor
  */
-public class PPEvsJPPEIntegrationTest {
+public class PPEvsJPPEIntegrationTest extends TestCase {
 
-  private static final int WARMUP_SUBMISSIONS = 5;
+  private static final int WARM_UP_SUBMISSIONS = 5;
+
+  /**
+   * Times the execution of the specified number of submissions provided by the submission supplier in the process pool executor.
+   *
+   * @param processPool The process pool executor to test.
+   * @param submissions The number of submissions to execute.
+   * @param reuse Whether processes should be reused for multiple submissions.
+   * @param submissionSupplier The submission supplier.
+   * @return The time it took to execute all submissions in nanoseconds.
+   * @throws Exception If something goes south.
+   */
+  private static long testProcessPool(ProcessPoolExecutor processPool, int submissions, boolean reuse,
+      Supplier<Submission<?>> submissionSupplier) throws Exception {
+    try {
+      for (int i = 0; i < WARM_UP_SUBMISSIONS; i++) {
+        processPool.submit(submissionSupplier.get(), !reuse).get();
+      }
+      List<Future<?>> futures = new ArrayList<>();
+      long start = System.nanoTime();
+      for (int i = 0; i < submissions; i++) {
+        futures.add(processPool.submit(submissionSupplier.get(), !reuse));
+      }
+      for (Future<?> f : futures) {
+        f.get();
+      }
+      return System.nanoTime() - start;
+    } finally {
+      processPool.shutdown();
+      processPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+    }
+  }
+
+  /**
+   * Times the execution of the specified number of submissions provided by the submission supplier in the Java process pool executor.
+   *
+   * @param minSize The minimum sizes of the two pools.
+   * @param maxSize The maximum sizes of the two pools.
+   * @param reserveSize The reserve sizes of the two pools.
+   * @param submissions The number of submissions to send to the pools.
+   * @param reuse Whether processes should be reused or killed after the execution of a submission.
+   * @param startupTask The startup task.
+   * @param submissionTask The submission task that is to be executed <code>submissions</code> times (possibly in parallel).
+   * @param <T> The type of the serializable startup task.
+   * @return The time it took to execute all submissions in nanoseconds.
+   * @throws Exception If something goes south.
+   */
+  private static <T extends Runnable & Serializable> long testJavaProcessPool(int minSize, int maxSize, int reserveSize, int submissions,
+      boolean reuse, T startupTask, T submissionTask) throws Exception {
+    JavaProcessConfig javaConfig = new SimpleJavaProcessConfig(1, 10, 512);
+    T actualStartupTask = reuse ? startupTask : null;
+    JavaProcessManagerFactory<T> processManagerFactory = new JavaProcessManagerFactory<>(javaConfig, actualStartupTask, null, null);
+    JavaProcessPoolExecutor javaProcessPool = new JavaProcessPoolExecutor(processManagerFactory, minSize, maxSize, reserveSize);
+    return testProcessPool(javaProcessPool, submissions, reuse, () -> {
+      try {
+        return new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
+          submissionTask.run();
+          return null;
+        });
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
+  }
 
   /**
    * Executes the performance test according to the specified arguments on a Java process pool using JNI to invoke the native test method.
@@ -45,29 +116,11 @@ public class PPEvsJPPEIntegrationTest {
    * @return The time it took to execute the specified number of submissions with the specified execution length in nanoseconds.
    * @throws Exception If something goes wrong.
    */
-  private long testJNI(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
-    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
-        new SimpleJavaProcessConfig(1, 10, 512),
-        reuse ? (Runnable & Serializable) WrapperJNI::new : null, null, null),
-        minSize, maxSize, reserveSize);
-    try {
-      Runnable javaTask = (Runnable & Serializable) () -> (new WrapperJNI()).doStuff(taskTime);
-      for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
-        javaPool.submit(javaTask).get();
-      }
-      List<Future<?>> futures = new ArrayList<>();
-      long start = System.nanoTime();
-      for (int i = 0; i < submissions; i++) {
-        futures.add(javaPool.submit(javaTask, !reuse));
-      }
-      for (Future<?> f : futures) {
-        f.get();
-      }
-      return System.nanoTime() - start;
-    } finally {
-      javaPool.shutdown();
-      javaPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-    }
+  private static long testJNIProcessPool(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse)
+      throws Exception {
+    return testJavaProcessPool(minSize, maxSize, reserveSize, submissions, reuse,
+        (Runnable & Serializable) WrapperJNI::new,
+        (Runnable & Serializable) () -> (new WrapperJNI()).doStuff(taskTime));
   }
 
   /**
@@ -82,39 +135,31 @@ public class PPEvsJPPEIntegrationTest {
    * @return The time it took to execute the specified number of submissions with the specified execution length in nanoseconds.
    * @throws Exception If something goes wrong.
    */
-  private long testJNA(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse) throws Exception {
-    JavaProcessPoolExecutor javaPool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
-        new SimpleJavaProcessConfig(1, 10, 512),
-        reuse ? (Runnable & Serializable) WrapperJNA::getInstance : null, null, null),
-        minSize, maxSize, reserveSize);
-    try {
-      Runnable javaTask = (Runnable & Serializable) () -> WrapperJNA.INSTANCE.doStuff(taskTime);
-      for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
-        javaPool.submit(javaTask).get();
-      }
-      List<Future<?>> futures = new ArrayList<>();
-      long start = System.nanoTime();
-      for (int i = 0; i < submissions; i++) {
-        futures.add(javaPool.submit(javaTask, !reuse));
-      }
-      for (Future<?> f : futures) {
-        f.get();
-      }
-      return System.nanoTime() - start;
-    } finally {
-      javaPool.shutdown();
-      javaPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-    }
+  private static long testJNAProcessPool(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse)
+      throws Exception {
+    return testJavaProcessPool(minSize, maxSize, reserveSize, submissions, reuse,
+        (Runnable & Serializable) WrapperJNA::getInstance,
+        (Runnable & Serializable) () -> WrapperJNA.getInstance().doStuff(taskTime));
   }
 
   /**
-   * Returns a submission for the native process pool.
+   * Executes the performance test according to the specified arguments on a native process pool.
    *
+   * @param minSize The minimum sizes of the two pools.
+   * @param maxSize The maximum sizes of the two pools.
+   * @param reserveSize The reserve sizes of the two pools.
+   * @param submissions The number of submissions to send to the pools.
    * @param taskTime The number of seconds a single task should take.
-   * @return A native process submission.
+   * @param reuse Whether processes should be reused or killed after the execution of a submission.
+   * @return The time it took to execute the specified number of submissions with the specified execution length in nanoseconds.
+   * @throws Exception If something goes wrong.
    */
-  private SimpleSubmission getNativeSubmission(int taskTime) {
-    return new SimpleSubmission(new SimpleCommand("process " + taskTime, (c, o) -> "ready".equals(o)));
+  private static long testNativeProcessPool(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse)
+      throws Exception {
+    ProcessManagerFactory processManagerFactory = new TestProcessManagerFactory();
+    ProcessPoolExecutor nativeProcessPool = new ProcessPoolExecutor(processManagerFactory, minSize, maxSize, reserveSize);
+    return testProcessPool(nativeProcessPool, submissions, reuse,
+        () -> new SimpleSubmission(new SimpleCommand("process " + taskTime, (c, o) -> "ready".equals(o))));
   }
 
   /**
@@ -127,83 +172,60 @@ public class PPEvsJPPEIntegrationTest {
    * @param taskTime The number of seconds a single task should take.
    * @param reuse Whether processes should be reused or killed after the execution of a submission.
    * @param jna Whether the Java process pool should use JNA or JNI to invoke the native method.
+   * @return Whether the test was successful.
    * @throws Exception If something goes wrong.
    */
-  private void test(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse, boolean jna)
+  private boolean perfTest(int minSize, int maxSize, int reserveSize, int submissions, int taskTime, boolean reuse, boolean jna)
       throws Exception {
-    long start, time, javaTime;
-    List<Future<?>> futures = new ArrayList<>();
-    ProcessPoolExecutor nativePool = new ProcessPoolExecutor(TestUtils.createTestProcessManagerFactory(), minSize, maxSize, reserveSize);
-    try {
-      for (int i = 0; i < WARMUP_SUBMISSIONS; i++) {
-        nativePool.submit(getNativeSubmission(taskTime), !reuse).get();
-      }
-      start = System.nanoTime();
-      for (int i = 0; i < submissions; i++) {
-        futures.add(nativePool.submit(getNativeSubmission(taskTime), !reuse));
-      }
-      for (Future<?> f : futures) {
-        f.get();
-      }
-      time = System.nanoTime() - start;
-    } finally {
-      nativePool.shutdown();
-      nativePool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-    }
-    javaTime = jna ? testJNA(minSize, maxSize, reserveSize, submissions, taskTime, reuse) :
-        testJNI(minSize, maxSize, reserveSize, submissions, taskTime, reuse);
-    boolean success = time < javaTime;
-    System.out.printf("Native time - %.3f : Java time - %.3f %s%n", (float) (((double) time) / 1000000),
-        (float) (((double) javaTime) / 1000000), success ? "" : "FAIL");
-    Assume.assumeTrue(success);
+    long nativeTime = testNativeProcessPool(minSize, maxSize, reserveSize, submissions, taskTime, reuse);
+    long javaTime = jna ? testJNAProcessPool(minSize, maxSize, reserveSize, submissions, taskTime, reuse) :
+        testJNIProcessPool(minSize, maxSize, reserveSize, submissions, taskTime, reuse);
+    boolean success = nativeTime < javaTime;
+    logger.info(String.format("Native time - %.3f : Java time - %.3f %s%n",
+        (float) (((double) nativeTime) / 1000000),
+        (float) (((double) javaTime) / 1000000),
+        success ? "" : "FAIL"));
+    return success;
   }
 
   @Test
   public void test01() throws Exception {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 1);
-    test(1, 1, 0, 10, 2, true, false);
+    Assume.assumeTrue(perfTest(1, 1, 0, 6, 3, true, false));
   }
 
   @Test
   public void test02() throws Exception {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 2);
-    test(1, 1, 0, 10, 2, true, true);
+    Assume.assumeTrue(perfTest(1, 1, 0, 10, 2, true, true));
   }
 
   @Test
   public void test03() throws Exception {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 3);
-    test(20, 50, 10, 50, 2, true, false);
+    Assume.assumeTrue(perfTest(20, 50, 10, 50, 2, true, false));
   }
 
   @Test
   public void test04() throws Exception {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 4);
-    test(20, 50, 10, 50, 2, true, true);
+    Assume.assumeTrue(perfTest(20, 50, 10, 50, 2, true, true));
   }
 
   @Test
   public void test05() throws Exception {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 5);
-    test(1, 1, 0, 10, 2, false, false);
+    Assume.assumeTrue(perfTest(1, 1, 0, 10, 2, false, false));
   }
 
   @Test
   public void test06() throws Exception {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 6);
-    test(1, 1, 0, 10, 2, false, true);
+    Assume.assumeTrue(perfTest(1, 1, 0, 10, 2, false, true));
   }
 
   @Test
   public void test07() throws Exception {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 7);
-    test(20, 50, 10, 50, 2, false, false);
+    Assume.assumeTrue(perfTest(20, 50, 10, 50, 2, false, false));
   }
 
   @Test
   public void test08() throws Exception {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 8);
-    test(20, 50, 10, 50, 2, false, true);
+    Assume.assumeTrue(perfTest(20, 50, 10, 50, 2, false, true));
   }
 
 }

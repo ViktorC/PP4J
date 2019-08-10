@@ -18,7 +18,6 @@ package net.viktorc.pp4j.impl;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CancellationException;
@@ -29,71 +28,252 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.FailedCommandException;
-import net.viktorc.pp4j.api.ProcessManager;
-import net.viktorc.pp4j.api.ProcessManagerFactory;
 import net.viktorc.pp4j.api.Submission;
+import net.viktorc.pp4j.impl.TestUtils.TestProcessManagerFactory;
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 /**
- * A test class for the standard process pool implementation.
+ * An integration test class for {@link ProcessPoolExecutor}.
  *
  * @author Viktor Csomor
  */
-public class PPEIntegrationTest {
-
-  @Rule
-  public final ExpectedException exceptionRule = ExpectedException.none();
-
-  private final String programLocation;
+public class PPEIntegrationTest extends TestCase {
 
   /**
-   * Resolves the path to the test program and ensures that it is executable.
+   * Makes assertions about the properties and the state of the process pool after startup.
+   *
+   * @param pool The process pool to test.
+   * @param minPoolSize The expected minimum pool size.
+   * @param maxPoolSize The expected maximum pool size.
+   * @param reserveSize The expected pool reserve size.
    */
-  public PPEIntegrationTest() {
-    programLocation = TestUtils.getExecutable().getAbsolutePath();
+  private static void checkPoolAfterStartup(ProcessPoolExecutor pool, int minPoolSize, int maxPoolSize, int reserveSize) {
+    assert minPoolSize == pool.getMinSize() : String.format("Different min pool sizes: %d instead of %s", minPoolSize, pool.getMinSize());
+    assert maxPoolSize == pool.getMaxSize() : String.format("Different max pool sizes: %d instead of %s", maxPoolSize, pool.getMaxSize());
+    assert reserveSize == pool.getReserveSize() :
+        String.format("Different pool reserve sizes: %d instead of %s", reserveSize, pool.getReserveSize());
+    assert pool.getNumOfSubmissions() == 0 :
+        String.format("Non-zero number of active submissions on startup: %d", pool.getNumOfSubmissions());
+    assert pool.getNumOfProcesses() == Math.max(minPoolSize, reserveSize) :
+        String.format("Unexpected number of total processes: %d instead of %d", pool.getNumOfProcesses(),
+            Math.max(minPoolSize, reserveSize));
+    assert !pool.isTerminated() : "Process pool terminated after startup";
+    assert !pool.isShutdown() : "Process pool shut down after startup";
   }
 
   /**
-   * Performs some basic checks on the pool concerning its size and other parameters.
+   * Makes assertions about the state of the process pool before shutdown.
    *
-   * @param pool The pool to check.
-   * @param minPoolSize The minimum pool size.
-   * @param maxPoolSize The maximum pool size.
-   * @param reserveSize The process reserve size.
+   * @param pool The process pool to test.
    */
-  private void checkPool(ProcessPoolExecutor pool, int minPoolSize, int maxPoolSize, int reserveSize) {
-    // Basic, implementation-specific pool state checks.
-    assert minPoolSize == pool.getMinSize() : "Different min pool sizes: " + minPoolSize + " and " + pool.getMinSize() + ".";
-    assert maxPoolSize == pool.getMaxSize() : "Different max pool sizes: " + maxPoolSize + " and " + pool.getMaxSize() + ".";
-    assert reserveSize == pool.getReserveSize() : "Different reserve sizes: " + reserveSize + " and " + pool.getReserveSize() + ".";
-    assert pool.getNumOfSubmissions() == 0 : "Non-zero number of active submissions on " + "startup: " + pool.getNumOfSubmissions() + ".";
-    assert pool.getNumOfProcesses() == Math.max(minPoolSize, reserveSize) : "Unexpected number of " + "total processes: " +
-        pool.getNumOfProcesses() + " instead of " + Math.max(minPoolSize, reserveSize) + ".";
+  private static void checkPoolBeforeShutdown(ProcessPoolExecutor pool) {
+    assert !pool.isTerminated() : "Process pool terminated early";
+    assert !pool.isShutdown() : "Process pool shut down early";
   }
 
   /**
-   * Creates a custom test process pool according to the specified parameters.
+   * Makes assertions about the state of the process pool after shutdown.
+   *
+   * @param pool The process pool to test.
+   */
+  private static void checkPoolAfterShutdown(ProcessPoolExecutor pool) {
+    assert pool.isShutdown() : "Process pool is not deemed shut down";
+  }
+
+  /**
+   * Makes assertions about the state of the process pool after termination.
+   *
+   * @param pool The process pool to test.
+   */
+  private static void checkPoolAfterTermination(ProcessPoolExecutor pool) {
+    assert pool.isTerminated() : "Process pool is not deemed terminated";
+  }
+
+  /**
+   * Makes assertions about the command output saved by the command implementation.
+   *
+   * @param command The command whose stored output is to be tested.
+   * @param procTime The number of processing cycles the command's instruction prompts.
+   */
+  private static void checkSavedCommandOutputBeforeReset(AbstractCommand command, int procTime) {
+    assert command.getStandardOutLines().size() == procTime - 1 && command.getStandardErrLines().size() == 0 :
+        String.format("Unexpected numbers of output lines - standard out: %d instead of %d; standard error: %d instead of %d",
+            command.getStandardOutLines().size(), procTime - 1, command.getStandardErrLines().size(), 0);
+    String expectedStdOutput = Arrays.stream(new String[procTime - 1])
+        .map(s -> "in progress")
+        .reduce("", (s1, s2) -> (s1 + "\n" + s2).trim());
+    assert expectedStdOutput.equals(command.getJointStandardOutLines()) :
+        String.format("Wrongly captured standard output - expected: \"%s\"; actual: \"%s\"", expectedStdOutput,
+            command.getJointStandardOutLines());
+    assert command.getJointStandardErrLines().isEmpty() :
+        String.format("Wrongly captured standard error - expected: \"\"; actual: \"%s\"", command.getJointStandardErrLines());
+  }
+
+  /**
+   * Makes assertions about the command output saved by the command implementation after the command is reset.
+   *
+   * @param command The command whose stored output is to be tested.
+   */
+  private static void checkSavedCommandOutputAfterReset(AbstractCommand command) {
+    assert command.getStandardOutLines().isEmpty() :
+        String.format("Non-zero lines of standard output after reset: %d", command.getStandardOutLines().size());
+    assert command.getStandardErrLines().isEmpty() :
+        String.format("Non-zero lines of error output after reset: %d", command.getStandardErrLines().size());
+    assert command.getJointStandardOutLines().isEmpty() :
+        String.format("Non-empty joint standard output after reset: \"%s\"", command.getJointStandardOutLines());
+    assert command.getJointStandardErrLines().isEmpty() :
+        String.format("Non-empty joint standard error after reset: \"%s\"", command.getJointStandardErrLines());
+  }
+
+  /**
+   * Creates and, if possible, checks a process pool of test processes.
    *
    * @param minPoolSize The minimum pool size.
    * @param maxPoolSize The maximum pool size.
-   * @param reserveSize The process reserve size.
-   * @param keepAliveTime The time after which idled processes are killed.
-   * @param verifyStartup Whether the startup should be verified.
-   * @param manuallyTerminate Whether the process should be terminated in an orderly way or forcibly.
-   * @param throwStartupException Whether a process exception should be thrown on startup.
-   * @return The process pool created according to the specified parameters.
-   * @throws InterruptedException If the thread is interrupted while it is waiting for the core threads to start up.
+   * @param reserveSize The reserve size.
+   * @param keepAliveTime The number of milliseconds of idleness after which the process are to be terminated.
+   * @param verifyStartup Whether the processes should only be considered started up after printing a certain output to their standard outs.
+   * @param manuallyTerminate Whether the processes should be terminated using the termination command or an OS level kill signal.
+   * @param throwStartupException Whether the process manager should throw a runtime exception when its
+   * {@link net.viktorc.pp4j.api.ProcessManager#isStartedUp(String, boolean)} is invoked.
+   * @return The process pool.
+   * @throws InterruptedException If the thread is interrupted while waiting for the pool to be initialized.
    */
-  private ProcessPoolExecutor getPool(int minPoolSize, int maxPoolSize, int reserveSize, Long keepAliveTime, boolean verifyStartup,
-      boolean manuallyTerminate, boolean throwStartupException) throws InterruptedException {
+  private static ProcessPoolExecutor createPool(int minPoolSize, int maxPoolSize, int reserveSize, Long keepAliveTime,
+      boolean verifyStartup, boolean manuallyTerminate, boolean throwStartupException) throws InterruptedException {
     TestProcessManagerFactory managerFactory = new TestProcessManagerFactory(keepAliveTime, verifyStartup, manuallyTerminate,
         throwStartupException);
-    ProcessPoolExecutor pool = new ProcessPoolExecutor(managerFactory, minPoolSize, maxPoolSize, reserveSize);
-    checkPool(pool, minPoolSize, maxPoolSize, reserveSize);
-    return pool;
+    ProcessPoolExecutor processPool = new ProcessPoolExecutor(managerFactory, minPoolSize, maxPoolSize, reserveSize);
+    if (!throwStartupException) {
+      checkPoolAfterStartup(processPool, minPoolSize, maxPoolSize, reserveSize);
+    }
+    return processPool;
+  }
+
+  /**
+   * Creates a command to use in a submission to submit to a test process.
+   *
+   * @param procTime The number of processing cycles the command is to entail.
+   * @param throwExecutionException Whether the command should throw a {@link FailedCommandException} when its
+   * {@link Command#isCompleted(String, boolean)} method is invoked.
+   * @return The command.
+   */
+  private static SimpleCommand createCommand(int procTime, boolean throwExecutionException) {
+    return new SimpleCommand("process " + procTime,
+        (command, outputLine) -> {
+          if (throwExecutionException) {
+            throw new FailedCommandException(command, "test");
+          }
+          if ("ready".equals(outputLine)) {
+            checkSavedCommandOutputBeforeReset(command, procTime);
+            command.reset();
+            checkSavedCommandOutputAfterReset(command);
+            return true;
+          }
+          return false;
+        });
+  }
+
+  /**
+   * Creates a submission to submit to a test process.
+   *
+   * @param procTimes An array of the number of processing cycles each command of the submission is to entail.
+   * @param throwExecutionException Whether the command should throw a {@link FailedCommandException} when its
+   * {@link Command#isCompleted(String, boolean)} method is invoked.
+   * @param times A list of times that the submission is to update upon its completion to calculate the execution duration.
+   * @param index The index of the submission. Only the element at this index is to be updated in <code>times</code>.
+   * @return The submission.
+   */
+  private static SimpleSubmission createSubmission(int[] procTimes, boolean throwExecutionException, List<Long> times, int index) {
+    List<Command> commands = null;
+    if (procTimes != null) {
+      commands = new ArrayList<>();
+      for (int procTime : procTimes) {
+        commands.add(createCommand(procTime, throwExecutionException));
+      }
+    }
+    return new SimpleSubmission(commands) {
+
+      @Override
+      public void onFinishedExecution() {
+        times.set(index, System.nanoTime() - times.get(index));
+      }
+    };
+  }
+
+  /**
+   * Submits the specified number of submissions to the provided process pool.
+   *
+   * @param processPool The process pool to submit the submissions to.
+   * @param procTimes An array of the number of processing cycles each command of each submission is to entail.
+   * @param submissions The total number of submissions to submit.
+   * @param timeSpan The number of milliseconds within which the uniformly distributed requests should be submitted.
+   * @param reuse Whether a process can execute multiple commands or should be terminated after execution.
+   * @param throwExecutionException Whether an exception should be thrown by the submitted command.
+   * @param futures An empty list to add the futures returned by the process pool when submitting the submissions to.
+   * @param times An empty list to which an entry is added for each submission then each submission updates it upon completion to record
+   * their individual execution times.
+   * @throws InterruptedException If the thread is interrupted while waiting between submissions.
+   */
+  private static void submitSubmissions(ProcessPoolExecutor processPool, int[] procTimes, int submissions, long timeSpan, boolean reuse,
+      boolean throwExecutionException, List<Future<?>> futures, List<Long> times) throws InterruptedException {
+    long frequency = submissions > 0 ? timeSpan / submissions : 0;
+    for (int i = 0; i < submissions; i++) {
+      if (i != 0 && frequency > 0) {
+        Thread.sleep(frequency);
+      }
+      Submission<?> submission = createSubmission(procTimes, throwExecutionException, times, i);
+      times.add(System.nanoTime());
+      futures.add(processPool.submit(submission, !reuse));
+    }
+  }
+
+  /**
+   * Waits for the the submissions to complete.
+   *
+   * @param futures The list of futures representing the results.
+   * @param waitTimeout The maximum number of milliseconds to wait for a submission.
+   * @throws InterruptedException If the thread is interrupted while waiting.
+   * @throws ExecutionException If a submission failed.
+   * @throws TimeoutException If the submission does not complete within <code>waitTimeout</code>.
+   */
+  private static void waitForFutures(List<Future<?>> futures, long waitTimeout)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    for (Future<?> future : futures) {
+      if (waitTimeout > 0) {
+        future.get(waitTimeout, TimeUnit.MILLISECONDS);
+      } else {
+        future.get();
+      }
+    }
+  }
+
+  /**
+   * Evaluates the success of the performance test.
+   *
+   * @param times A list of the execution times of each submission or an empty list if an error occurred during submission.
+   * @param submissions The total number of submissions.
+   * @param upperBound The maximum accepted execution time in milliseconds.
+   * @param lowerBound The minimum accepted execution time in milliseconds.
+   * @return Whether the performance test can be considered successful.
+   */
+  private boolean evaluatePerfTestResults(List<Long> times, int submissions, long upperBound, long lowerBound) {
+    if (times.size() == submissions) {
+      boolean pass = true;
+      for (Long time : times) {
+        time = Math.round(((double) time / 1000000));
+        boolean fail = time > upperBound || time < lowerBound;
+        if (fail) {
+          pass = false;
+        }
+        logTime(!fail, time);
+      }
+      return pass;
+    } else {
+      logger.info(String.format("Some requests were not processed: %d/%d", times.size(), submissions));
+      return false;
+    }
   }
 
   /**
@@ -105,8 +285,8 @@ public class PPEIntegrationTest {
    * @param reuse Whether a process can execute multiple commands.
    * @param procTimes The times for which the test processes should "execute" commands. Each element stands for a command. If there are
    * multiple elements, the commands will be chained.
-   * @param requests The number of commands to submit.
-   * @param timeSpan The number of milliseconds in which the uniformly distributed requests should be submitted.
+   * @param submissions The number of commands to submit.
+   * @param timeSpan The number of milliseconds within which the uniformly distributed requests should be submitted.
    * @param throwExecutionException Whether an exception should be thrown by the submitted command.
    * @param cancelTime The number of milliseconds after which the futures should be cancelled. If it is 0 or less, the futures are not
    * cancelled.
@@ -120,139 +300,36 @@ public class PPEIntegrationTest {
    * @return Whether the test passes.
    * @throws Exception If the process pool cannot be created.
    */
-  private boolean perfTest(ProcessPoolExecutor processPool, boolean reuse, int[] procTimes, int requests, long timeSpan,
+  private boolean perfTest(ProcessPoolExecutor processPool, boolean reuse, int[] procTimes, int submissions, long timeSpan,
       boolean throwExecutionException, long cancelTime, boolean forcedCancel, boolean earlyClose, boolean forcedEarlyClose,
       long waitTimeout, long lowerBound, long upperBound) throws Exception {
     try {
-      List<Long> times = new ArrayList<>();
-      List<Future<?>> futures = new ArrayList<>(requests);
-      long frequency = requests > 0 ? timeSpan / requests : 0;
-      for (int i = 0; i < requests; i++) {
-        if (i != 0 && frequency > 0) {
-          try {
-            Thread.sleep(frequency);
-          } catch (InterruptedException e) {
-            return false;
-          }
-        }
-        List<Command> commands;
-        if (procTimes == null) {
-          commands = null;
-        } else {
-          commands = new ArrayList<>();
-          for (int procTime : procTimes) {
-            commands.add(new SimpleCommand("process " + procTime, (c, o) -> {
-              if (throwExecutionException) {
-                throw new FailedCommandException(c, "test");
-              }
-              if ("ready".equals(o)) {
-                // Output line caching check.
-                assert c.getStandardOutLines().size() == procTime - 1 && c.getStandardErrLines().size() == 0 :
-                    String.format("Unexpected numbers of output lines: %d instead of %d and %d instead of %d.",
-                        c.getStandardOutLines().size(), procTime - 1, c.getStandardErrLines().size(), 0);
-                String expectedStdOutput = Arrays.stream(new String[procTime - 1])
-                    .map(s -> "in progress")
-                    .reduce("", (s1, s2) -> (s1 + "\n" + s2).trim());
-                assert expectedStdOutput.equals(c.getJointStandardOutLines()) :
-                    String.format("Wrongly captured standard output. Expected: \"%s\"%nActual: \"%s\"", expectedStdOutput,
-                        c.getJointStandardOutLines());
-                assert "".equals(c.getJointStandardErrLines()) :
-                    String.format("Wrongly captured standard output. Expected: \"\"%nActual: \"%s\"", c.getJointStandardOutLines());
-                c.reset();
-                return true;
-              }
-              return false;
-            }));
-          }
-        }
-        int index = i;
-        Submission<?> submission;
-        if (commands != null && commands.size() == 1) {
-          submission = new SimpleSubmission(commands.get(0)) {
-
-            @Override
-            public void onFinishedExecution() {
-              times.set(index, System.nanoTime() - times.get(index));
-            }
-          };
-        } else {
-          submission = new SimpleSubmission(commands) {
-
-            @Override
-            public void onFinishedExecution() {
-              times.set(index, System.nanoTime() - times.get(index));
-            }
-          };
-        }
-        times.add(System.nanoTime());
-        futures.add(reuse ? processPool.submit(submission) : processPool.submit(submission, true));
-      }
+      List<Long> times = new ArrayList<>(submissions);
+      List<Future<?>> futures = new ArrayList<>(submissions);
+      submitSubmissions(processPool, procTimes, submissions, timeSpan, reuse, throwExecutionException, futures, times);
       if (cancelTime > 0) {
         Thread.sleep(cancelTime);
         for (Future<?> future : futures) {
           future.cancel(forcedCancel);
         }
       } else if (earlyClose) {
-        assert !processPool.isTerminated() : "Process pool terminated early.";
-        assert !processPool.isShutdown() : "Process pool shut down early.";
+        checkPoolBeforeShutdown(processPool);
         if (forcedEarlyClose) {
           processPool.forceShutdown();
         } else {
           processPool.shutdown();
         }
-        assert processPool.isShutdown() : "Process pool considered alive falsely.";
+        checkPoolAfterShutdown(processPool);
       }
-      for (Future<?> future : futures) {
-        if (waitTimeout > 0) {
-          future.get(waitTimeout, TimeUnit.MILLISECONDS);
-        } else {
-          future.get();
-        }
-      }
+      waitForFutures(futures, waitTimeout);
       if (!earlyClose) {
-        assert !processPool.isTerminated() : "Process pool terminated early.";
-        assert !processPool.isShutdown() : "Process pool shut down early.";
+        checkPoolBeforeShutdown(processPool);
         processPool.shutdown();
-        assert processPool.isShutdown() : "Process pool considered alive falsely.";
+        checkPoolAfterShutdown(processPool);
         processPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-        assert processPool.isTerminated() : "Process pool has not terminated.";
+        checkPoolAfterTermination(processPool);
       }
-      String testArgMessage = "keepAliveTime: %d; throwStartupError: %s; verifyStartup: %s;%n" +
-          "manuallyTerminate: %s; reuse: %s; procTimes: %s; requests: %d; timeSpan: %d;%n" +
-          "throwExecutionError: %s; cancelTime: %d; forcedCancel: %s; earlyClose: %s;%n" +
-          "forcedEarlyClose: %s; waitTimeout: %.3f; lowerBound: %.3f; upperBound: %.3f;%n";
-      TestProcessManagerFactory procManagerFactory = (TestProcessManagerFactory) processPool.getProcessManagerFactory();
-      Object[] args = new Object[]{procManagerFactory.keepAliveTime, Boolean.toString(procManagerFactory.throwStartupException),
-          Boolean.toString(procManagerFactory.verifyStartup), Boolean.toString(procManagerFactory.manuallyTerminate),
-          Boolean.toString(reuse), Arrays.toString(procTimes), requests, timeSpan, Boolean.toString(throwExecutionException),
-          cancelTime, Boolean.toString(forcedCancel), Boolean.toString(earlyClose), Boolean.toString(forcedEarlyClose),
-          (float) (((double) waitTimeout) / 1000), (float) (((double) lowerBound) / 1000), (float) (((double) upperBound) / 1000)};
-      testArgMessage = "minPoolSize: %d; maxPoolSize: %d; reserveSize: %d;%n" + testArgMessage;
-      Object[] additionalArgs = new Object[]{processPool.getMinSize(), processPool.getMaxSize(), processPool.getReserveSize()};
-      Object[] extendedArgs = new Object[args.length + additionalArgs.length];
-      System.arraycopy(additionalArgs, 0, extendedArgs, 0, additionalArgs.length);
-      System.arraycopy(args, 0, extendedArgs, additionalArgs.length, args.length);
-      args = extendedArgs;
-      String separator = "------------------------------------------------------------------------------------------";
-      System.out.println(separator);
-      System.out.printf(testArgMessage, args);
-      System.out.println(separator);
-      if (times.size() == requests) {
-        boolean pass = true;
-        for (Long time : times) {
-          // Convert nanoseconds to milliseconds.
-          time = Math.round(((double) time / 1000000));
-          boolean fail = time > upperBound || time < lowerBound;
-          if (fail) {
-            pass = false;
-          }
-          System.out.printf("Time: %.3f %s%n", (float) (((double) time) / 1000), fail ? "FAIL" : "");
-        }
-        return pass;
-      } else {
-        System.out.printf("Some requests were not processed %d/%d%n", times.size(), requests);
-        return false;
-      }
+      return evaluatePerfTestResults(times, submissions, upperBound, lowerBound);
     } catch (Exception e) {
       if (!processPool.isTerminated()) {
         processPool.forceShutdown();
@@ -265,56 +342,44 @@ public class PPEIntegrationTest {
   // Exception testing.
   @Test
   public void test01() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 1");
     exceptionRule.expect(IllegalArgumentException.class);
-    ProcessPoolExecutor pool = getPool(-1, 5, 0, null, false, false, false);
-    perfTest(pool, false, new int[]{5}, 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
+    createPool(-1, 5, 0, null, false, false, false);
   }
 
   @Test
   public void test02() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 2");
     exceptionRule.expect(IllegalArgumentException.class);
-    ProcessPoolExecutor pool = getPool(0, 0, 0, null, false, false, false);
-    pool.shutdown();
+    createPool(0, 0, 0, null, false, false, false);
   }
 
   @Test
   public void test03() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 3");
     exceptionRule.expect(IllegalArgumentException.class);
-    ProcessPoolExecutor pool = getPool(10, 5, 0, null, false, false, false);
-    pool.shutdown();
+    createPool(10, 5, 0, null, false, false, false);
   }
 
   @Test
   public void test04() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 4");
     exceptionRule.expect(IllegalArgumentException.class);
-    ProcessPoolExecutor pool = getPool(10, 12, -1, null, false, false, false);
-    pool.shutdown();
+    createPool(10, 12, -1, null, false, false, false);
   }
 
   @Test
   public void test05() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 5");
     exceptionRule.expect(IllegalArgumentException.class);
-    ProcessPoolExecutor pool = getPool(10, 12, 15, null, false, false, false);
-    pool.shutdown();
+    createPool(10, 12, 15, null, false, false, false);
   }
 
   @Test
   public void test06() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 6");
-    ProcessPoolExecutor pool = getPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
     exceptionRule.expect(IllegalArgumentException.class);
     perfTest(pool, false, null, 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
   }
 
   @Test
   public void test07() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 7");
-    ProcessPoolExecutor pool = getPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
     exceptionRule.expect(IllegalArgumentException.class);
     perfTest(pool, false, new int[0], 100, 10000, false, 0, false, false, false, 0, 4995, 6200);
   }
@@ -322,96 +387,84 @@ public class PPEIntegrationTest {
   // Performance testing.
   @Test
   public void test08() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 8");
-    ProcessPoolExecutor pool = getPool(0, 100, 0, null, true, false, false);
+    ProcessPoolExecutor pool = createPool(0, 100, 0, null, true, false, false);
     Assert.assertTrue(perfTest(pool, true, new int[]{5}, 100, 10000, false, 0, false, false, false,
         0, 4995, 6250));
   }
 
   @Test
   public void test09() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 9");
-    ProcessPoolExecutor pool = getPool(50, 150, 20, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(50, 150, 20, null, false, false, false);
     Assert.assertTrue(perfTest(pool, true, new int[]{5}, 100, 5000, false, 0, false, false, false,
         0, 4995, 5100));
   }
 
   @Test
   public void test10() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 10");
-    ProcessPoolExecutor pool = getPool(10, 25, 5, 15000L, true, false, false);
+    ProcessPoolExecutor pool = createPool(10, 25, 5, 15000L, true, false, false);
     Assert.assertTrue(perfTest(pool, true, new int[]{5}, 20, 10000, false, 0, false, false, false,
         0, 4995, 5100));
   }
 
   @Test
   public void test11() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 11");
-    ProcessPoolExecutor pool = getPool(50, 150, 20, null, false, true, false);
+    ProcessPoolExecutor pool = createPool(50, 150, 20, null, false, true, false);
     Assert.assertTrue(perfTest(pool, true, new int[]{5}, 100, 5000, false, 0, false, false, false,
         0, 4995, 5100));
   }
 
   @Test
   public void test12() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 12");
-    ProcessPoolExecutor pool = getPool(10, 50, 5, 15000L, true, false, false);
+    ProcessPoolExecutor pool = createPool(10, 50, 5, 15000L, true, false, false);
     Assert.assertTrue(perfTest(pool, true, new int[]{5, 3, 2}, 50, 10000, false, 0, false, false,
         false, 0, 9995, 10340));
   }
 
   @Test
   public void test13() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 13");
-    ProcessPoolExecutor pool = getPool(100, 250, 20, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(100, 250, 20, null, true, true, false);
     Assert.assertTrue(perfTest(pool, true, new int[]{5}, 800, 20000, false, 0, false, false, false,
         0, 4995, 6000));
   }
 
   @Test
   public void test14() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 14");
-    ProcessPoolExecutor pool = getPool(0, 100, 0, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(0, 100, 0, null, false, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 10000, false, 0, false, false, false,
         0, 4995, 6850));
   }
 
   @Test
   public void test15() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 15");
-    ProcessPoolExecutor pool = getPool(50, 150, 10, null, true, false, false);
+    ProcessPoolExecutor pool = createPool(50, 150, 10, null, true, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 5000, false, 0, false, false, false,
         0, 4995, 5620));
   }
 
   @Test
   public void test16() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 16");
-    ProcessPoolExecutor pool = getPool(10, 25, 5, 15000L, false, true, false);
+    ProcessPoolExecutor pool = createPool(10, 25, 5, 15000L, false, true, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 10000, false, 0, false, false, false,
         0, 4995, 5100));
   }
 
   @Test
   public void test17() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 17");
-    ProcessPoolExecutor pool = getPool(50, 150, 10, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(50, 150, 10, null, true, true, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 5000, false, 0, false, false, false,
         0, 4995, 5600));
   }
 
   @Test
   public void test18() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 18");
-    ProcessPoolExecutor pool = getPool(10, 50, 5, 15000L, false, false, false);
+    ProcessPoolExecutor pool = createPool(10, 50, 5, 15000L, false, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5, 3, 2}, 50, 10000, false, 0, false, false,
         false, 0, 9995, 10350));
   }
 
   @Test
   public void test19() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 19");
-    ProcessPoolExecutor pool = getPool(50, 250, 20, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(50, 250, 20, null, true, true, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 800, 20000, false, 0, false, false, false,
         0, 4995, 6000));
   }
@@ -419,8 +472,7 @@ public class PPEIntegrationTest {
   // Keep alive timer test.
   @Test
   public void test20() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 20");
-    ProcessPoolExecutor pool = getPool(20, 40, 4, 250L, true, true, false);
+    ProcessPoolExecutor pool = createPool(20, 40, 4, 250L, true, true, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 50, 5000, false, 0, false, false, false,
         0, 4995, 8200));
   }
@@ -428,8 +480,7 @@ public class PPEIntegrationTest {
   // Cancellation testing.
   @Test
   public void test21() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 21");
-    ProcessPoolExecutor pool = getPool(10, 30, 5, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(10, 30, 5, null, true, true, false);
     exceptionRule.expect(CancellationException.class);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 0, false, 2500, true, false, false,
         0, 2495, 2520));
@@ -437,16 +488,14 @@ public class PPEIntegrationTest {
 
   @Test
   public void test22() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 22");
-    ProcessPoolExecutor pool = getPool(20, 20, 0, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(20, 20, 0, null, false, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 0, false, 2500, false, false, false,
         0, 4995, 5120));
   }
 
   @Test
   public void test23() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 23");
-    ProcessPoolExecutor pool = getPool(10, 30, 5, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(10, 30, 5, null, true, true, false);
     exceptionRule.expect(CancellationException.class);
     Assert.assertTrue(perfTest(pool, false, new int[]{5, 5, 3}, 20, 0, false, 2500, true, false,
         false, 0, 2495, 2520));
@@ -454,8 +503,7 @@ public class PPEIntegrationTest {
 
   @Test
   public void test24() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 24");
-    ProcessPoolExecutor pool = getPool(20, 20, 0, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(20, 20, 0, null, true, true, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5, 5, 3}, 20, 0, false, 3000, false, false,
         false, 0, 12995, 13120));
   }
@@ -463,8 +511,7 @@ public class PPEIntegrationTest {
   // Early shutdown testing.
   @Test
   public void test25() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 25");
-    ProcessPoolExecutor pool = getPool(100, 100, 0, 5000L, true, false, false);
+    ProcessPoolExecutor pool = createPool(100, 100, 0, 5000L, true, false, false);
     exceptionRule.expect(ExecutionException.class);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 0, false, 0, false, true, true,
         0, 0, 0));
@@ -472,8 +519,7 @@ public class PPEIntegrationTest {
 
   @Test
   public void test26() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 26");
-    ProcessPoolExecutor pool = getPool(100, 100, 0, 5000L, true, false, false);
+    ProcessPoolExecutor pool = createPool(100, 100, 0, 5000L, true, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 0, false, 0, false, true, false,
         0, 4995, 5100));
     exceptionRule.expect(RejectedExecutionException.class);
@@ -484,7 +530,6 @@ public class PPEIntegrationTest {
   // Interrupted construction testing.
   @Test
   public void test27() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 27");
     ProcessPoolExecutor pool = null;
     Thread thread = Thread.currentThread();
     Timer timer = new Timer();
@@ -497,7 +542,7 @@ public class PPEIntegrationTest {
           thread.interrupt();
         }
       }, 500);
-      pool = getPool(20, 30, 0, null, false, false, false);
+      pool = createPool(20, 30, 0, null, false, false, false);
     } finally {
       if (pool != null) {
         pool.forceShutdown();
@@ -508,16 +553,14 @@ public class PPEIntegrationTest {
   // Single process pool performance testing.
   @Test
   public void test28() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 28");
-    ProcessPoolExecutor pool = getPool(1, 1, 0, 20000L, true, true, false);
+    ProcessPoolExecutor pool = createPool(1, 1, 0, 20000L, true, true, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 5, 30000, false, 0, false, false, false,
         0, 4995, 5250));
   }
 
   @Test
   public void test29() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 29");
-    ProcessPoolExecutor pool = getPool(1, 1, 0, null, true, false, false);
+    ProcessPoolExecutor pool = createPool(1, 1, 0, null, true, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 5, 20000, false, 0, false, false, false,
         0, 4995, 13250));
   }
@@ -525,16 +568,14 @@ public class PPEIntegrationTest {
   // Fixed size process pool performance testing.
   @Test
   public void test30() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 30");
-    ProcessPoolExecutor pool = getPool(20, 20, 0, null, true, false, false);
+    ProcessPoolExecutor pool = createPool(20, 20, 0, null, true, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 5000, false, 0, false, false, false,
         0, 4995, 5200));
   }
 
   @Test
   public void test31() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 31");
-    ProcessPoolExecutor pool = getPool(20, 20, 0, null, true, false, false);
+    ProcessPoolExecutor pool = createPool(20, 20, 0, null, true, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 40, 10000, false, 0, false, false, false,
         0, 4995, 6200));
   }
@@ -542,8 +583,7 @@ public class PPEIntegrationTest {
   // Wait with timeout testing.
   @Test
   public void test32() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 32");
-    ProcessPoolExecutor pool = getPool(20, 50, 10, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(20, 50, 10, null, true, true, false);
     exceptionRule.expect(TimeoutException.class);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 40, 0, false, 0, false, false, false,
         3000, 3000, 3000));
@@ -551,8 +591,7 @@ public class PPEIntegrationTest {
 
   @Test
   public void test33() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 33");
-    ProcessPoolExecutor pool = getPool(20, 50, 0, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(20, 50, 0, null, true, true, false);
     exceptionRule.expect(TimeoutException.class);
     Assert.assertTrue(perfTest(pool, false, new int[]{5, 5}, 40, 0, false, 0, false, false,
         false, 5000, 5000, 5000));
@@ -561,8 +600,7 @@ public class PPEIntegrationTest {
   // Wait with timeout plus cancellation testing.
   @Test
   public void test34() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 34");
-    ProcessPoolExecutor pool = getPool(10, 30, 5, null, true, true, false);
+    ProcessPoolExecutor pool = createPool(10, 30, 5, null, true, true, false);
     exceptionRule.expect(CancellationException.class);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 0, false, 2500, true, false,
         false, 5000, 2495, 2520));
@@ -570,8 +608,7 @@ public class PPEIntegrationTest {
 
   @Test
   public void test35() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 35");
-    ProcessPoolExecutor pool = getPool(20, 20, 0, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(20, 20, 0, null, false, false, false);
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 0, false, 2500, false, false,
         false, 3000, 4995, 5120));
   }
@@ -579,8 +616,7 @@ public class PPEIntegrationTest {
   // Execution exception testing.
   @Test
   public void test36() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 36");
-    ProcessPoolExecutor pool = getPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
     exceptionRule.expect(ExecutionException.class);
     exceptionRule.expectMessage("test");
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 4000, true, 0, false, false,
@@ -589,8 +625,7 @@ public class PPEIntegrationTest {
 
   @Test
   public void test37() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 37");
-    ProcessPoolExecutor pool = getPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(0, Integer.MAX_VALUE, 0, null, false, false, false);
     exceptionRule.expect(ExecutionException.class);
     exceptionRule.expectMessage("test");
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 4000, true, 0, false, false,
@@ -600,90 +635,26 @@ public class PPEIntegrationTest {
   // Startup exception testing.
   @Test
   public void test38() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 38");
-    new ProcessPoolExecutor(new TestProcessManagerFactory(null, false, false, true), 20, 20, 0);
+    createPool(20, 20, 0, null, false, false, true);
     Assert.assertTrue(true);
   }
 
   // Execute method testing.
   @Test
   public void test39() throws Exception {
-    System.out.println(System.lineSeparator() + "Test 39");
-    ProcessPoolExecutor pool = getPool(1, 1, 0, null, false, false, false);
+    ProcessPoolExecutor pool = createPool(1, 1, 0, null, false, false, false);
     try {
       SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o));
       long start = System.currentTimeMillis();
       pool.execute(new SimpleSubmission(command));
-      long dur = System.currentTimeMillis() - start;
-      boolean success = dur > 2995 && dur < 3050;
-      System.out.println("------------------------------------------------------------------------------------------");
-      System.out.printf("Time: %.3f %s%n", ((float) dur) / 1000, success ? "" : "FAIL");
+      long time = System.currentTimeMillis() - start;
+      boolean success = time > 2995 && time < 3050;
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       pool.shutdown();
       pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
     }
-  }
-
-  /**
-   * An implementation of the {@link net.viktorc.pp4j.api.ProcessManagerFactory} interface for testing purposes.
-   *
-   * @author Viktor Csomor
-   */
-  private class TestProcessManagerFactory implements ProcessManagerFactory {
-
-    final Long keepAliveTime;
-    final boolean verifyStartup;
-    final boolean manuallyTerminate;
-    final boolean throwStartupException;
-
-    /**
-     * Constructs an instance according to the specified parameters.
-     *
-     * @param verifyStartup Whether the startup should be verified.
-     * @param manuallyTerminate Whether the process should be terminated in an orderly way or forcibly.
-     * @param throwStartupException Whether a process exception should be thrown on startup.
-     */
-    TestProcessManagerFactory(Long keepAliveTime, boolean verifyStartup, boolean manuallyTerminate, boolean throwStartupException) {
-      this.keepAliveTime = keepAliveTime;
-      this.verifyStartup = verifyStartup;
-      this.manuallyTerminate = manuallyTerminate;
-      this.throwStartupException = throwStartupException;
-    }
-
-    @Override
-    public ProcessManager newProcessManager() {
-      return new SimpleProcessManager(new ProcessBuilder(programLocation), null, null,
-          () -> new SimpleSubmission(new SimpleCommand("start", (c, o) -> "ok".equals(o))), null) {
-
-        @Override
-        public boolean startsUpInstantly() {
-          if (throwStartupException) {
-            throw new RuntimeException("Test startup exception.");
-          }
-          return !verifyStartup && super.startsUpInstantly();
-        }
-
-        @Override
-        public boolean isStartedUp(String output, boolean error) {
-          return (super.isStartedUp(output, error) && !verifyStartup) || (!error && "hi".equals(output));
-        }
-
-        @Override
-        public Optional<Submission<?>> getTerminationSubmission() {
-          if (manuallyTerminate) {
-            return Optional.of(new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o))));
-          }
-          return super.getTerminationSubmission();
-        }
-
-        @Override
-        public Optional<Long> getKeepAliveTime() {
-          return keepAliveTime != null ? Optional.of(keepAliveTime) : super.getKeepAliveTime();
-        }
-      };
-    }
-
   }
 
 }

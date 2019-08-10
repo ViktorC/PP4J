@@ -36,31 +36,25 @@ import net.viktorc.pp4j.impl.JavaProcess.Request;
 import net.viktorc.pp4j.impl.JavaProcess.Response;
 import net.viktorc.pp4j.impl.JavaProcess.Signal;
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 /**
- * A test class for the Java process based process pool executor implementation.
+ * An integration test class for {@link JavaProcessPoolExecutor}.
  *
  * @author Viktor Csomor
  */
-public class JPPEIntegrationTest {
-
-  @Rule
-  public final ExpectedException exceptionRule = ExpectedException.none();
+public class JPPEIntegrationTest extends TestCase {
 
   // Startup testing
   @Test
   public void test01() throws InterruptedException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 1);
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         1, 1, 0);
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 1500;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdownNow();
@@ -70,7 +64,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test02() throws InterruptedException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 2);
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256)),
@@ -78,7 +71,7 @@ public class JPPEIntegrationTest {
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 750;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdownNow();
@@ -88,7 +81,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test03() throws InterruptedException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 3);
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096), null, null, 5000L),
@@ -96,7 +88,7 @@ public class JPPEIntegrationTest {
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 750;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdownNow();
@@ -106,14 +98,13 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test04() throws InterruptedException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 4);
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         10, 15, 5);
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 2500;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdownNow();
@@ -123,7 +114,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test05() throws InterruptedException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 5);
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256)),
@@ -131,7 +121,7 @@ public class JPPEIntegrationTest {
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 2500;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdownNow();
@@ -141,7 +131,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test06() throws InterruptedException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 6);
     long start = System.currentTimeMillis();
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096), null, null, 5000L),
@@ -149,7 +138,7 @@ public class JPPEIntegrationTest {
     try {
       long time = System.currentTimeMillis() - start;
       boolean success = time < 2500;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdownNow();
@@ -160,7 +149,6 @@ public class JPPEIntegrationTest {
   // Submission testing.
   @Test
   public void test07() throws InterruptedException, ExecutionException {
-    System.out.println(System.lineSeparator() + "Test 7");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         5, 5, 0);
     try {
@@ -173,7 +161,8 @@ public class JPPEIntegrationTest {
             try {
               Thread.sleep(500);
             } catch (InterruptedException e) {
-              e.printStackTrace();
+              Thread.currentThread().interrupt();
+              throw new RuntimeException(e);
             }
             j.incrementAndGet();
           });
@@ -181,7 +170,8 @@ public class JPPEIntegrationTest {
           try {
             t.join();
           } catch (InterruptedException e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
           }
         }));
       }
@@ -197,7 +187,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test08() throws InterruptedException, ExecutionException {
-    System.out.println(System.lineSeparator() + "Test 8");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256)),
         5, 5, 0);
@@ -211,7 +200,8 @@ public class JPPEIntegrationTest {
             try {
               Thread.sleep(500);
             } catch (InterruptedException e) {
-              e.printStackTrace();
+              Thread.currentThread().interrupt();
+              throw new RuntimeException(e);
             }
             j.incrementAndGet();
           });
@@ -219,7 +209,8 @@ public class JPPEIntegrationTest {
           try {
             t.join();
           } catch (InterruptedException e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
           }
         }, j));
       }
@@ -234,7 +225,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test09() throws InterruptedException, ExecutionException {
-    System.out.println(System.lineSeparator() + "Test 9");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         1, 1, 0);
     int base = 13;
@@ -249,7 +239,6 @@ public class JPPEIntegrationTest {
   // Synchronous execution testing.
   @Test
   public void test10() throws InterruptedException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 10);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         2, 2, 0);
     try {
@@ -258,12 +247,13 @@ public class JPPEIntegrationTest {
         try {
           Thread.sleep(5000);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
         }
       });
       long time = System.currentTimeMillis() - start;
       boolean success = time < 5650 && time > 4995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdown();
@@ -274,7 +264,6 @@ public class JPPEIntegrationTest {
   // Invocation testing.
   @Test
   public void test11() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 11);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         2, 2, 0);
     try {
@@ -292,7 +281,7 @@ public class JPPEIntegrationTest {
       List<Future<Integer>> results = exec.invokeAll(tasks);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 4650 && time > 3995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
       Assert.assertEquals(2197, (int) results.get(1).get());
@@ -304,7 +293,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test12() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 12);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         1, 1, 0);
     try {
@@ -322,7 +310,7 @@ public class JPPEIntegrationTest {
       List<Future<Integer>> results = exec.invokeAll(tasks);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 6350 && time > 5995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
       Assert.assertEquals(2197, (int) results.get(1).get());
@@ -334,7 +322,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test13() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 13);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         2, 2, 0);
     try {
@@ -352,7 +339,7 @@ public class JPPEIntegrationTest {
       List<Future<Integer>> results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 3350 && time > 2995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
       exceptionRule.expect(CancellationException.class);
@@ -365,7 +352,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test14() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 14);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         1, 1, 0);
     try {
@@ -383,7 +369,7 @@ public class JPPEIntegrationTest {
       List<Future<Integer>> results = exec.invokeAll(tasks, 3000, TimeUnit.MILLISECONDS);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 3350 && time > 2995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertEquals(169, (int) results.get(0).get());
       exceptionRule.expect(CancellationException.class);
@@ -396,7 +382,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test15() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 15);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         2, 2, 0);
     try {
@@ -417,7 +402,7 @@ public class JPPEIntegrationTest {
       int result = exec.invokeAny(tasks);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 4350 && time > 3995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertTrue(result == 169 || result == 2197);
     } finally {
@@ -428,7 +413,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test16() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 16);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         2, 2, 0);
     try {
@@ -445,7 +429,7 @@ public class JPPEIntegrationTest {
       int result = exec.invokeAny(tasks);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 2350 && time > 1995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertEquals(169, result);
     } finally {
@@ -456,7 +440,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test17() throws InterruptedException, ExecutionException, TimeoutException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 17);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         2, 2, 0);
     try {
@@ -474,7 +457,7 @@ public class JPPEIntegrationTest {
       int result = exec.invokeAny(tasks, 3000, TimeUnit.MILLISECONDS);
       long time = System.currentTimeMillis() - start;
       boolean success = time < 3350 && time > 2995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertEquals(169, result);
     } finally {
@@ -485,7 +468,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test18() throws InterruptedException, ExecutionException, TimeoutException {
-    System.out.println(System.lineSeparator() + "Test 18");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         2, 2, 0);
     try {
@@ -510,7 +492,6 @@ public class JPPEIntegrationTest {
   // Test of shutdownNow.
   @Test
   public void test19() throws InterruptedException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 19);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         1, 1, 0);
     try {
@@ -518,21 +499,24 @@ public class JPPEIntegrationTest {
         try {
           Thread.sleep(1000);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
         }
       };
       Runnable r2 = (Runnable & Serializable) () -> {
         try {
           Thread.sleep(2000);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
         }
       };
       exec.submit((Runnable & Serializable) () -> {
         try {
           Thread.sleep(1000);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
         }
       });
       exec.submit(r1);
@@ -549,7 +533,7 @@ public class JPPEIntegrationTest {
       }
       long time = System.currentTimeMillis() - start;
       boolean success = time < 20;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertTrue(a1 == r1 && a2 == r2);
     } finally {
@@ -561,7 +545,6 @@ public class JPPEIntegrationTest {
   // Task and result exchange performance testing.
   @Test
   public void test20() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 20);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         1, 1, 0);
     try {
@@ -572,7 +555,7 @@ public class JPPEIntegrationTest {
       }).get();
       long time = System.currentTimeMillis() - start;
       boolean success = time < 2350 && time > 1995;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
       Assert.assertEquals(13, res.get());
     } finally {
@@ -583,7 +566,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test21() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 21);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256)),
         30, 80, 10);
@@ -602,7 +584,7 @@ public class JPPEIntegrationTest {
       }
       long time = System.currentTimeMillis() - start;
       boolean success = time < 15550 && time > 7495;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdown();
@@ -612,7 +594,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test22() throws InterruptedException, ExecutionException {
-    System.out.printf(TestUtils.TEST_TITLE_FORMAT, 22);
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(2, 4, 256), null, null, 500L),
         30, 80, 10);
@@ -631,7 +612,7 @@ public class JPPEIntegrationTest {
       }
       long time = System.currentTimeMillis() - start;
       boolean success = time < 20550 && time > 7500;
-      System.out.printf("Time: %.3f %s%n", ((double) time) / 1000, success ? "" : "FAIL");
+      logTime(success, time);
       Assert.assertTrue(success);
     } finally {
       exec.shutdown();
@@ -642,7 +623,6 @@ public class JPPEIntegrationTest {
   // Java process manager factory testing.
   @Test
   public void test23() throws InterruptedException {
-    System.out.println(System.lineSeparator() + "Test 23");
     JavaProcessManagerFactory<?> processManagerFactory = new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig());
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(processManagerFactory, 5, 5, 0);
     try {
@@ -656,7 +636,6 @@ public class JPPEIntegrationTest {
   // Java process testing.
   @Test
   public void test24() throws IOException, ClassNotFoundException {
-    System.out.println(System.lineSeparator() + "Test 24");
     PrintStream origOutStream = System.out;
     String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n",
         "",
@@ -692,7 +671,6 @@ public class JPPEIntegrationTest {
   // Not serializable task testing.
   @Test
   public void test25() throws InterruptedException {
-    System.out.println(System.lineSeparator() + "Test 25");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -706,7 +684,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test26() throws InterruptedException {
-    System.out.println(System.lineSeparator() + "Test 26");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -720,7 +697,6 @@ public class JPPEIntegrationTest {
 
   @Test
   public void test27() throws InterruptedException {
-    System.out.println(System.lineSeparator() + "Test 27");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -736,7 +712,6 @@ public class JPPEIntegrationTest {
   // Startup task testing.
   @Test
   public void test28() throws InterruptedException, ExecutionException {
-    System.out.println(System.lineSeparator() + "Test 28");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(),
         (Runnable & Serializable) () -> {
           for (int i = 0; i < 10; i++) {
@@ -755,7 +730,6 @@ public class JPPEIntegrationTest {
   // Wrap-up task testing.
   @Test
   public void test29() throws InterruptedException, ExecutionException {
-    System.out.println(System.lineSeparator() + "Test 28");
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(),
         null, (Runnable & Serializable) () -> System.out.println("Wrapping up"), null),
         0, 1, 0);

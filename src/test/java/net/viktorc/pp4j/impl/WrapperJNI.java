@@ -22,7 +22,6 @@ package net.viktorc.pp4j.impl;
  */
 public class WrapperJNI {
 
-  // Load the library.
   static {
     System.load(TestUtils.getLibrary().getAbsolutePath());
   }

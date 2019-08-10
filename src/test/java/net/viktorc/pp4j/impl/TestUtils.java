@@ -29,30 +29,24 @@ import net.viktorc.pp4j.api.ProcessManagerFactory;
  */
 class TestUtils {
 
-  static final String TEST_TITLE_FORMAT = "%nTest %d%n-------------------------------------------------%n";
-
+  private static final String BASE_PATH = "net/viktorc/pp4j/impl/";
   private static final String EXECUTABLE_PATH;
   private static final String LIBRARY_PATH;
   static {
-    String basePath = "net/viktorc/pp4j/impl/";
     String osName = System.getProperty("os.name").toLowerCase();
     if ("mac os x".equals(osName)) {
-      EXECUTABLE_PATH = basePath + "osx/testwrapper";
-      LIBRARY_PATH = basePath + "osx/libtest.so";
+      EXECUTABLE_PATH = BASE_PATH + "osx/testwrapper";
+      LIBRARY_PATH = BASE_PATH + "osx/libtest.so";
     } else if (osName.contains("win")) {
-      EXECUTABLE_PATH = basePath + "win/testwrapper.exe";
-      LIBRARY_PATH = basePath + "win/test.dll";
+      EXECUTABLE_PATH = BASE_PATH + "win/testwrapper.exe";
+      LIBRARY_PATH = BASE_PATH + "win/test.dll";
     } else {
-      EXECUTABLE_PATH = basePath + "linux/testwrapper";
-      LIBRARY_PATH = basePath + "linux/libtest.so";
+      EXECUTABLE_PATH = BASE_PATH + "linux/testwrapper";
+      LIBRARY_PATH = BASE_PATH + "linux/libtest.so";
     }
   }
 
-  /**
-   * All static.
-   */
-  private TestUtils() {
-  }
+  private TestUtils() { }
 
   /**
    * It returns a file resource given the file path.
@@ -77,7 +71,7 @@ class TestUtils {
   }
 
   /**
-   * Returns a {@link java.io.File} instance representing the test executable.
+   * Returns a {@link File} instance representing the test executable.
    *
    * @return A <code>File</code> pointing to the test executable.
    */
@@ -86,7 +80,7 @@ class TestUtils {
   }
 
   /**
-   * Returns a {@link java.io.File} instance representing the test library.
+   * Returns a {@link File} instance representing the test library.
    *
    * @return A <code>File</code> pointing to the test library.
    */
@@ -95,42 +89,55 @@ class TestUtils {
   }
 
   /**
-   * Returns a test {@link net.viktorc.pp4j.api.ProcessManagerFactory} instance.
-   *
-   * @return A test <code>ProcessManagerFactory</code> instance.
-   */
-  static ProcessManagerFactory createTestProcessManagerFactory() {
-    return new TestProcessManagerFactory();
-  }
-
-  /**
-   * A simple test process manager factory for starting process managers for the test program.
+   * An implementation of the {@link ProcessManagerFactory} interface for testing purposes.
    *
    * @author Viktor Csomor
    */
-  private static class TestProcessManagerFactory implements ProcessManagerFactory {
+  static class TestProcessManagerFactory implements ProcessManagerFactory {
 
-    ProcessBuilder builder;
+    private final Long keepAliveTime;
+    private final boolean verifyStartup;
+    private final boolean manuallyTerminate;
+    private final boolean throwStartupException;
+    private final ProcessBuilder builder;
 
     /**
-     * Constructs an instance for creating process managers.
+     * Constructs an instance according to the specified parameters.
+     *
+     * @param keepAliveTime The maximum allowed duration of idleness before the process is terminated.
+     * @param verifyStartup Whether the startup should be verified.
+     * @param manuallyTerminate Whether the process should be terminated in an orderly way or forcibly.
+     * @param throwStartupException Whether a process exception should be thrown on startup.
+     */
+    TestProcessManagerFactory(Long keepAliveTime, boolean verifyStartup, boolean manuallyTerminate, boolean throwStartupException) {
+      this.keepAliveTime = keepAliveTime;
+      this.verifyStartup = verifyStartup;
+      this.manuallyTerminate = manuallyTerminate;
+      this.throwStartupException = throwStartupException;
+      builder = new ProcessBuilder(getExecutable().getAbsolutePath());
+    }
+
+    /**
+     * Constructs a default test process manager factory.
      */
     TestProcessManagerFactory() {
-      builder = new ProcessBuilder(getExecutable().getAbsolutePath());
+      this(null, true, false, false);
     }
 
     @Override
     public ProcessManager newProcessManager() {
-      return new SimpleProcessManager(builder) {
+      return new SimpleProcessManager(builder,
+          keepAliveTime,
+          verifyStartup ? (outputLine, error) -> !error && "hi".equals(outputLine) : null,
+          () -> new SimpleSubmission(new SimpleCommand("start", (c, o) -> "ok".equals(o))),
+          () -> manuallyTerminate ? new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o))) : null) {
 
         @Override
         public boolean startsUpInstantly() {
-          return false;
-        }
-
-        @Override
-        public boolean isStartedUp(String outputLine, boolean error) {
-          return !error && "hi".equals(outputLine);
+          if (throwStartupException) {
+            throw new RuntimeException("Test startup exception.");
+          }
+          return !verifyStartup;
         }
       };
     }

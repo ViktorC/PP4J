@@ -17,38 +17,31 @@ package net.viktorc.pp4j.impl;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import net.viktorc.pp4j.impl.TestUtils.TestProcessManagerFactory;
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 /**
- * Test cases for the {@link net.viktorc.pp4j.impl.SimpleProcessExecutor}.
+ * An integration test class for {@link SimpleProcessExecutor}.
  *
  * @author Viktor
  */
-public class SPEIntegrationTest {
-
-  @Rule
-  public final ExpectedException exceptionRule = ExpectedException.none();
+public class SPEIntegrationTest extends TestCase {
 
   @Test
   public void test01() throws Exception {
-    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
-        TestUtils.createTestProcessManagerFactory().newProcessManager())) {
+    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
       SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o));
       executor.start();
       executor.execute(new SimpleSubmission(command));
       Assert.assertFalse(executor.tryTerminate());
-      Assert.assertTrue(command.getJointStandardOutLines()
-          .contains("in progress\nin progress\nready"));
+      Assert.assertTrue(command.getJointStandardOutLines().contains("in progress\nin progress\nready"));
     }
   }
 
   @Test
   public void test02() throws Exception {
-    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
-        TestUtils.createTestProcessManagerFactory().newProcessManager())) {
+    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
       executor.start();
       exceptionRule.expect(IllegalStateException.class);
       executor.start();
@@ -57,8 +50,7 @@ public class SPEIntegrationTest {
 
   @Test
   public void test03() throws Exception {
-    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
-        TestUtils.createTestProcessManagerFactory().newProcessManager())) {
+    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
       Assert.assertFalse(executor.isAlive());
       executor.start();
       Assert.assertTrue(executor.isAlive());
@@ -68,13 +60,15 @@ public class SPEIntegrationTest {
   @Test
   public void test04() throws Exception {
     Thread t;
-    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(
-        TestUtils.createTestProcessManagerFactory().newProcessManager())) {
+    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
       Future<?> future = executor.start();
       t = new Thread(() -> {
         try {
           future.get();
-        } catch (ExecutionException | InterruptedException e) {
+        } catch (ExecutionException e) {
+          throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
           throw new RuntimeException(e);
         }
       });
