@@ -142,7 +142,7 @@ public class PPEIntegrationTest extends TestCase {
    */
   private static ProcessPoolExecutor createPool(int minPoolSize, int maxPoolSize, int reserveSize, Long keepAliveTime,
       boolean verifyStartup, boolean manuallyTerminate, boolean throwStartupException) throws InterruptedException {
-    TestProcessManagerFactory managerFactory = new TestProcessManagerFactory(keepAliveTime, verifyStartup, manuallyTerminate,
+    TestProcessManagerFactory managerFactory = new TestProcessManagerFactory(keepAliveTime, verifyStartup, true, manuallyTerminate,
         throwStartupException);
     ProcessPoolExecutor processPool = new ProcessPoolExecutor(managerFactory, minPoolSize, maxPoolSize, reserveSize);
     if (!throwStartupException) {

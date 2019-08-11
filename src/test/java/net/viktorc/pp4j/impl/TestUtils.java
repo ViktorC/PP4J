@@ -97,6 +97,7 @@ class TestUtils {
 
     private final Long keepAliveTime;
     private final boolean verifyStartup;
+    private final boolean executeInitSubmission;
     private final boolean manuallyTerminate;
     private final boolean throwStartupException;
     private final ProcessBuilder builder;
@@ -106,12 +107,15 @@ class TestUtils {
      *
      * @param keepAliveTime The maximum allowed duration of idleness before the process is terminated.
      * @param verifyStartup Whether the startup should be verified.
+     * @param executeInitSubmission Whether an initial submission is to be executed upon the startup of the process.
      * @param manuallyTerminate Whether the process should be terminated in an orderly way or forcibly.
      * @param throwStartupException Whether a process exception should be thrown on startup.
      */
-    TestProcessManagerFactory(Long keepAliveTime, boolean verifyStartup, boolean manuallyTerminate, boolean throwStartupException) {
+    TestProcessManagerFactory(Long keepAliveTime, boolean verifyStartup, boolean executeInitSubmission, boolean manuallyTerminate,
+        boolean throwStartupException) {
       this.keepAliveTime = keepAliveTime;
       this.verifyStartup = verifyStartup;
+      this.executeInitSubmission = executeInitSubmission;
       this.manuallyTerminate = manuallyTerminate;
       this.throwStartupException = throwStartupException;
       builder = new ProcessBuilder(getExecutable().getAbsolutePath());
@@ -121,7 +125,7 @@ class TestUtils {
      * Constructs a default test process manager factory.
      */
     TestProcessManagerFactory() {
-      this(null, true, false, false);
+      this(null, true, false, false, false);
     }
 
     @Override
@@ -129,7 +133,7 @@ class TestUtils {
       return new SimpleProcessManager(builder,
           keepAliveTime,
           verifyStartup ? (outputLine, error) -> !error && "hi".equals(outputLine) : null,
-          () -> new SimpleSubmission(new SimpleCommand("start", (c, o) -> "ok".equals(o))),
+          () -> executeInitSubmission ? new SimpleSubmission(new SimpleCommand("start", (c, o) -> "ok".equals(o))) : null,
           () -> manuallyTerminate ? new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o))) : null) {
 
         @Override
