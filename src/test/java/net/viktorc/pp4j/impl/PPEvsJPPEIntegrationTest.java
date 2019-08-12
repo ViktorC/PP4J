@@ -15,9 +15,7 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.io.IOException;
 import java.io.Serializable;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -92,16 +90,10 @@ public class PPEvsJPPEIntegrationTest extends TestCase {
     T actualStartupTask = reuse ? startupTask : null;
     JavaProcessManagerFactory<T> processManagerFactory = new JavaProcessManagerFactory<>(javaConfig, actualStartupTask, null, null);
     JavaProcessPoolExecutor javaProcessPool = new JavaProcessPoolExecutor(processManagerFactory, minSize, maxSize, reserveSize);
-    return testProcessPool(javaProcessPool, submissions, reuse, () -> {
-      try {
-        return new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
-          submissionTask.run();
-          return null;
-        });
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
-      }
-    });
+    return testProcessPool(javaProcessPool, submissions, reuse, () -> new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
+      submissionTask.run();
+      return null;
+    }));
   }
 
   /**

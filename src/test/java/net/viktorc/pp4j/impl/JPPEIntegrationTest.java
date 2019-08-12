@@ -495,7 +495,7 @@ public class JPPEIntegrationTest extends TestCase {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         1, 1, 0);
     try {
-      Runnable r1 = (Runnable & Serializable) () -> {
+      Runnable task1 = (Runnable & Serializable) () -> {
         try {
           Thread.sleep(1000);
         } catch (InterruptedException e) {
@@ -503,15 +503,37 @@ public class JPPEIntegrationTest extends TestCase {
           throw new RuntimeException(e);
         }
       };
-      Runnable r2 = (Runnable & Serializable) () -> {
+      Callable<Integer> task2 = (Callable<Integer> & Serializable) () -> {
         try {
           Thread.sleep(2000);
+          return 0;
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           throw new RuntimeException(e);
         }
       };
-      exec.submit((Runnable & Serializable) () -> {
+      exec.submit(task1);
+      exec.submit(task1);
+      exec.submit(task2);
+      long start = System.currentTimeMillis();
+      List<Runnable> queuedTasks = exec.shutdownNow();
+      long time = System.currentTimeMillis() - start;
+      boolean success = time < 20;
+      logTime(success, time);
+      Assert.assertTrue(success);
+      Assert.assertEquals(2, queuedTasks.size());
+    } finally {
+      exec.shutdown();
+      exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+    }
+  }
+
+  @Test
+  public void test20() throws InterruptedException {
+    JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
+        1, 1, 0);
+    try {
+      JavaSubmission<?> submission1 = new JavaSubmission<>((Runnable & Serializable) () -> {
         try {
           Thread.sleep(1000);
         } catch (InterruptedException e) {
@@ -519,23 +541,28 @@ public class JPPEIntegrationTest extends TestCase {
           throw new RuntimeException(e);
         }
       });
-      exec.submit(r1);
-      exec.submit(r2);
+      JavaSubmission<Integer> submission2 = new JavaSubmission<>((Callable<Integer> & Serializable) () -> {
+        try {
+          Thread.sleep(2000);
+          return 0;
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException(e);
+        }
+      });
+      exec.submit(submission1);
+      Thread.sleep(100);
+      exec.submit(submission2);
+      exec.submit(submission2);
       long start = System.currentTimeMillis();
       List<Runnable> queuedTasks = exec.shutdownNow();
-      Runnable a1, a2;
-      if (queuedTasks.size() == 2) {
-        a1 = queuedTasks.get(0);
-        a2 = queuedTasks.get(1);
-      } else {
-        a1 = queuedTasks.get(1);
-        a2 = queuedTasks.get(2);
-      }
       long time = System.currentTimeMillis() - start;
       boolean success = time < 20;
       logTime(success, time);
       Assert.assertTrue(success);
-      Assert.assertTrue(a1 == r1 && a2 == r2);
+      Assert.assertEquals(2, queuedTasks.size());
+      Assert.assertFalse(queuedTasks.contains(submission1.getTask()));
+      Assert.assertTrue(queuedTasks.contains(submission2.getTask()));
     } finally {
       exec.shutdown();
       exec.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -544,7 +571,7 @@ public class JPPEIntegrationTest extends TestCase {
 
   // Task and result exchange performance testing.
   @Test
-  public void test20() throws InterruptedException, ExecutionException {
+  public void test21() throws InterruptedException, ExecutionException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         1, 1, 0);
     try {
@@ -565,7 +592,7 @@ public class JPPEIntegrationTest extends TestCase {
   }
 
   @Test
-  public void test21() throws InterruptedException, ExecutionException {
+  public void test22() throws InterruptedException, ExecutionException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256)),
         30, 80, 10);
@@ -593,7 +620,7 @@ public class JPPEIntegrationTest extends TestCase {
   }
 
   @Test
-  public void test22() throws InterruptedException, ExecutionException {
+  public void test23() throws InterruptedException, ExecutionException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(
         new SimpleJavaProcessConfig(2, 4, 256), null, null, 500L),
         30, 80, 10);
@@ -622,7 +649,7 @@ public class JPPEIntegrationTest extends TestCase {
 
   // Java process manager factory testing.
   @Test
-  public void test23() throws InterruptedException {
+  public void test24() throws InterruptedException {
     JavaProcessManagerFactory<?> processManagerFactory = new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig());
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(processManagerFactory, 5, 5, 0);
     try {
@@ -635,7 +662,7 @@ public class JPPEIntegrationTest extends TestCase {
 
   // Java process testing.
   @Test
-  public void test24() throws IOException, ClassNotFoundException {
+  public void test25() throws IOException, ClassNotFoundException {
     PrintStream origOutStream = System.out;
     String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n",
         "",
@@ -670,7 +697,7 @@ public class JPPEIntegrationTest extends TestCase {
 
   // Not serializable task testing.
   @Test
-  public void test25() throws InterruptedException {
+  public void test26() throws InterruptedException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -683,7 +710,7 @@ public class JPPEIntegrationTest extends TestCase {
   }
 
   @Test
-  public void test26() throws InterruptedException {
+  public void test27() throws InterruptedException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -696,7 +723,7 @@ public class JPPEIntegrationTest extends TestCase {
   }
 
   @Test
-  public void test27() throws InterruptedException {
+  public void test28() throws InterruptedException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -711,7 +738,7 @@ public class JPPEIntegrationTest extends TestCase {
 
   // Startup task testing.
   @Test
-  public void test28() throws InterruptedException, ExecutionException {
+  public void test29() throws InterruptedException, ExecutionException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(),
         (Runnable & Serializable) () -> {
           for (int i = 0; i < 10; i++) {
@@ -729,7 +756,7 @@ public class JPPEIntegrationTest extends TestCase {
 
   // Wrap-up task testing.
   @Test
-  public void test29() throws InterruptedException, ExecutionException {
+  public void test30() throws InterruptedException, ExecutionException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(),
         null, (Runnable & Serializable) () -> System.out.println("Wrapping up"), null),
         0, 1, 0);

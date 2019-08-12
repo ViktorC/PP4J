@@ -17,6 +17,7 @@ package net.viktorc.pp4j.impl;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -26,30 +27,57 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A sub-class of {@link AbstractSubmission} for serializable {@link Callable} instances to submit in Java process. It serializes, encodes,
- * and sends the <code>Callable</code> to the process for execution. It also looks for the serialized and encoded return value of the
- * <code>Callable</code>, and for a serialized and encoded {@link Throwable} instance output to the stderr stream in case of an error.
+ * A sub-class of {@link AbstractSubmission} for encapsulating a serializable task to execute in a separate Java process. It serializes,
+ * encodes, and sends the task to the process for execution. It then monitors the standard output stream of the process for the encoded
+ * return value of the task or any encoded exceptions thrown in the process while executing the task. If such an exception is found, it
+ * rethrows it as a {@link FailedCommandException}. If the task completes successfully, the submission invokes the
+ * {@link AbstractSubmission#setResult(Object)} method with the decoded and deserialized return value.
  *
- * @param <T> The serializable return type variable of the <code>Callable</code>
- * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
+ * @param <T> The serializable return type of the task to execute in the separate Java process.
  * @author Viktor Csomor
  */
-public class JavaSubmission<T extends Serializable, S extends Callable<T> & Serializable> extends AbstractSubmission<T> {
+public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JavaSubmission.class);
 
-  private final S task;
+  private final SerializableTask<T> task;
   private final String command;
 
   /**
-   * Creates a submission for the specified {@link Callable}.
+   * Creates a submission for the specified task that implements both the {@link Serializable} and {@link Callable} interfaces.
    *
    * @param task The task to execute.
-   * @throws IOException If the encoding of the serialized task fails.
    */
-  public JavaSubmission(S task) throws IOException {
-    this.task = task;
-    command = JavaObjectCodec.getInstance().encode(task);
+  public <S extends Callable<T> & Serializable> JavaSubmission(S task) {
+    this.task = task::call;
+    try {
+      command = JavaObjectCodec.getInstance().encode(task);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /**
+   * Creates a submission for the specified task that implements both the {@link Serializable} and {@link Runnable} interfaces.
+   *
+   * @param task The task to execute.
+   * @param result The return value of the task that is expected to be set within the {@link Runnable#run()} method of the task.
+   */
+  public <S extends Runnable & Serializable> JavaSubmission(S task, T result) {
+    this((Callable<T> & Serializable) () -> {
+      task.run();
+      return result;
+    });
+  }
+
+  /**
+   * Creates a submission for the specified task that implements both the {@link Serializable} and {@link Runnable} interfaces and has no
+   * return value.
+   *
+   * @param task The task to execute.
+   */
+  public <S extends Runnable & Serializable> JavaSubmission(S task) {
+    this(task, null);
   }
 
   /**
@@ -57,7 +85,7 @@ public class JavaSubmission<T extends Serializable, S extends Callable<T> & Seri
    *
    * @return The task submission encapsulates.
    */
-  public S getTask() {
+  public SerializableTask<T> getTask() {
     return task;
   }
 
@@ -86,9 +114,23 @@ public class JavaSubmission<T extends Serializable, S extends Callable<T> & Seri
         (command, outputLine) -> false));
   }
 
-  @Override
-  public String toString() {
-    return task.toString();
+  /**
+   * A serializable, runnable, and callable task with a serializable return type.
+   *
+   * @param <T> The serializable return type of the task.
+   * @author Viktor Csomor
+   */
+  public interface SerializableTask<T extends Serializable> extends Callable<T>, Runnable, Serializable {
+
+    @Override
+    default void run() {
+      try {
+        call();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+
   }
 
 }

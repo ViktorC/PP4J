@@ -21,7 +21,6 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
 import org.slf4j.Logger;
@@ -79,16 +78,7 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
   @Override
   public Optional<Submission<?>> getInitSubmission() {
     if (initTask != null) {
-      try {
-        // Avoid having to have the process manager serialized.
-        T initTask = this.initTask;
-        return Optional.of(new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
-          initTask.run();
-          return null;
-        }));
-      } catch (IOException e) {
-        LOGGER.warn(e.getMessage(), e);
-      }
+      return Optional.of(new JavaSubmission<>(initTask));
     }
     return Optional.empty();
   }
@@ -97,16 +87,8 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
   public Optional<Submission<?>> getTerminationSubmission() {
     List<Command> commands = new ArrayList<>();
     if (wrapUpTask != null) {
-      T wrapUpTask = this.wrapUpTask;
-      try {
-        Submission<?> wrapUpJavaSubmission = new JavaSubmission<>((Callable<Serializable> & Serializable) () -> {
-          wrapUpTask.run();
-          return null;
-        });
-        commands.addAll(wrapUpJavaSubmission.getCommands());
-      } catch (IOException e) {
-        LOGGER.warn(e.getMessage(), e);
-      }
+      Submission<?> wrapUpJavaSubmission = new JavaSubmission<>(wrapUpTask);
+      commands.addAll(wrapUpJavaSubmission.getCommands());
     }
     try {
       String terminationCommand = JavaObjectCodec.getInstance().encode(JavaProcess.Request.TERMINATE);

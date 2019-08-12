@@ -15,13 +15,10 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.io.IOException;
-import java.io.NotSerializableException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -82,24 +79,6 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     super(processManagerFactory, minPoolSize, maxPoolSize, reserveSize);
   }
 
-  /**
-   * It executes a serializable {@link java.util.concurrent.Callable} instance with a serializable return type in one of the processes of
-   * the pool and returns its return value. If the implementation contains non-serializable, non-transient fields, or the return type is not
-   * serializable, the method fails.
-   *
-   * @param task The task to execute.
-   * @param terminateProcessAfterwards Whether the process that executes the task should be terminated afterwards.
-   * @param <T> The serializable return type variable of the <code>Callable</code>
-   * @param <S> A serializable <code>Callable</code> instance with the return type <code>T</code>.
-   * @return A {@link Future} instance associated with the return value of the task.
-   * @throws IOException If the serialization fails.
-   * @throws NotSerializableException If some object to be serialized does not implement the {@link Serializable} interface.
-   */
-  public <T extends Serializable, S extends Callable<T> & Serializable> Future<T> submitExplicitly(S task,
-      boolean terminateProcessAfterwards) throws IOException {
-    return submit(new JavaSubmission<>(task), terminateProcessAfterwards);
-  }
-
   @Override
   public void execute(Runnable command) {
     Future<?> future = submit(command);
@@ -117,7 +96,8 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   @Override
   public <T> Future<T> submit(Callable<T> task, boolean terminateProcessAfterwards) {
     try {
-      return new CastFuture<>(submitExplicitly(new SerializableCallable<>((Callable<T> & Serializable) task), terminateProcessAfterwards));
+      return new CastFuture<>(submit(new JavaSubmission<>(new CastCallable<>((Callable<T> & Serializable) task)),
+          terminateProcessAfterwards));
     } catch (Exception e) {
       throw new RejectedExecutionException(e);
     }
@@ -125,24 +105,15 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
   @Override
   public <T> Future<T> submit(Runnable task, T result, boolean terminateProcessAfterwards) {
-    try {
-      return new CastFuture<>(submitExplicitly(new SerializableCallable<>((Callable<T> & Serializable)
-          () -> {
-            task.run();
-            return result;
-          }, task), terminateProcessAfterwards));
-    } catch (Exception e) {
-      throw new RejectedExecutionException(e);
-    }
+    return new CastFuture<>(submit((Callable<T> & Serializable) () -> {
+      task.run();
+      return result;
+    }, terminateProcessAfterwards));
   }
 
   @Override
   public Future<?> submit(Runnable task, boolean terminateProcessAfterwards) {
-    try {
-      return submit(task, null, terminateProcessAfterwards);
-    } catch (Exception e) {
-      throw new RejectedExecutionException(e);
-    }
+    return submit(task, null, terminateProcessAfterwards);
   }
 
   @Override
@@ -228,18 +199,42 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     throw execException;
   }
 
-  /**
-   * See {@link java.util.concurrent.ExecutorService#shutdownNow()}. It is equivalent to {@link #forceShutdown()} with the only difference
-   * being that this method filters and converts the returned submissions to a list of {@link Runnable} instances excluding
-   * {@link Callable} based submissions.
-   */
   @Override
   public List<Runnable> shutdownNow() {
     return super.forceShutdown().stream()
         .filter(s -> s instanceof JavaSubmission)
-        .map(s -> ((SerializableCallable<?, ?>) ((JavaSubmission<?, ?>) s).getTask()).runnablePart)
-        .filter(Objects::nonNull)
+        .map(s -> ((JavaSubmission<?>) s).getTask())
         .collect(Collectors.toList());
+  }
+
+  /**
+   * A wrapper class implementing the {@link Callable} interface for casting a serializable <code>Callable</code> instance with a not
+   * explicitly serializable return type into a serializable instance with an explicitly serializable return type.
+   *
+   * @param <T> The serializable return type.
+   * @param <S> The serializable <code>Callable</code> implementation with a not explicitly serializable return type.
+   * @author Viktor Csomor
+   */
+  private static class CastCallable<T extends Serializable, S extends Callable<? super T> & Serializable>
+      implements Callable<T>, Serializable {
+
+    final Callable<T> callable;
+
+    /**
+     * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the specified serializable
+     * <code>Callable</code> instance with a not explicitly serializable return type.
+     *
+     * @param callable The <code>Callable</code> to cast.
+     */
+    CastCallable(S callable) {
+      this.callable = (Callable<T> & Serializable) callable;
+    }
+
+    @Override
+    public T call() throws Exception {
+      return callable.call();
+    }
+
   }
 
   /**
@@ -247,7 +242,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    * sub-type of that of the wrapped instance.
    *
    * @param <T> The return type of the original <code>Future</code> instance.
-   * @param <S> A subtype of <code>T</code>, the return type of the wrapper <code>Future</code> instance.
+   * @param <S> A subtype of <code>T</code>, the return type of the cast <code>Future</code> instance.
    * @author Viktor Csomor
    */
   private static class CastFuture<T, S extends T> implements Future<T> {
@@ -257,7 +252,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     /**
      * Constructs the wrapper object for the specified <code>Future</code> instance.
      *
-     * @param origFuture The <code>Future</code> instance to wrap.
+     * @param origFuture The <code>Future</code> instance to cast.
      */
     CastFuture(Future<S> origFuture) {
       this.origFuture = origFuture;
@@ -286,50 +281,6 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     @Override
     public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
       return origFuture.get(timeout, unit);
-    }
-
-  }
-
-  /**
-   * A wrapper class implementing the {@link Callable} interface for turning a serializable <code>Callable</code> instance with a not
-   * explicitly serializable return type into a serializable instance with an explicitly serializable return type.
-   *
-   * @param <T> The serializable return type.
-   * @param <S> The serializable <code>Callable</code> implementation with a not explicitly serializable return type.
-   * @author Viktor Csomor
-   */
-  private static class SerializableCallable<T extends Serializable, S extends Callable<? super T> & Serializable>
-      implements Callable<T>, Serializable {
-
-    final Callable<T> callable;
-    final Runnable runnablePart;
-
-    /**
-     * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the specified serializable
-     * <code>Callable</code> instance with a not explicitly serializable return type.
-     *
-     * @param callable The <code>Callable</code> to wrap.
-     * @param runnablePart The optional <code>Runnable</code> part of the <code>Callable</code> instance in case it consists of a
-     * <code>Runnable</code> and a return object.
-     */
-    SerializableCallable(S callable, Runnable runnablePart) {
-      this.callable = (Callable<T> & Serializable) callable;
-      this.runnablePart = runnablePart;
-    }
-
-    /**
-     * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the specified serializable
-     * <code>Callable</code> instance with a not explicitly serializable return type.
-     *
-     * @param callable The <code>Callable</code> to wrap.
-     */
-    SerializableCallable(S callable) {
-      this(callable, null);
-    }
-
-    @Override
-    public T call() throws Exception {
-      return callable.call();
     }
 
   }
