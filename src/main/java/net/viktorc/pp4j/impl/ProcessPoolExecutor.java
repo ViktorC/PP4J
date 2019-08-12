@@ -129,14 +129,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     poolTerminationLatch = new CountDownLatch(1);
     mainLock = new Object();
     forceShutdownLock = new Object();
-    synchronized (mainLock) {
-      for (int i = 0; i < actualMinSize; i++) {
-        startNewProcess();
-      }
-    }
-    // Wait for the processes in the initial pool to start up.
-    poolInitLatch.await();
-    LOGGER.debug("Pool started up");
+    startPool(actualMinSize);
   }
 
   /**
@@ -243,20 +236,37 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   }
 
   /**
+   * It start up the specified number of process executors and blocks until they are ready for submissions.
+   *
+   * @param actualMinSize The initial number of process executors to have in the pool.
+   * @throws InterruptedException If the current thread is interrupted while waiting for the processes to start up.
+   */
+  private void startPool(int actualMinSize) throws InterruptedException {
+    LOGGER.debug("Starting up process pool...");
+    synchronized (mainLock) {
+      for (int i = 0; i < actualMinSize; i++) {
+        startNewProcess();
+      }
+    }
+    poolInitLatch.await();
+    LOGGER.debug("Pool started up");
+  }
+
+  /**
    * Waits until all submissions are completed and calls {@link #syncForceShutdown()}.
    */
   private void syncShutdown() {
-    LOGGER.debug("Waiting for submissions to complete...");
-    try {
-      synchronized (mainLock) {
+    synchronized (mainLock) {
+      try {
+        LOGGER.debug("Waiting for submissions to complete...");
         while (numOfSubmissions > 0) {
           mainLock.wait();
         }
+      } catch (InterruptedException e) {
+        LOGGER.warn(e.getMessage(), e);
+        Thread.currentThread().interrupt();
+        return;
       }
-    } catch (InterruptedException e) {
-      LOGGER.warn(e.getMessage(), e);
-      Thread.currentThread().interrupt();
-      return;
     }
     syncForceShutdown();
   }
@@ -286,8 +296,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         secondaryThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
         processExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
       } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
         LOGGER.warn(e.getMessage(), e);
+        Thread.currentThread().interrupt();
       }
       synchronized (mainLock) {
         LOGGER.debug("Setting remaining submission future exceptions...");
@@ -783,8 +793,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     InternalProcessExecutorThreadPool() {
       super(Math.max(minPoolSize, reserveSize), maxPoolSize, threadKeepAliveTime, TimeUnit.MILLISECONDS,
           new LinkedTransferQueue<Runnable>() {
-
-            private static final long serialVersionUID = 1L;
 
             @Override
             public boolean offer(Runnable r) {
