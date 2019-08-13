@@ -8,7 +8,7 @@ addons:
     token:
       secure: $SONAR_TOKEN
 install: true
-script: mvn clean install jacoco:report coveralls:report sonar:sonar
+script: mvn clean jacoco:prepare-agent install sonar:sonar
 cache:
   directories:
   - $HOME/.m2
