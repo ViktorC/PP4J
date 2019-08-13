@@ -354,6 +354,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private void tearDownExecutor(int returnCode) {
     LOGGER.trace("Tearing down executor");
     synchronized (stateLock) {
+      terminateForcibly();
       killed = false;
       idle = false;
       startedUp = false;
@@ -450,9 +451,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   protected abstract void onExecutorTermination();
 
   /**
-   * Returns whether the the underlying process is alive.
+   * Returns whether the process executor is alive. The process executor is considered alive if its underlying process is alive and has not
+   * not received a kill signal.
    *
-   * @return Whether the process is alive.
+   * @return Whether the process executor is alive.
    */
   protected boolean isAlive() {
     synchronized (stateLock) {
