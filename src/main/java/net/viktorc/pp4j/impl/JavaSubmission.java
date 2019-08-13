@@ -47,6 +47,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
    * Creates a submission for the specified task that implements both the {@link Serializable} and {@link Callable} interfaces.
    *
    * @param task The task to execute.
+   * @param <S> The type of the serializable and callable task.
    */
   public <S extends Callable<T> & Serializable> JavaSubmission(S task) {
     this.task = task::call;
@@ -62,6 +63,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
    *
    * @param task The task to execute.
    * @param result The return value of the task that is expected to be set within the {@link Runnable#run()} method of the task.
+   * @param <S> The type of the serializable and runnable task.
    */
   public <S extends Runnable & Serializable> JavaSubmission(S task, T result) {
     this((Callable<T> & Serializable) () -> {
@@ -75,6 +77,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
    * return value.
    *
    * @param task The task to execute.
+   * @param <S> The type of the serializable and runnable task.
    */
   public <S extends Runnable & Serializable> JavaSubmission(S task) {
     this(task, null);
