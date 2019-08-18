@@ -89,11 +89,12 @@ The above examples demonstrate both the flexibility of the API and the effective
 Besides the process pools, PP4J also provides a standard implementation of the `ProcessExecutor` interface, `SimpleProcessExecutor` for the running of single processes without pooling. This, as presented below, allows for the synchronous execution of submissions in a single separate process with ease.
 ```java
 ProcessManager processManager = new SimpleProcessManager(new ProcessBuilder("cmd.exe"));
-try (SimpleProcessExecutor executor = new SimpleProcessExecutor(processManager)) {
-  SimpleCommand command = new SimpleCommand("netstat & echo netstat done",
+SimpleCommand command = new SimpleCommand("netstat & echo netstat done",
       (command, outputLine) -> "netstat done".equals(outputLine));
+SimpleSubmission submission = new SimpleSubmission(command);
+try (SimpleProcessExecutor executor = new SimpleProcessExecutor(processManager)) {
   executor.start();
-  executor.execute(new SimpleSubmission(command));
+  executor.execute(submission);
   System.out.println(command.getJointStandardOutLines());
 }
 ```
