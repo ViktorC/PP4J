@@ -55,9 +55,9 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 
   protected final ProcessManager manager;
   protected final ExecutorService threadPool;
-  protected final Object runLock;
-  protected final Object stateLock;
+  protected final Lock runLock;
   protected final Lock executeLock;
+  protected final Object stateLock;
   protected final AtomicInteger numOfChildThreads;
   protected final Semaphore terminationSemaphore;
 
@@ -85,9 +85,9 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   protected AbstractProcessExecutor(ProcessManager manager, ExecutorService threadPool) {
     this.manager = manager;
     this.threadPool = threadPool;
-    runLock = new Object();
-    stateLock = new Object();
+    runLock = new ReentrantLock(true);
     executeLock = new ReentrantLock(true);
+    stateLock = new Object();
     numOfChildThreads = new AtomicInteger();
     terminationSemaphore = new Semaphore(0);
   }
@@ -575,7 +575,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 
   @Override
   public void run() {
-    synchronized (runLock) {
+    runLock.lock();
+    try {
       int returnCode = UNEXPECTED_TERMINATION_RETURN_CODE;
       try {
         setUpExecutor();
@@ -586,6 +587,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       } finally {
         tearDownExecutor(returnCode);
       }
+    } finally {
+      runLock.unlock();
     }
   }
 

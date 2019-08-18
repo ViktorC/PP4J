@@ -15,8 +15,6 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import net.viktorc.pp4j.impl.TestUtils.TestProcessManagerFactory;
 import org.junit.Assert;
 import org.junit.Test;
@@ -31,11 +29,8 @@ public class SPEIntegrationTest extends TestCase {
   @Test
   public void test01() throws Exception {
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
-      SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o));
       executor.start();
-      executor.execute(new SimpleSubmission(command));
       Assert.assertFalse(executor.tryTerminate());
-      Assert.assertTrue(command.getJointStandardOutLines().contains("in progress\nin progress\nready"));
     }
   }
 
@@ -51,6 +46,31 @@ public class SPEIntegrationTest extends TestCase {
   @Test
   public void test03() throws Exception {
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
+      executor.start();
+      exceptionRule.expect(IllegalStateException.class);
+      executor.run();
+    }
+  }
+
+  @Test
+  public void test04() throws Exception {
+    SimpleProcessExecutor executorRef;
+    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
+      executorRef = executor;
+      Assert.assertFalse(executor.isAlive());
+      executor.start();
+      Assert.assertTrue(executor.isAlive());
+    }
+    Assert.assertFalse(executorRef.isAlive());
+  }
+
+  @Test
+  public void test05() throws Exception {
+    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
+      executor.start();
+      Assert.assertTrue(executor.isAlive());
+      executor.terminate();
+      executor.waitFor();
       Assert.assertFalse(executor.isAlive());
       executor.start();
       Assert.assertTrue(executor.isAlive());
@@ -58,26 +78,34 @@ public class SPEIntegrationTest extends TestCase {
   }
 
   @Test
-  public void test04() throws Exception {
+  public void test06() throws Exception {
     Thread t;
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
-      Future<?> future = executor.start();
+      executor.start();
       t = new Thread(() -> {
         try {
-          future.get();
-        } catch (ExecutionException e) {
-          throw new RuntimeException(e);
+          executor.waitFor();
         } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
           throw new RuntimeException(e);
         }
       });
       t.start();
       Assert.assertTrue(t.isAlive());
       executor.terminate();
-      future.get();
+      executor.waitFor();
       Thread.sleep(20);
       Assert.assertFalse(t.isAlive());
+    }
+  }
+
+  @Test
+  public void test07() throws Exception {
+    SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o));
+    SimpleSubmission submission = new SimpleSubmission(command);
+    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
+      executor.start();
+      executor.execute(submission);
+      Assert.assertTrue(command.getJointStandardOutLines().contains("in progress\nin progress\nready"));
     }
   }
 
