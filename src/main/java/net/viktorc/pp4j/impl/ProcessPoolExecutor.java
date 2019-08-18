@@ -129,7 +129,14 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     poolTerminationLatch = new CountDownLatch(1);
     mainLock = new Object();
     forceShutdownLock = new Object();
-    startPool(actualMinSize);
+    try {
+      startPool(actualMinSize);
+    } catch (InterruptedException e) {
+      processExecutorThreadPool.shutdownNow();
+      secondaryThreadPool.shutdownNow();
+      LOGGER.debug("Internal thread pools shut down due to constructor interruption");
+      throw e;
+    }
   }
 
   /**
