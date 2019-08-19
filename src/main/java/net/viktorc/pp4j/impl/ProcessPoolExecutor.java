@@ -678,10 +678,14 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       InternalSubmission<?> submission;
       boolean submissionDone = false;
       try {
+        LOGGER.trace("Waiting for process executor to be ready for submission execution...");
+        executeLock.lockInterruptibly();
+        executeLock.unlock();
+        LOGGER.trace("Waiting for a submission...");
         submission = submissionQueue.takeFirst();
         LOGGER.trace("Submission {} taken off queue", submission);
       } catch (InterruptedException e) {
-        LOGGER.trace("Thread interrupted while waiting for submission", e);
+        LOGGER.trace("Submission executor thread interrupted while waiting", e);
         return;
       }
       try {
@@ -706,7 +710,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
      * Waits on the blocking queue of submissions executing available ones one at a time.
      */
     void takeAndExecuteSubmissions() {
-      numOfChildThreads.incrementAndGet();
+      LOGGER.trace("Starting submission executor thread...");
+      initSemaphore.release();
       synchronized (stateLock) {
         submissionThread = Thread.currentThread();
       }
@@ -719,12 +724,18 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
           submissionThread = null;
         }
         terminationSemaphore.release();
+        LOGGER.trace("Submission executor thread stopped");
       }
     }
 
     @Override
+    protected void executeAdditionalChildThreads() {
+      threadPool.execute(this::takeAndExecuteSubmissions);
+      numOfChildThreads.incrementAndGet();
+    }
+
+    @Override
     protected void onExecutorStartup() {
-      threadPool.submit(this::takeAndExecuteSubmissions);
       poolInitLatch.countDown();
     }
 

@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 public class SimpleProcessExecutor extends AbstractProcessExecutor implements AutoCloseable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleProcessExecutor.class);
-  private static final String PROCESS_EXECUTOR_ALREADY_STARTING_OR_RUNNING_MESSAGE = "Process executor already starting or running";
+  private static final String PROCESS_EXECUTOR_ALREADY_STARTED_OR_RUNNING_MESSAGE = "Process executor already started or running";
 
   private final Lock startLock;
   private final Semaphore startupSemaphore;
@@ -59,13 +59,15 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
    * It starts the process executor and waits until it is running and set up.
    *
    * @throws InterruptedException If the thread is interrupted while waiting for the process executor to start up.
-   * @throws IllegalStateException If the process is already starting or running.
+   * @throws IllegalStateException If the process is already started or running.
    */
   public void start() throws InterruptedException {
+    LOGGER.trace("Attempting to start process executor...");
     if (startLock.tryLock()) {
       try {
         if (runLock.tryLock()) {
           try {
+            LOGGER.trace("Starting process executor...");
             threadPool.execute(() -> {
               runLock.lock();
               try {
@@ -79,13 +81,14 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
             runLock.unlock();
           }
           startupSemaphore.acquire(1);
+          LOGGER.trace("Process executor started up and running");
           return;
         }
       } finally {
         startLock.unlock();
       }
     }
-    throw new IllegalStateException(PROCESS_EXECUTOR_ALREADY_STARTING_OR_RUNNING_MESSAGE);
+    throw new IllegalStateException(PROCESS_EXECUTOR_ALREADY_STARTED_OR_RUNNING_MESSAGE);
   }
 
   /**
@@ -94,13 +97,19 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
    * @throws InterruptedException If the thread is interrupted while waiting for the process executor to stop running.
    */
   public void waitFor() throws InterruptedException {
+    LOGGER.trace("Waiting for process executor to stop running");
     startLock.lockInterruptibly();
     try {
       runLock.lockInterruptibly();
+      LOGGER.trace("Process executor not running");
       runLock.unlock();
     } finally {
       startLock.unlock();
     }
+  }
+
+  @Override
+  protected void executeAdditionalChildThreads() {
   }
 
   @Override
@@ -114,29 +123,35 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
 
   @Override
   public void run() {
+    LOGGER.trace("Attempting to run process executor...");
     if (startLock.tryLock()) {
       try {
         if (runLock.tryLock()) {
           try {
+            LOGGER.trace("Running process executor...");
             super.run();
             return;
           } finally {
             startupSemaphore.drainPermits();
             runLock.unlock();
+            LOGGER.trace("Process executor finished running");
           }
         }
       } finally {
         startLock.unlock();
       }
     }
-    throw new IllegalStateException(PROCESS_EXECUTOR_ALREADY_STARTING_OR_RUNNING_MESSAGE);
+    throw new IllegalStateException(PROCESS_EXECUTOR_ALREADY_STARTED_OR_RUNNING_MESSAGE);
   }
 
   @Override
   public void close() throws Exception {
+    LOGGER.trace("Closing process executor...");
     terminate();
+    LOGGER.trace("Shutting down thread pool...");
     threadPool.shutdown();
     threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+    LOGGER.trace("Process executor closed");
   }
 
 }

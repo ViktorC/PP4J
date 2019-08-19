@@ -59,6 +59,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   protected final Lock executeLock;
   protected final Object stateLock;
   protected final AtomicInteger numOfChildThreads;
+  protected final Semaphore initSemaphore;
   protected final Semaphore terminationSemaphore;
 
   private Process process;
@@ -89,6 +90,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     executeLock = new ReentrantLock(true);
     stateLock = new Object();
     numOfChildThreads = new AtomicInteger();
+    initSemaphore = new Semaphore(0);
     terminationSemaphore = new Semaphore(0);
   }
 
@@ -163,8 +165,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * @param error Whether it is the standard error or the standard out stream of the process.
    */
   private void readStreamAndProcessOutput(BufferedReader reader, boolean error) {
-    numOfChildThreads.incrementAndGet();
-    LOGGER.trace("Starting standard {} stream listener...", getStreamName(error));
+    LOGGER.trace("Starting standard {} stream listener thread...", getStreamName(error));
+    initSemaphore.release();
     try {
       String line;
       while ((line = reader.readLine()) != null) {
@@ -178,8 +180,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       LOGGER.trace("Error while reading from stream and/or processing output", e);
       terminateForcibly();
     } finally {
-      LOGGER.trace("Stopping listening to standard {} stream", getStreamName(error));
       terminationSemaphore.release();
+      LOGGER.trace("Standard {} stream listener thread stopped", getStreamName(error));
     }
   }
 
@@ -235,8 +237,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * @param keepAliveTime The number of milliseconds of idleness after which the process is to be terminated.
    */
   private void timeIdlenessAndTerminateProcess(long keepAliveTime) {
-    numOfChildThreads.incrementAndGet();
-    LOGGER.trace("Starting idle process terminator...");
+    LOGGER.trace("Starting idle process terminator thread...");
+    initSemaphore.release();
     try {
       synchronized (stateLock) {
         while (isAlive()) {
@@ -251,9 +253,32 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       LOGGER.trace("Error while timing idleness and/or terminating process", e);
       terminateForcibly();
     } finally {
-      LOGGER.trace("Stopping idleness timer");
       terminationSemaphore.release();
+      LOGGER.trace("Idle process terminator thread stopped");
     }
+  }
+
+  /**
+   * Executes the child threads in the process executors thread pool and waits for them to start running.
+   *
+   * @throws InterruptedException If the thread is interrupted while waiting for the child threads to start running.
+   */
+  private void startUpChildThreads() throws InterruptedException {
+    LOGGER.trace("Executing core child threads...");
+    threadPool.execute(() -> readStreamAndProcessOutput(stdOutReader, false));
+    numOfChildThreads.incrementAndGet();
+    threadPool.execute(() -> readStreamAndProcessOutput(stdErrReader, true));
+    numOfChildThreads.incrementAndGet();
+    Optional<Long> keepAliveTime = manager.getKeepAliveTime();
+    if (keepAliveTime.isPresent()) {
+      threadPool.execute(() -> timeIdlenessAndTerminateProcess(keepAliveTime.get()));
+      numOfChildThreads.incrementAndGet();
+    }
+    LOGGER.trace("Executing additional child threads...");
+    executeAdditionalChildThreads();
+    LOGGER.trace("Waiting for child threads to start running...");
+    initSemaphore.acquire(numOfChildThreads.get());
+    LOGGER.trace("Child threads running");
   }
 
   /**
@@ -307,6 +332,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     try {
       synchronized (stateLock) {
         numOfChildThreads.set(0);
+        initSemaphore.drainPermits();
         terminationSemaphore.drainPermits();
         Charset charset = manager.getEncoding();
         process = manager.start();
@@ -315,9 +341,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), charset));
         stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream(), charset));
         stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), charset));
-        threadPool.execute(() -> readStreamAndProcessOutput(stdOutReader, false));
-        threadPool.execute(() -> readStreamAndProcessOutput(stdErrReader, true));
-        manager.getKeepAliveTime().ifPresent(keepAliveTime -> threadPool.execute(() -> timeIdlenessAndTerminateProcess(keepAliveTime)));
+        startUpChildThreads();
         waitForProcessStartup();
         executeInitialSubmission();
         LOGGER.trace("Invoking start-up call-back methods...");
@@ -352,7 +376,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * @param returnCode The return code of the process.
    */
   private void tearDownExecutor(int returnCode) {
-    LOGGER.trace("Tearing down executor");
+    LOGGER.trace("Tearing down executor...");
     synchronized (stateLock) {
       terminateForcibly();
       killed = false;
@@ -361,7 +385,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       running = false;
       process = null;
       stateLock.notifyAll();
-      LOGGER.trace("Invoking termination call-back methods");
+      LOGGER.trace("Invoking termination call-back methods...");
       manager.onTermination(returnCode);
       onExecutorTermination();
     }
@@ -369,7 +393,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     closeStream(stdInWriter);
     closeStream(stdOutReader);
     closeStream(stdErrReader);
-    LOGGER.trace("Waiting for child threads to terminate");
+    LOGGER.trace("Waiting for child threads to terminate...");
     try {
       terminationSemaphore.acquire(numOfChildThreads.get());
     } catch (InterruptedException e) {
@@ -439,6 +463,12 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     LOGGER.trace("Submission {} executed", submission);
     submission.onFinishedExecution();
   }
+
+  /**
+   * A method called after submitting the core child threads to the process executor's thread pool and before blocking the main thread of
+   * the executor to wait for the child threads to start running. It provides an opportunity to submit additional child threads.
+   */
+  protected abstract void executeAdditionalChildThreads();
 
   /**
    * A method called after the startup of the process and the set up of the executor.
