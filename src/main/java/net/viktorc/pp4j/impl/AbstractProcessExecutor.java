@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
@@ -58,9 +60,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   protected final Lock runLock;
   protected final Lock executeLock;
   protected final Object stateLock;
-  protected final AtomicInteger numOfChildThreads;
-  protected final Semaphore initSemaphore;
-  protected final Semaphore terminationSemaphore;
+
+  private final AtomicInteger numOfChildThreads;
+  private final Semaphore initSemaphore;
+  private final Semaphore terminationSemaphore;
 
   private Process process;
   private BufferedWriter stdInWriter;
@@ -92,16 +95,6 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     numOfChildThreads = new AtomicInteger();
     initSemaphore = new Semaphore(0);
     terminationSemaphore = new Semaphore(0);
-  }
-
-  /**
-   * Returns the name of the standard stream based on the provided boolean parameter.
-   *
-   * @param error Whether the stream is the standard error stream.
-   * @return The name of the stream.
-   */
-  private static String getStreamName(boolean error) {
-    return error ? "error" : "out";
   }
 
   /**
@@ -149,7 +142,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void processOutput(String line, boolean error) {
     synchronized (stateLock) {
-      LOGGER.trace("Output \"{}\" printed to standard {} stream", line, getStreamName(error));
+      LOGGER.trace("Output \"{}\" printed to standard {} stream", line, error ? "error" : "out");
       if (!startedUp) {
         processStartupOutput(line, error);
       } else if (command != null && !commandCompleted) {
@@ -163,25 +156,16 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    *
    * @param reader The buffered reader to use to listen to the steam.
    * @param error Whether it is the standard error or the standard out stream of the process.
+   * @throws IOException If there is an error while reading from the stream.
    */
-  private void readStreamAndProcessOutput(BufferedReader reader, boolean error) {
-    LOGGER.trace("Starting standard {} stream listener thread...", getStreamName(error));
-    initSemaphore.release();
-    try {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        line = line.trim();
-        if (line.isEmpty()) {
-          continue;
-        }
-        processOutput(line, error);
+  private void readStreamAndProcessOutput(BufferedReader reader, boolean error) throws IOException {
+    String line;
+    while ((line = reader.readLine()) != null) {
+      line = line.trim();
+      if (line.isEmpty()) {
+        continue;
       }
-    } catch (Exception e) {
-      LOGGER.trace("Error while reading from stream and/or processing output", e);
-      terminateForcibly();
-    } finally {
-      terminationSemaphore.release();
-      LOGGER.trace("Standard {} stream listener thread stopped", getStreamName(error));
+      processOutput(line, error);
     }
   }
 
@@ -235,47 +219,59 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * Keeps measuring the time spent in an idle state and terminates the process once this time reaches the specified amount.
    *
    * @param keepAliveTime The number of milliseconds of idleness after which the process is to be terminated.
+   * @throws InterruptedException If the thread is interrupted while waiting for the process to go idle or while waiting for process to
+   * exceed itss maximum allowed duration of idleness.
    */
-  private void timeIdlenessAndTerminateProcess(long keepAliveTime) {
-    LOGGER.trace("Starting idle process terminator thread...");
-    initSemaphore.release();
-    try {
-      synchronized (stateLock) {
-        while (isAlive()) {
-          waitForIdleness();
-          if (isAlive()) {
-            waitKeepAliveTime(keepAliveTime);
-            terminateIdleProcessIfTimedOut();
-          }
+  private void timeIdlenessAndTerminateProcess(long keepAliveTime) throws InterruptedException {
+    synchronized (stateLock) {
+      while (isAlive()) {
+        waitForIdleness();
+        if (isAlive()) {
+          waitKeepAliveTime(keepAliveTime);
+          terminateIdleProcessIfTimedOut();
         }
       }
-    } catch (Exception e) {
-      LOGGER.trace("Error while timing idleness and/or terminating process", e);
-      terminateForcibly();
-    } finally {
-      terminationSemaphore.release();
-      LOGGER.trace("Idle process terminator thread stopped");
     }
   }
 
   /**
-   * Executes the child threads in the process executors thread pool and waits for them to start running.
+   * It launches the specified runnable in the process executor's thread pool and handles the initialization and termination semaphores.
+   *
+   * @param runnable The child thread to run.
+   * @param threadName The name of the child thread.
+   */
+  private void startChildThread(ThrowingRunnable runnable, String threadName) {
+    threadPool.execute(() -> {
+      LOGGER.trace("Starting {} thread...", threadName);
+      initSemaphore.release();
+      try {
+        runnable.run();
+      } catch (Throwable e) {
+        LOGGER.trace(String.format("Error while running %s thread", threadName), e);
+        terminateForcibly();
+      } finally {
+        terminationSemaphore.release();
+        LOGGER.trace("The {} thread stopped", threadName);
+      }
+    });
+    numOfChildThreads.incrementAndGet();
+  }
+
+  /**
+   * Launches the child threads in the process executor's thread pool and waits for them to start running.
    *
    * @throws InterruptedException If the thread is interrupted while waiting for the child threads to start running.
    */
-  private void startUpChildThreads() throws InterruptedException {
+  private void startAndWaitForChildThreads() throws InterruptedException {
     LOGGER.trace("Executing core child threads...");
-    threadPool.execute(() -> readStreamAndProcessOutput(stdOutReader, false));
-    numOfChildThreads.incrementAndGet();
-    threadPool.execute(() -> readStreamAndProcessOutput(stdErrReader, true));
-    numOfChildThreads.incrementAndGet();
-    Optional<Long> keepAliveTime = manager.getKeepAliveTime();
-    if (keepAliveTime.isPresent()) {
-      threadPool.execute(() -> timeIdlenessAndTerminateProcess(keepAliveTime.get()));
-      numOfChildThreads.incrementAndGet();
-    }
+    startChildThread(() -> readStreamAndProcessOutput(stdOutReader, false), "standard out listener");
+    startChildThread(() -> readStreamAndProcessOutput(stdErrReader, true), "standard error listener");
+    manager.getKeepAliveTime()
+        .ifPresent(keepAliveTime -> startChildThread(() -> timeIdlenessAndTerminateProcess(keepAliveTime), "idle process terminator"));
     LOGGER.trace("Executing additional child threads...");
-    executeAdditionalChildThreads();
+    for (Entry<String, ThrowingRunnable> entry : getAdditionalChildThreads().entrySet()) {
+      startChildThread(entry.getValue(), entry.getKey());
+    }
     LOGGER.trace("Waiting for child threads to start running...");
     initSemaphore.acquire(numOfChildThreads.get());
     LOGGER.trace("Child threads running");
@@ -341,7 +337,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         stdInWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), charset));
         stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream(), charset));
         stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), charset));
-        startUpChildThreads();
+        startAndWaitForChildThreads();
         waitForProcessStartup();
         executeInitialSubmission();
         LOGGER.trace("Invoking start-up call-back methods...");
@@ -465,10 +461,12 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   }
 
   /**
-   * A method called after submitting the core child threads to the process executor's thread pool and before blocking the main thread of
-   * the executor to wait for the child threads to start running. It provides an opportunity to submit additional child threads.
+   * Returns a map of additional child threads to run where the keys are the names of the child threads and the values are the
+   * runnable tasks. If no tasks are to be executed as child threads, it should return an empty map.
+   *
+   * @return A map of child thread tasks.
    */
-  protected abstract void executeAdditionalChildThreads();
+  protected abstract Map<String, ThrowingRunnable> getAdditionalChildThreads();
 
   /**
    * A method called after the startup of the process and the set up of the executor.
@@ -637,6 +635,23 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     protected ProcessException(Exception e) {
       super(e);
     }
+
+  }
+
+  /**
+   * A functional interface for a runnable that may throw checked exceptions and errors.
+   *
+   * @author Viktor Csomor
+   */
+  @FunctionalInterface
+  protected interface ThrowingRunnable {
+
+    /**
+     * Runs a task and may throw an exception or error if an error occurs.
+     *
+     * @throws Throwable If something goes wrong.
+     */
+    void run() throws Throwable;
 
   }
 

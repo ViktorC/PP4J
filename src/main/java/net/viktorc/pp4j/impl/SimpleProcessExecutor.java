@@ -15,6 +15,8 @@
  */
 package net.viktorc.pp4j.impl;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -109,7 +111,8 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
   }
 
   @Override
-  protected void executeAdditionalChildThreads() {
+  protected Map<String, ThrowingRunnable> getAdditionalChildThreads() {
+    return Collections.emptyMap();
   }
 
   @Override

@@ -16,7 +16,9 @@
 package net.viktorc.pp4j.impl;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.BlockingDeque;
@@ -710,8 +712,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
      * Waits on the blocking queue of submissions executing available ones one at a time.
      */
     void takeAndExecuteSubmissions() {
-      LOGGER.trace("Starting submission executor thread...");
-      initSemaphore.release();
       synchronized (stateLock) {
         submissionThread = Thread.currentThread();
       }
@@ -723,15 +723,12 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         synchronized (stateLock) {
           submissionThread = null;
         }
-        terminationSemaphore.release();
-        LOGGER.trace("Submission executor thread stopped");
       }
     }
 
     @Override
-    protected void executeAdditionalChildThreads() {
-      threadPool.execute(this::takeAndExecuteSubmissions);
-      numOfChildThreads.incrementAndGet();
+    protected Map<String, ThrowingRunnable> getAdditionalChildThreads() {
+      return Collections.singletonMap("submission executor", this::takeAndExecuteSubmissions);
     }
 
     @Override
