@@ -36,8 +36,8 @@ import org.slf4j.LoggerFactory;
  */
 public class SimpleProcessExecutor extends AbstractProcessExecutor implements AutoCloseable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleProcessExecutor.class);
   private static final String PROCESS_EXECUTOR_ALREADY_STARTED_OR_RUNNING_MESSAGE = "Process executor already started or running";
+  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleProcessExecutor.class);
 
   private final Lock startLock;
   private final Semaphore startupSemaphore;
