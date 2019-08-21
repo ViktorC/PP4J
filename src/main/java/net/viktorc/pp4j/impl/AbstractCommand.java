@@ -36,8 +36,12 @@ public abstract class AbstractCommand implements Command {
    * Constructs an instance holding the specified instruction.
    *
    * @param instruction The instruction to send to the process' standard in as the command.
+   * @throws IllegalArgumentException If the instruction is <code>null</code>.
    */
   protected AbstractCommand(String instruction) {
+    if (instruction == null) {
+      throw new IllegalArgumentException("The instruction cannot be null");
+    }
     this.instruction = instruction;
     stdOutLines = new ArrayList<>();
     stdErrLines = new ArrayList<>();

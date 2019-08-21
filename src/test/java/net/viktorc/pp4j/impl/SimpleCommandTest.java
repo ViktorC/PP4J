@@ -27,20 +27,26 @@ public class SimpleCommandTest extends TestCase {
 
   @Test
   public void testGeneratesOutputFalseWhenNoCompletionPredicatesDefined() {
-    SimpleCommand command = new SimpleCommand(null);
+    SimpleCommand command = new SimpleCommand("");
     Assert.assertFalse(command.generatesOutput());
   }
 
   @Test
   public void testGeneratesOutputTrueWhenCompletionPredicatesDefined() {
-    SimpleCommand command = new SimpleCommand(null, (c, o) -> true, (c, o) -> false);
+    SimpleCommand command = new SimpleCommand("", (c, o) -> true, (c, o) -> false);
     Assert.assertTrue(command.generatesOutput());
+  }
+
+  @Test
+  public void testThrowsExceptionWhenInstructionNull() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleCommand(null);
   }
 
   @Test
   public void testThrowsExceptionWhenPredicateNull() {
     exceptionRule.expect(IllegalArgumentException.class);
-    new SimpleCommand(null, (c, o) -> true, null);
+    new SimpleCommand("", (c, o) -> true, null);
   }
 
 }

@@ -37,6 +37,7 @@ public class SimpleCommand extends AbstractCommand {
    * determines when the command is to be considered processed.
    * @param isCompletedStdErr The predicate that allows for the processing of the process' standard error output in response to the command and
    * determines when the command is to be considered processed.
+   * @throws IllegalArgumentException If either of the two predicates is <code>null</code>.
    */
   public SimpleCommand(String instruction, CommandCompletionPredicate isCompletedStdOut, CommandCompletionPredicate isCompletedStdErr) {
     super(instruction);

@@ -523,7 +523,7 @@ public class PPEIntegrationTest extends TestCase {
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 0, false, 0, false, true, false,
         0, 4995, 5100));
     exceptionRule.expect(RejectedExecutionException.class);
-    pool.submit(new SimpleSubmission(new SimpleCommand(null, null, null)), false);
+    pool.submit(new SimpleSubmission(new SimpleCommand("")), false);
     pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
   }
 
