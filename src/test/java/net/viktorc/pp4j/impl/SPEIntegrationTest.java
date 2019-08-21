@@ -22,7 +22,7 @@ import org.junit.Test;
 /**
  * An integration test class for {@link SimpleProcessExecutor}.
  *
- * @author Viktor
+ * @author Viktor Csomor
  */
 public class SPEIntegrationTest extends TestCase {
 
