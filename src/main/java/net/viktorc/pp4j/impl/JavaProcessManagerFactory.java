@@ -40,8 +40,8 @@ public class JavaProcessManagerFactory<T extends Runnable & Serializable> implem
   private final Long keepAliveTime;
 
   /**
-   * Constructs an instance based on the specified JVM config, <code>keepAliveTime</code>, initiation task, and wrap-up task which are
-   * used for the creation of all processes of the pool.
+   * Constructs an instance based on the specified JVM config, <code>keepAliveTime</code>, initialization task, and wrap-up task which are
+   * used for the for the management of all Java processes of the pool.
    *
    * @param config The JVM config for starting the Java process.
    * @param initTask The task to execute in each process on startup, before the process starts accepting submissions. If it is
@@ -77,13 +77,25 @@ public class JavaProcessManagerFactory<T extends Runnable & Serializable> implem
   }
 
   /**
-   * Constructs an instance based on the specified JVM config which is used for the creation of all processes of the pool.
+   * Constructs an instance based on the specified JVM config and <code>keepAliveTime</code> which are used for the management of all Java
+   * processes of the pool.
+   *
+   * @param config The JVM config for starting the Java process.
+   * @param keepAliveTime The number of milliseconds after which idle processes are terminated.
+   * @throws IllegalArgumentException If the <code>config</code> is <code>null</code> or contains invalid values.
+   */
+  public JavaProcessManagerFactory(JavaProcessConfig config, Long keepAliveTime) {
+    this(config, null, null, keepAliveTime);
+  }
+
+  /**
+   * Constructs an instance based on the specified JVM config which is used for the creation of all Java processes of the pool.
    *
    * @param config The JVM config for starting the Java process.
    * @throws IllegalArgumentException If the <code>config</code> is <code>null</code> or contains invalid values.
    */
   public JavaProcessManagerFactory(JavaProcessConfig config) {
-    this(config, null, null, null);
+    this(config, null);
   }
 
   /**
