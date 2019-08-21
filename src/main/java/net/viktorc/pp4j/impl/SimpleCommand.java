@@ -40,6 +40,9 @@ public class SimpleCommand extends AbstractCommand {
    */
   public SimpleCommand(String instruction, CommandCompletionPredicate isCompletedStdOut, CommandCompletionPredicate isCompletedStdErr) {
     super(instruction);
+    if (isCompletedStdOut == null || isCompletedStdErr == null) {
+      throw new IllegalArgumentException("Command completion predicate cannot be null");
+    }
     this.isCompletedStdOut = isCompletedStdOut;
     this.isCompletedStdErr = isCompletedStdErr;
     generatesOutput = true;
