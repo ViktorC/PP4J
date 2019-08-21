@@ -442,6 +442,17 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
 
     /**
+     * Returns whether the submission has been fully executed.
+     *
+     * @return Whether submission has been processed.
+     */
+    boolean isProcessed() {
+      synchronized (lock) {
+        return processed;
+      }
+    }
+
+    /**
      * Sets the thread that is executing the submission.
      *
      * @param t The thread that executes the submission.
@@ -449,6 +460,17 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     void setThread(Thread t) {
       synchronized (lock) {
         thread = t;
+      }
+    }
+
+    /**
+     * Returns the exception thrown during the execution of the submission if there was one.
+     *
+     * @return The exception thrown during the execution of the submission or <code>null</code> if there was not one.
+     */
+    Exception getException() {
+      synchronized (lock) {
+        return exception;
       }
     }
 
@@ -645,18 +667,17 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
      * Updates the process pool and its submission queue based on the outcome of the attempt to execute the submission.
      *
      * @param submission The submission on which the attempt was made or null if no submission was retrieved.
-     * @param submissionDone Whether the submission can be considered completed, even if that is due to cancellation or a fatal error.
      */
-    void updateSubmissionQueue(InternalSubmission<?> submission, boolean submissionDone) {
+    void updateSubmissionQueue(InternalSubmission<?> submission) {
       if (submission != null) {
         synchronized (mainLock) {
-          if (submissionDone) {
+          if (submission.isProcessed() || submission.isCancelled() || submission.getException() != null) {
             numOfSubmissions--;
-            LOGGER.debug(String.format("Submission %s processed; delay: %.3f; execution time: %.3f.%n%s",
-                submission,
-                (submission.submittedTime - submission.receivedTime) / 1000000000d,
-                (submission.processedTime - submission.submittedTime) / 1000000000d,
-                getPoolStats()));
+            LOGGER.debug(String.format("Submission %s processed%s", submission,
+                submission.isProcessed() ? String.format(" - delay: %.3f; execution time: %.3f",
+                    (submission.submittedTime - submission.receivedTime) / 1000000000d,
+                    (submission.processedTime - submission.submittedTime) / 1000000000d) : ""));
+            LOGGER.debug(getPoolStats());
             // If the pool is shutdown and there are no more submissions left, signal it.
             if (shutdown && numOfSubmissions == 0) {
               mainLock.notifyAll();
@@ -678,7 +699,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
      */
     void waitForAndExecuteAvailableSubmission() {
       InternalSubmission<?> submission;
-      boolean submissionDone = false;
       try {
         LOGGER.trace("Waiting for process executor to be ready for submission execution...");
         executeLock.lockInterruptibly();
@@ -692,19 +712,19 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       }
       try {
         submission.setThread(submissionThread);
-        submissionDone = !submission.isCancelled() && tryExecute(submission, submission.terminateProcessAfterwards);
+        if (!submission.isCancelled()) {
+          tryExecute(submission, submission.terminateProcessAfterwards);
+        }
       } catch (FailedCommandException e) {
         LOGGER.trace("Exception while executing submission", e);
         submission.setException(e);
-        submissionDone = true;
       } catch (DisruptedExecutionException e) {
         // The submission is not assumed to be at fault.
       } finally {
         if (submission.isCancelled()) {
           LOGGER.trace("Submission cancelled");
-          submissionDone = true;
         }
-        updateSubmissionQueue(submission, submissionDone);
+        updateSubmissionQueue(submission);
       }
     }
 
