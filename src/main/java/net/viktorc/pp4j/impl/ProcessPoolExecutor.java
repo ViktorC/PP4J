@@ -769,7 +769,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
 
     @Override
     public String toString() {
-      return String.format("%s-intProcExecutor@%s", ProcessPoolExecutor.this, Integer.toHexString(hashCode()));
+      return String.format("%s-internalProcessExecutor@%s", ProcessPoolExecutor.this, Integer.toHexString(hashCode()));
     }
 
   }
