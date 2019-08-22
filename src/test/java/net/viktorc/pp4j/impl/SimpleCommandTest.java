@@ -15,6 +15,8 @@
  */
 package net.viktorc.pp4j.impl;
 
+import java.util.List;
+import net.viktorc.pp4j.api.FailedCommandException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -47,6 +49,47 @@ public class SimpleCommandTest extends TestCase {
   public void testThrowsExceptionWhenPredicateNull() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleCommand("", (c, o) -> true, null);
+  }
+
+  @Test
+  public void testIsCompletedThrowsExceptionWhenStdErrPredicateNotDefined() throws FailedCommandException {
+    SimpleCommand command = new SimpleCommand("", (c, o) -> true);
+    exceptionRule.expect(FailedCommandException.class);
+    command.isCompleted("", true);
+  }
+
+  @Test
+  public void testIsCompletedReturnsTrueIfPredicateDoes() throws FailedCommandException {
+    SimpleCommand command = new SimpleCommand("", (c, o) -> "done".equals(o), (c, o) -> "error".equals(o));
+    Assert.assertFalse(command.isCompleted("error", false));
+    Assert.assertFalse(command.isCompleted("", false));
+    Assert.assertTrue(command.isCompleted("done", false));
+    Assert.assertFalse(command.isCompleted("done", true));
+    Assert.assertFalse(command.isCompleted("", true));
+    Assert.assertTrue(command.isCompleted("error", true));
+  }
+
+  @Test
+  public void testSavesProcessOutputCorrectly() throws FailedCommandException {
+    SimpleCommand command = new SimpleCommand("", (c, o) -> true, (c, o) -> true);
+    command.isCompleted("1", false);
+    command.isCompleted("dog", true);
+    command.isCompleted("2", false);
+    command.isCompleted("cat", false);
+    command.isCompleted("3", true);
+    List<String> stdOutLines = command.getStandardOutLines();
+    List<String> stdErrLines = command.getStandardErrLines();
+    String jointStdOutLines = command.getJointStandardOutLines();
+    String jointStdErrLines = command.getJointStandardErrLines();
+    Assert.assertEquals(3, stdOutLines.size());
+    Assert.assertEquals(2, stdErrLines.size());
+    Assert.assertEquals("1", stdOutLines.get(0));
+    Assert.assertEquals("2", stdOutLines.get(1));
+    Assert.assertEquals("cat", stdOutLines.get(2));
+    Assert.assertEquals("dog", stdErrLines.get(0));
+    Assert.assertEquals("3", stdErrLines.get(1));
+    Assert.assertEquals(String.format("1%n2%ncat"), jointStdOutLines);
+    Assert.assertEquals(String.format("dog%n3"), jointStdErrLines);
   }
 
 }
