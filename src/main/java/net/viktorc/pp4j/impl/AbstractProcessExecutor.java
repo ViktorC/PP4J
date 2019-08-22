@@ -242,7 +242,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void startChildThread(ThrowingRunnable runnable, String threadName) {
     threadPool.execute(() -> {
-      LOGGER.trace("Starting {} thread...", threadName);
+      LOGGER.trace("Starting {} thread of process executor {}...", threadName, this);
       initSemaphore.release();
       try {
         runnable.run();
@@ -251,7 +251,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         terminateForcibly();
       } finally {
         terminationSemaphore.release();
-        LOGGER.trace("The {} thread stopped", threadName);
+        LOGGER.trace("Process executor {}'s {} thread stopped", this, threadName);
       }
     });
     numOfChildThreads.incrementAndGet();
