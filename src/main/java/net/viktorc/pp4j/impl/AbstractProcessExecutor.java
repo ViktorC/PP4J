@@ -27,7 +27,6 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import net.viktorc.pp4j.api.Command;
@@ -61,7 +60,6 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   protected final Lock executeLock;
   protected final Object stateLock;
 
-  private final AtomicInteger numOfChildThreads;
   private final Semaphore initSemaphore;
   private final Semaphore terminationSemaphore;
 
@@ -76,6 +74,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private boolean startedUp;
   private boolean idle;
   private boolean killed;
+  private int numOfChildThreads;
 
   /**
    * Constructs an executor for the specified process using <code>threadPool</code> to provide the threads required for listening to the
@@ -92,7 +91,6 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     runLock = new ReentrantLock(true);
     executeLock = new ReentrantLock(true);
     stateLock = new Object();
-    numOfChildThreads = new AtomicInteger();
     initSemaphore = new Semaphore(0);
     terminationSemaphore = new Semaphore(0);
   }
@@ -254,7 +252,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         LOGGER.trace("Process executor {}'s {} thread stopped", this, threadName);
       }
     });
-    numOfChildThreads.incrementAndGet();
+    numOfChildThreads++;
   }
 
   /**
@@ -273,7 +271,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       startChildThread(entry.getValue(), entry.getKey());
     }
     LOGGER.trace("Waiting for child threads to start running...");
-    initSemaphore.acquire(numOfChildThreads.get());
+    initSemaphore.acquire(numOfChildThreads);
     LOGGER.trace("Child threads running");
   }
 
@@ -327,7 +325,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     executeLock.lock();
     try {
       synchronized (stateLock) {
-        numOfChildThreads.set(0);
+        numOfChildThreads = 0;
         initSemaphore.drainPermits();
         terminationSemaphore.drainPermits();
         Charset charset = manager.getEncoding();
@@ -391,7 +389,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     closeStream(stdErrReader);
     LOGGER.trace("Waiting for child threads to terminate...");
     try {
-      terminationSemaphore.acquire(numOfChildThreads.get());
+      terminationSemaphore.acquire(numOfChildThreads);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       LOGGER.trace(e.getMessage(), e);
