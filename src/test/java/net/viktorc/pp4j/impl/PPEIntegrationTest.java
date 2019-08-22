@@ -185,7 +185,7 @@ public class PPEIntegrationTest extends TestCase {
    * @param index The index of the submission. Only the element at this index is to be updated in <code>times</code>.
    * @return The submission.
    */
-  private static SimpleSubmission createSubmission(int[] procTimes, boolean throwExecutionException, List<Long> times, int index) {
+  private static SimpleSubmission<?> createSubmission(int[] procTimes, boolean throwExecutionException, List<Long> times, int index) {
     List<Command> commands = null;
     if (procTimes != null) {
       commands = new ArrayList<>();
@@ -193,7 +193,7 @@ public class PPEIntegrationTest extends TestCase {
         commands.add(createCommand(procTime, throwExecutionException));
       }
     }
-    return new SimpleSubmission(commands) {
+    return new SimpleSubmission<Object>(commands) {
 
       @Override
       public void onFinishedExecution() {
@@ -523,7 +523,7 @@ public class PPEIntegrationTest extends TestCase {
     Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 0, false, 0, false, true, false,
         0, 4995, 5100));
     exceptionRule.expect(RejectedExecutionException.class);
-    pool.submit(new SimpleSubmission(new SimpleCommand("")), false);
+    pool.submit(new SimpleSubmission<>(new SimpleCommand("")), false);
     pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
   }
 
@@ -646,7 +646,7 @@ public class PPEIntegrationTest extends TestCase {
     try {
       SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o));
       long start = System.currentTimeMillis();
-      pool.execute(new SimpleSubmission(command));
+      pool.execute(new SimpleSubmission<>(command));
       long time = System.currentTimeMillis() - start;
       boolean success = time > 2995 && time < 3050;
       logTime(success, time);

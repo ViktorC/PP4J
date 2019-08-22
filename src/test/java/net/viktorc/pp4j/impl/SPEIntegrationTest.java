@@ -101,7 +101,7 @@ public class SPEIntegrationTest extends TestCase {
   @Test
   public void test07() throws Exception {
     SimpleCommand command = new SimpleCommand("process 3", (c, o) -> "ready".equals(o));
-    SimpleSubmission submission = new SimpleSubmission(command);
+    SimpleSubmission<?> submission = new SimpleSubmission<>(command);
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager())) {
       executor.start();
       executor.execute(submission);

@@ -102,7 +102,7 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
               return false;
             }
           }));
-      return Optional.of(new SimpleSubmission(commands));
+      return Optional.of(new SimpleSubmission<>(commands));
     } catch (IOException e) {
       LOGGER.warn(e.getMessage(), e);
       return Optional.empty();

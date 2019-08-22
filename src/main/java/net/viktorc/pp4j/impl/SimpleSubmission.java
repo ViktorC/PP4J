@@ -22,22 +22,27 @@ import java.util.Objects;
 import net.viktorc.pp4j.api.Command;
 
 /**
- * A simple sub-class of the {@link AbstractSubmission} interface that only allows for the specification of the commands to execute and
- * does not return anything.
+ * A simple sub-class of the {@link AbstractSubmission} interface that allows for the specification of the commands to execute and the
+ * result object to return.
  *
+ * @param <T> The expected type of the result of the submission.
  * @author Viktor Csomor
  */
-public class SimpleSubmission extends AbstractSubmission<Object> {
+public class SimpleSubmission<T> extends AbstractSubmission<T> {
 
   private final List<Command> commands;
 
   /**
-   * Constructs an instance according to the specified parameters.
+   * Constructs a <code>SimpleSubmission</code> instance according to the specified parameters.
    *
    * @param commands A list of commands to execute. It should not contain null references.
+   * @param result The result object that will be returned wrapped in an <code>Optional</code> when invoking the {@link #getResult()}
+   * method of the instance. Keeping the result a parameter of the submission allows for the commands of the submission to have a reference
+   * to the result object before instantiating this submission and therefore, it enables them to modify the result from their method
+   * definitions.
    * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
    */
-  public SimpleSubmission(List<Command> commands) {
+  public SimpleSubmission(List<Command> commands, T result) {
     if (commands == null) {
       throw new IllegalArgumentException("The commands cannot be null.");
     }
@@ -48,16 +53,43 @@ public class SimpleSubmission extends AbstractSubmission<Object> {
       throw new IllegalArgumentException("The commands cannot include null references.");
     }
     this.commands = new ArrayList<>(commands);
+    setResult(result);
   }
 
   /**
-   * Constructs an instance according to the specified parameters.
+   * Constructs a <code>SimpleSubmission</code> instance according to the specified parameters. The submission's {@link #getResult()}
+   * method will always return an empty optional.
+   *
+   * @param commands A list of commands to execute. It should not contain null references.
+   * @throws IllegalArgumentException If the commands are null or empty or contain at least one null reference.
+   */
+  public SimpleSubmission(List<Command> commands) {
+    this(commands, null);
+  }
+
+  /**
+   * Constructs a <code>SimpleSubmission</code> instance according to the specified parameters.
+   *
+   * @param command A command to execute.
+   * @param result The result object that will be returned wrapped in an <code>Optional</code> when invoking the {@link #getResult()}
+   * method of the instance. Keeping the result a parameter of the submission allows for the commands of the submission to have a reference
+   * to the result object before instantiating this submission and therefore, it enables them to modify the result from their method
+   * definitions.
+   * @throws IllegalArgumentException If the command is null.
+   */
+  public SimpleSubmission(Command command, T result) {
+    this(Collections.singletonList(command), result);
+  }
+
+  /**
+   * Constructs a <code>SimpleSubmission</code> instance according to the specified parameters. The submission's {@link #getResult()}
+   * method will always return an empty optional.
    *
    * @param command A command to execute.
    * @throws IllegalArgumentException If the command is null.
    */
   public SimpleSubmission(Command command) {
-    this(Collections.singletonList(command));
+    this(command, null);
   }
 
   @Override

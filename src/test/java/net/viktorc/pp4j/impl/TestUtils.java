@@ -133,8 +133,8 @@ class TestUtils {
       return new SimpleProcessManager(builder,
           keepAliveTime,
           verifyStartup ? (outputLine, error) -> !error && "hi".equals(outputLine) : null,
-          () -> executeInitSubmission ? new SimpleSubmission(new SimpleCommand("start", (c, o) -> "ok".equals(o))) : null,
-          () -> manuallyTerminate ? new SimpleSubmission(new SimpleCommand("stop", (c, o) -> "bye".equals(o))) : null) {
+          () -> executeInitSubmission ? new SimpleSubmission<>(new SimpleCommand("start", (c, o) -> "ok".equals(o))) : null,
+          () -> manuallyTerminate ? new SimpleSubmission<>(new SimpleCommand("stop", (c, o) -> "bye".equals(o))) : null) {
 
         @Override
         public boolean startsUpInstantly() {

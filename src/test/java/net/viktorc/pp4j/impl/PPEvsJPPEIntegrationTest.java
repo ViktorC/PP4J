@@ -151,7 +151,7 @@ public class PPEvsJPPEIntegrationTest extends TestCase {
     ProcessManagerFactory processManagerFactory = new TestProcessManagerFactory();
     ProcessPoolExecutor nativeProcessPool = new ProcessPoolExecutor(processManagerFactory, minSize, maxSize, reserveSize);
     return testProcessPool(nativeProcessPool, submissions, reuse,
-        () -> new SimpleSubmission(new SimpleCommand("process " + taskTime, (c, o) -> "ready".equals(o))));
+        () -> new SimpleSubmission<>(new SimpleCommand("process " + taskTime, (c, o) -> "ready".equals(o))));
   }
 
   /**
