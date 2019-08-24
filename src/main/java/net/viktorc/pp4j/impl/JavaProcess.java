@@ -180,7 +180,7 @@ public class JavaProcess {
      * @param result The optional result.
      * @param error The optional error.
      */
-    private Response(ResponseType type, Object result, Throwable error) {
+    Response(ResponseType type, Object result, Throwable error) {
       this.type = type;
       this.result = result;
       this.error = error;
@@ -192,7 +192,7 @@ public class JavaProcess {
      * @param type The type of the response.
      * @param result The optional result.
      */
-    private Response(ResponseType type, Object result) {
+    Response(ResponseType type, Object result) {
       this(type, result, null);
     }
 
@@ -202,7 +202,7 @@ public class JavaProcess {
      * @param type The type of the response.
      * @param error The optional error.
      */
-    private Response(ResponseType type, Throwable error) {
+    Response(ResponseType type, Throwable error) {
       this(type, null, error);
     }
 
@@ -211,7 +211,7 @@ public class JavaProcess {
      *
      * @param type The type of the response.
      */
-    private Response(ResponseType type) {
+    Response(ResponseType type) {
       this(type, null, null);
     }
 
