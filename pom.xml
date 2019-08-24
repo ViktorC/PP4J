@@ -108,7 +108,6 @@
         <version>3.1.1</version>
         <configuration>
           <noqualifier>all</noqualifier>
-          <additionalparam>${javadoc.opts}</additionalparam>
           <reportOutputDirectory>${basedir}/docs</reportOutputDirectory>
           <destDir>docs</destDir>
         </configuration>
@@ -147,7 +146,6 @@
         <configuration>
           <forkCount>1</forkCount>
           <reuseForks>false</reuseForks>
-          <argLine>${argLine} -Xmx1024m</argLine>
         </configuration>
       </plugin>
       <plugin>
