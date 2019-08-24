@@ -15,10 +15,6 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,9 +28,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.viktorc.pp4j.api.JavaProcessConfig.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessConfig.JVMType;
-import net.viktorc.pp4j.impl.JavaProcess.Request;
-import net.viktorc.pp4j.impl.JavaProcess.Response;
-import net.viktorc.pp4j.impl.JavaProcess.Signal;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -660,44 +653,9 @@ public class JPPEIntegrationTest extends TestCase {
     }
   }
 
-  // Java process testing.
-  @Test
-  public void test25() throws IOException, ClassNotFoundException {
-    PrintStream origOutStream = System.out;
-    String testInput = String.format("%s%n%s%n%s%n%s%n%s%n%s%n",
-        "",
-        JavaObjectCodec.getInstance().encode("test"),
-        JavaObjectCodec.getInstance().encode((Callable<Long> & Serializable) () -> Math.round(Math.E)),
-        JavaObjectCodec.getInstance().encode((Callable<Object> & Serializable) () -> {
-          throw new Exception("test");
-        }),
-        "test",
-        JavaObjectCodec.getInstance().encode(Request.TERMINATE));
-    try (ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ByteArrayInputStream in = new ByteArrayInputStream(testInput.getBytes())) {
-      System.setOut(new PrintStream(out));
-      System.setIn(in);
-      JavaProcess.main(new String[0]);
-      String[] lines = out.toString().split(System.lineSeparator());
-      Assert.assertEquals(5, lines.length);
-      Assert.assertEquals(Signal.READY, JavaObjectCodec.getInstance().decode(lines[0]));
-      Response response1 = (Response) JavaObjectCodec.getInstance().decode(lines[1]);
-      Assert.assertFalse(response1.isError());
-      Assert.assertEquals(3L, response1.getResult());
-      Response response2 = (Response) JavaObjectCodec.getInstance().decode(lines[2]);
-      Assert.assertTrue(response2.isError());
-      Assert.assertEquals("test", ((Throwable) response2.getResult()).getMessage());
-      Response response3 = (Response) JavaObjectCodec.getInstance().decode(lines[3]);
-      Assert.assertTrue(response3.isError());
-      Assert.assertEquals(Signal.TERMINATED, JavaObjectCodec.getInstance().decode(lines[4]));
-    } finally {
-      System.setOut(origOutStream);
-    }
-  }
-
   // Not serializable task testing.
   @Test
-  public void test26() throws InterruptedException {
+  public void test25() throws InterruptedException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -710,7 +668,7 @@ public class JPPEIntegrationTest extends TestCase {
   }
 
   @Test
-  public void test27() throws InterruptedException {
+  public void test26() throws InterruptedException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -723,7 +681,7 @@ public class JPPEIntegrationTest extends TestCase {
   }
 
   @Test
-  public void test28() throws InterruptedException {
+  public void test27() throws InterruptedException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()),
         0, 1, 0);
     try {
@@ -738,7 +696,7 @@ public class JPPEIntegrationTest extends TestCase {
 
   // Startup task testing.
   @Test
-  public void test29() throws InterruptedException, ExecutionException {
+  public void test28() throws InterruptedException, ExecutionException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(),
         (Runnable & Serializable) () -> {
           for (int i = 0; i < 10; i++) {
@@ -756,7 +714,7 @@ public class JPPEIntegrationTest extends TestCase {
 
   // Wrap-up task testing.
   @Test
-  public void test30() throws InterruptedException, ExecutionException {
+  public void test29() throws InterruptedException, ExecutionException {
     JavaProcessPoolExecutor exec = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(),
         null, (Runnable & Serializable) () -> System.out.println("Wrapping up"), null),
         0, 1, 0);

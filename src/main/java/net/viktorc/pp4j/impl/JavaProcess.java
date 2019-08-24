@@ -16,10 +16,12 @@
 package net.viktorc.pp4j.impl;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.Serializable;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -29,65 +31,78 @@ import java.util.concurrent.Callable;
  */
 public class JavaProcess {
 
+  private static boolean exit;
+
   /**
    * The method executed as a separate process. It listens to its standard in for encoded and serialized {@link Callable} instances,
    * which it decodes, deserializes, and executes on receipt. The return value is normally output to its stdout stream in the form of the
    * serialized and encoded return values of the <code>Callable</code> instances. If an exception occurs, it is serialized, encoded, and
-   * output to the stderr stream.
+   * output to the stdout stream as well.
    *
    * @param args They are ignored for now.
    */
   public static void main(String[] args) {
     PrintStream originalOut = System.out;
     try (BufferedReader in = new BufferedReader(new InputStreamReader(System.in, JavaObjectCodec.CHARSET));
-        DummyPrintStream dummyOut = new DummyPrintStream();
-        DummyPrintStream dummyErr = new DummyPrintStream()) {
-      /* As the process' stderr is redirected to the stdout, there is no need for a
-       * reference to this stream; neither should the submissions be able to print to
-       * stdout through the System.err stream. */
+        PrintStream dummyOut = new DummyPrintStream();
+        PrintStream dummyErr = new DummyPrintStream()) {
+      /* As the process' stderr is redirected to the stdout, there is no need for a reference to this stream; neither should the
+       * submissions be able to print to stdout through the System.err stream. */
       redirectStdErr(dummyErr);
       // Send the startup signal.
-      System.out.println(JavaObjectCodec.getInstance().encode(Signal.READY));
-      try {
-        for (;;) {
-          try {
-            String line = in.readLine();
-            if (line == null) {
-              return;
-            }
-            line = line.trim();
-            if (line.isEmpty()) {
-              continue;
-            }
-            Object input = JavaObjectCodec.getInstance().decode(line);
-            if (input == Request.TERMINATE) {
-              System.out.println(JavaObjectCodec.getInstance().encode(Signal.TERMINATED));
-              return;
-            } else if (input instanceof Callable<?>) {
-              Callable<?> c = (Callable<?>) input;
-              /* Try to redirect the out stream to make sure that print
-               * statements and such do not cause the submission to be assumed
-               * done falsely. */
-              redirectStdOut(dummyOut);
-              Object output = c.call();
-              redirectStdOut(originalOut);
-              System.out.println(JavaObjectCodec.getInstance().encode(new Response(false, output)));
-            }
-          } catch (Throwable e) {
-            redirectStdOut(originalOut);
-            System.out.println(JavaObjectCodec.getInstance().encode(new Response(true, e)));
-          }
+      System.out.println(JavaObjectCodec.getInstance().encode(new Response(ResponseType.TASK_SUCCESS)));
+      while (!exit) {
+        String line = in.readLine();
+        if (line == null) {
+          return;
         }
-      } catch (Throwable e) {
-        redirectStdOut(dummyOut);
-        throw e;
+        line = line.trim();
+        if (line.isEmpty()) {
+          continue;
+        }
+        Object input = JavaObjectCodec.getInstance().decode(line);
+        if (input instanceof Callable<?>) {
+          executeTask((Callable<?>) input, originalOut, dummyOut);
+        }
       }
     } catch (Throwable e) {
+      redirectStdOut(originalOut);
       try {
-        System.out.println(JavaObjectCodec.getInstance().encode(new Response(true, e)));
-      } catch (Exception e1) {
-        // Give up all hope.
+        System.out.println(JavaObjectCodec.getInstance().encode(new Response(ResponseType.PROCESS_FAILURE, e)));
+      } catch (IOException ex) {
+        // Not much else left to do.
       }
+    } finally {
+      exit = false;
+    }
+  }
+
+  /**
+   * Invoking this method from within a task results in the main method exiting upon the iteration following the execution of the task.
+   */
+  static void exit() {
+    exit = true;
+  }
+
+  /**
+   * Handles an execution request by executing the task and printing the response containing its result (or the exception if one is
+   * thrown) to the process' standard out stream.
+   *
+   * @param task The task to execute.
+   * @param originalOut The original standard out stream.
+   * @param dummyOut The dummy stream to redirect standard out to before executing the request task.
+   * @throws IOException If an error occurs while encoding the response.
+   */
+  private static void executeTask(Callable<?> task, PrintStream originalOut, PrintStream dummyOut) throws IOException {
+    try {
+      // Redirect the out stream to make sure that messages sent to it from within the task are not treated as responses.
+      redirectStdOut(dummyOut);
+      Object result = task.call();
+      redirectStdOut(originalOut);
+      System.out.println(JavaObjectCodec.getInstance().encode(new Response(ResponseType.TASK_SUCCESS, result)));
+    } catch (Throwable e) {
+      redirectStdOut(originalOut);
+      System.out.println(JavaObjectCodec.getInstance().encode(new Response(ResponseType.TASK_FAILURE, e)));
     }
   }
 
@@ -137,55 +152,94 @@ public class JavaProcess {
   }
 
   /**
-   * An enum representing requests that can be sent to the Java process.
+   * An enum representing types of responses that the Java process can send back to the parent process.
+   *
+   * @author Viktor Csomor
    */
-  public enum Request {
-    TERMINATE
+  public enum ResponseType {
+    TASK_SUCCESS,
+    TASK_FAILURE,
+    PROCESS_FAILURE
   }
 
   /**
-   * An enum representing signals that the Java process can send back to the parent process.
-   */
-  public enum Signal {
-    READY,
-    TERMINATED
-  }
-
-  /**
-   * A simple class to encapsulate the response of the Java process to a task.
+   * A simple class to encapsulate the response of the Java process to a request.
+   *
+   * @author Viktor Csomor
    */
   public static class Response implements Serializable {
 
-    private boolean error;
-    private Object result;
+    private final ResponseType type;
+    private final Object result;
+    private final Throwable error;
 
     /**
-     * Constructs a <code>Response</code> object.
+     * Constructs a <code>Response</code> instance using the specified parameters.
      *
-     * @param error Whether the result is an exception thrown during execution.
-     * @param result The result of the submission.
+     * @param type The type of the response.
+     * @param result The optional result.
+     * @param error The optional error.
      */
-    private Response(boolean error, Object result) {
-      this.error = error;
+    private Response(ResponseType type, Object result, Throwable error) {
+      this.type = type;
       this.result = result;
+      this.error = error;
     }
 
     /**
-     * Returns whether the result is an exception or error thrown during the execution of the task.
+     * Constructs a <code>Response</code> instance using the specified parameters.
      *
-     * @return Whether the result is an instance of {@link Throwable} thrown during the execution of the task.
+     * @param type The type of the response.
+     * @param result The optional result.
      */
-    public boolean isError() {
-      return error;
+    private Response(ResponseType type, Object result) {
+      this(type, result, null);
     }
 
     /**
-     * Returns the result of the task or the {@link Throwable} thrown during the execution of the task.
+     * Constructs a <code>Response</code> instance using the specified parameters.
      *
-     * @return The result of the task.
+     * @param type The type of the response.
+     * @param error The optional error.
      */
-    public Object getResult() {
-      return result;
+    private Response(ResponseType type, Throwable error) {
+      this(type, null, error);
+    }
+
+    /**
+     * Constructs a <code>Response</code> instance without a result or an error.
+     *
+     * @param type The type of the response.
+     */
+    private Response(ResponseType type) {
+      this(type, null, null);
+    }
+
+    /**
+     * Returns the type of the response.
+     *
+     * @return The type of the response.
+     */
+    public ResponseType getType() {
+      return type;
+    }
+
+    /**
+     * Returns the optional task result.
+     *
+     * @return The optional task result.
+     */
+    public Optional<?> getResult() {
+      return Optional.ofNullable(result);
+    }
+
+    /**
+     * Returns the optional <code>Throwable</code>.
+     *
+     * @return The optional error instance caught in the process.
+     */
+    public Optional<Throwable> getError() {
+      return Optional.ofNullable(error);
     }
 
   }

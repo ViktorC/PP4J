@@ -18,11 +18,10 @@ package net.viktorc.pp4j.impl;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
-import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
+import net.viktorc.pp4j.impl.JavaProcess.Response;
+import net.viktorc.pp4j.impl.JavaProcess.ResponseType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +66,13 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
     if (!error) {
       try {
         Object output = JavaObjectCodec.getInstance().decode(outputLine);
-        return output == JavaProcess.Signal.READY;
+        if (output instanceof Response) {
+          Response response = (Response) output;
+          if (response.getType() == ResponseType.PROCESS_FAILURE) {
+            LOGGER.error("Java process error during startup", response.getError().orElse(null));
+          }
+          return response.getType() == ResponseType.TASK_SUCCESS;
+        }
       } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
         LOGGER.trace(e.getMessage(), e);
       }
@@ -85,28 +90,17 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
 
   @Override
   public Optional<Submission<?>> getTerminationSubmission() {
-    List<Command> commands = new ArrayList<>();
-    if (wrapUpTask != null) {
-      Submission<?> wrapUpJavaSubmission = new JavaSubmission<>(wrapUpTask);
-      commands.addAll(wrapUpJavaSubmission.getCommands());
-    }
-    try {
-      String terminationCommand = JavaObjectCodec.getInstance().encode(JavaProcess.Request.TERMINATE);
-      commands.add(new SimpleCommand(terminationCommand,
-          (command, outputLine) -> {
-            try {
-              Object output = JavaObjectCodec.getInstance().decode(outputLine);
-              return output == JavaProcess.Signal.TERMINATED;
-            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
-              LOGGER.trace(e.getMessage(), e);
-              return false;
-            }
-          }));
-      return Optional.of(new SimpleSubmission<>(commands));
-    } catch (IOException e) {
-      LOGGER.warn(e.getMessage(), e);
-      return Optional.empty();
-    }
+    // Avoid having to serialize the enclosing instance.
+    T wrapUpTask = this.wrapUpTask;
+    return Optional.of(new JavaSubmission<>((Runnable & Serializable) () -> {
+      try {
+        if (wrapUpTask != null) {
+          wrapUpTask.run();
+        }
+      } finally {
+        JavaProcess.exit();
+      }
+    }));
   }
 
   @Override

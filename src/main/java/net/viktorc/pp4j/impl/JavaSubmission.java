@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.FailedCommandException;
+import net.viktorc.pp4j.impl.JavaProcess.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,13 +105,20 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
             LOGGER.trace(e.getMessage(), e);
             return false;
           }
-          if (output instanceof JavaProcess.Response) {
-            JavaProcess.Response response = (JavaProcess.Response) output;
-            if (response.isError()) {
-              throw new FailedCommandException(command, (Throwable) response.getResult());
+          if (output instanceof Response) {
+            Response response = (Response) output;
+            switch (response.getType()) {
+              case TASK_SUCCESS:
+                setResult((T) response.getResult().orElse(null));
+                return true;
+              case TASK_FAILURE:
+                throw new FailedCommandException(command, response.getError().orElse(null));
+              case PROCESS_FAILURE:
+                LOGGER.error("Java process error upon task submission", response.getError().orElse(null));
+                return false;
+              default:
+                return false;
             }
-            setResult((T) response.getResult());
-            return true;
           }
           return false;
         },
