@@ -31,7 +31,7 @@ import java.util.concurrent.Callable;
  */
 public class JavaProcess {
 
-  private static boolean exit;
+  private static volatile boolean exit;
 
   /**
    * The method executed as a separate process. It listens to its standard in for encoded and serialized {@link Callable} instances,
