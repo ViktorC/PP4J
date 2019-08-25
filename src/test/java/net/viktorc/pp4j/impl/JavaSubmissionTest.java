@@ -110,6 +110,13 @@ public class JavaSubmissionTest extends TestCase {
   }
 
   @Test
+  public void testCommandIsCompletedReturnsFalseIfNotInstanceOfResponse() throws FailedCommandException, IOException {
+    AtomicInteger atomicInteger = new AtomicInteger();
+    String outputLine = JavaObjectCodec.getInstance().encode(atomicInteger);
+    Assert.assertFalse(noOpJavaSubmissionCommand.isCompleted(outputLine, false));
+  }
+
+  @Test
   public void testCommandIsCompletedReturnsFalseIfLineFromStdErr() throws IOException, FailedCommandException {
     Response response = new Response(ResponseType.TASK_SUCCESS);
     String outputLine = JavaObjectCodec.getInstance().encode(response);
