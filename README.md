@@ -37,8 +37,8 @@ All process pools of PP4J implement the `ProcessExecutorService` interface. The 
 ProcessManagerFactory processManagerFactory = () -> new SimpleProcessManager(new ProcessBuilder("test.exe"),
     60000L,
     (outputLine, error) -> error || "hi".equals(outputLine),
-    () -> new SimpleSubmission(new SimpleCommand("start", (command, outputLine) -> "ok".equals(outputLine))),
-    () -> new SimpleSubmission(new SimpleCommand("stop", (command, outputLine) -> "bye".equals(outputLine))));
+    () -> new SimpleSubmission<>(new SimpleCommand("start", (command, outputLine) -> "ok".equals(outputLine))),
+    () -> new SimpleSubmission<>(new SimpleCommand("stop", (command, outputLine) -> "bye".equals(outputLine))));
 ProcessExecutorService pool = new ProcessPoolExecutor(processManagerFactory, 10, 50, 5);
 ```
 In the example above, a process pool for instances of a program called "test.exe" is created. Every time the pool starts a new process, it waits until the message "hi" is output to the process' standard out, signaling that it has started up, then the pool sends the instruction "start" to the process' standard in. The instruction "start" has the process perform some startup activities before it outputs "ok". Once this message is output to the process' standard out, the pool considers the process ready for submissions. By default, when something is output to the process' standard error stream, a `FailedCommandException` is thrown. This behaviour can be overriden by specifying an additional predicate for the standard error stream as the third argument of the constructor. Throwing a `FailedCommandException` from these predicates or from the `isCompleted` method (when implementing the `Command` interface directly) is indicative of the completion of the command and results in the abortion of the execution of the submission. Whenever the process needs to be terminated (either due to timing out or cancellation after the execution of a submission), the pool tries to terminate the process in an orderly way by sending it the "stop" instruction. If the response to this is "bye", the process is considered terminated. However, if something is printed to the process' standard error stream in response to the "stop" instruction, the process is killed forcibly. As specified by the second argument of the constructor of `AbstractProcessManager`, processes in the pool are terminated after 1 minute of idleness. The pool's minimum size is 10, its maximum size is 50, and its reserve size is 5.
@@ -46,7 +46,7 @@ In the example above, a process pool for instances of a program called "test.exe
 List<Future<?>> futures = new ArrayList<>();
 for (int i = 0; i < 30; i++) {
   Thread.sleep(100);
-  Submission<?> submission = new SimpleSubmission(new SimpleCommand("process 5",
+  Submission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 5",
       (command, outputLine) -> "ready".equals(outputLine)));
   futures.add(pool.submit(submission, true));
 }
@@ -55,30 +55,25 @@ pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 ```
 Once the pool is initialized, it is sent 30 instructions within 3 seconds. The instruction "process 5" has the process sleep for 5 seconds, printing "in progress" to its standard out every second except for the 5th second, when it prints "ready". This final output signals the completion of the execution of the command. The submissions above also result in the termination of the executing processes as denoted by the second, boolean parameter of the `submit` method of the pool. As the pool receives the submissions, it manages its size according to its minimum, maximum, and reserve size parameters. After the execution of the submissions, the pool is shutdown identically in behaviour to Java thread pools.
 
-PP4J also allows for submissions to have returns values. The result of a submission can be set, usually while processing the output of its commands, through the `setResult` method of the `AbstractSubmission` class as shown in the code snippet below. This result can be accessed through the `Future` instance returned by the process pool's `submit` method or directly through invoking the `getResult` method of the submission itself after its execution is completed.
+PP4J also allows for submissions to have return values. The result of a submission can be set, usually while processing the output of its commands, through the `setResult` method of the `AbstractSubmission` class. However, to be able to invoke the `setResult` method of the submission from the command implementations, the `AbstractSubmission` class must be extended and the commands must be defined in the implementation of the `getCommands` method. To make the definition of submissions with a return value simpler, the `SimpleSubmission` class has special constructors that take the result object as a parameter. As shown in the code snippet below, this result parameter can be mutated conveniently in the command definitions without the need for a reference to the submission instance. At last, the final result can be accessed through the `Future` instance returned by the process pool's `submit` method or directly through invoking the `getResult` method of the submission itself after its execution is completed.
 ```java
 ProcessManagerFactory processManagerFactory = () -> new SimpleProcessManager(new ProcessBuilder("bash"));
 ProcessExecutorService pool = new ProcessPoolExecutor(processManagerFactory, 10, 10, 0);
-List<Future<String>> futures = new ArrayList<>();
+List<Future<AtomicReference<String>>> futures = new ArrayList<>();
 for (int i = 0; i < 10; i++) {
-  Submission<String> submission = new AbstractSubmission<String>() {
-
-    @Override
-    public List<Command> getCommands() {
-      return Collections.singletonList(new SimpleCommand("echo user:$USER",
-          (command, outputLine) -> {
-            if (outputLine.startsWith("user:")) {
-              setResult(outputLine.substring(5));
-              return true;
-            }
-            return false;
-          }));
+  AtomicReference<String> result = new AtomicReference<>();
+  Command command = new SimpleCommand("echo user:$USER", (command1, outputLine) -> {
+    if (outputLine.startsWith("user:")) {
+      result.set(outputLine.substring(5));
+      return true;
     }
-  };
+    return false;
+  });
+  Submission<AtomicReference<String>> submission = new SimpleSubmission<>(command, result);
   futures.add(pool.submit(submission));
 }
-for (Future<String> future : futures) {
-  System.out.println(future.get());
+for (Future<AtomicReference<String>> future : futures) {
+  System.out.println(future.get().get());
 }
 pool.shutdown();
 pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -90,8 +85,8 @@ Besides the process pools, PP4J also provides a standard implementation of the `
 ```java
 ProcessManager processManager = new SimpleProcessManager(new ProcessBuilder("cmd.exe"));
 SimpleCommand command = new SimpleCommand("netstat & echo netstat done",
-      (command, outputLine) -> "netstat done".equals(outputLine));
-SimpleSubmission submission = new SimpleSubmission(command);
+    (command1, outputLine) -> "netstat done".equals(outputLine));
+SimpleSubmission<?> submission = new SimpleSubmission<>(command);
 try (SimpleProcessExecutor executor = new SimpleProcessExecutor(processManager)) {
   executor.start();
   executor.execute(submission);
