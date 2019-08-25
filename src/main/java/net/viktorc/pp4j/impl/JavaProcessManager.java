@@ -71,7 +71,7 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
           if (response.getType() == ResponseType.PROCESS_FAILURE) {
             LOGGER.error("Java process error during startup", response.getError().orElse(null));
           }
-          return response.getType() == ResponseType.TASK_SUCCESS;
+          return response.getType() == ResponseType.STARTUP_SUCCESS;
         }
       } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
         LOGGER.trace(e.getMessage(), e);

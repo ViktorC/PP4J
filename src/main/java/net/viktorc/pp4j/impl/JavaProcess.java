@@ -50,7 +50,7 @@ public class JavaProcess {
        * submissions be able to print to stdout through the System.err stream. */
       redirectStdErr(dummyErr);
       // Send the startup signal.
-      System.out.println(JavaObjectCodec.getInstance().encode(new Response(ResponseType.TASK_SUCCESS)));
+      System.out.println(JavaObjectCodec.getInstance().encode(new Response(ResponseType.STARTUP_SUCCESS)));
       while (!exit) {
         String line = in.readLine();
         if (line == null) {
@@ -157,6 +157,7 @@ public class JavaProcess {
    * @author Viktor Csomor
    */
   public enum ResponseType {
+    STARTUP_SUCCESS,
     TASK_SUCCESS,
     TASK_FAILURE,
     PROCESS_FAILURE
