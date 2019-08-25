@@ -61,9 +61,7 @@ public class JavaProcess {
           continue;
         }
         Object input = JavaObjectCodec.getInstance().decode(line);
-        if (input instanceof Callable<?>) {
-          executeTask((Callable<?>) input, originalOut, dummyOut);
-        }
+        executeTask((Callable<?>) input, originalOut, dummyOut);
       }
     } catch (Throwable e) {
       redirectStdOut(originalOut);
