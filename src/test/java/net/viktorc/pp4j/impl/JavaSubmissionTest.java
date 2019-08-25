@@ -28,6 +28,7 @@ import net.viktorc.pp4j.impl.JavaProcess.ResponseType;
 import net.viktorc.pp4j.impl.JavaSubmission.SerializableTask;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -36,6 +37,15 @@ import org.junit.Test;
  * @author Viktor Csomor
  */
 public class JavaSubmissionTest extends TestCase {
+
+  private JavaSubmission<?> noOpJavaSubmission;
+  private Command noOpJavaSubmissionCommand;
+
+  @Before
+  public void setUp() {
+    noOpJavaSubmission = new JavaSubmission<>((Runnable & Serializable) () -> {});
+    noOpJavaSubmissionCommand = noOpJavaSubmission.getCommands().get(0);
+  }
 
   @Test
   public void testThrowsUncheckedIOExceptionIfNotSerializable() {
@@ -96,60 +106,48 @@ public class JavaSubmissionTest extends TestCase {
 
   @Test
   public void testCommandIsCompletedReturnsFalseIfStringNotDecodable() throws FailedCommandException {
-    JavaSubmission<?> javaSubmission = new JavaSubmission<>((Runnable & Serializable) () -> {});
-    Command command = javaSubmission.getCommands().get(0);
-    Assert.assertFalse(command.isCompleted("", false));
+    Assert.assertFalse(noOpJavaSubmissionCommand.isCompleted("", false));
   }
 
   @Test
   public void testCommandIsCompletedReturnsFalseIfLineFromStdErr() throws IOException, FailedCommandException {
-    JavaSubmission<?> javaSubmission = new JavaSubmission<>((Runnable & Serializable) () -> {});
-    Command command = javaSubmission.getCommands().get(0);
     Response response = new Response(ResponseType.TASK_SUCCESS);
     String outputLine = JavaObjectCodec.getInstance().encode(response);
-    Assert.assertFalse(command.isCompleted(outputLine, true));
+    Assert.assertFalse(noOpJavaSubmissionCommand.isCompleted(outputLine, true));
   }
 
   @Test
   public void testCommandIsCompletedReturnsFalseIfResponseProcessFailure() throws IOException, FailedCommandException {
-    JavaSubmission<?> javaSubmission = new JavaSubmission<>((Runnable & Serializable) () -> {});
-    Command command = javaSubmission.getCommands().get(0);
     Response response = new Response(ResponseType.PROCESS_FAILURE);
     String outputLine = JavaObjectCodec.getInstance().encode(response);
-    Assert.assertFalse(command.isCompleted(outputLine, true));
+    Assert.assertFalse(noOpJavaSubmissionCommand.isCompleted(outputLine, true));
   }
 
   @Test
   public void testCommandIsCompletedThrowsFailedCommandExceptionIfResponseTaskFailure() throws IOException, FailedCommandException {
-    JavaSubmission<?> javaSubmission = new JavaSubmission<>((Runnable & Serializable) () -> {});
-    Command command = javaSubmission.getCommands().get(0);
     Response response = new Response(ResponseType.TASK_FAILURE);
     String outputLine = JavaObjectCodec.getInstance().encode(response);
     exceptionRule.expect(FailedCommandException.class);
-    command.isCompleted(outputLine, false);
+    noOpJavaSubmissionCommand.isCompleted(outputLine, false);
   }
 
   @Test
   public void testCommandIsCompletedThrowsFailedCommandExceptionWithCorrectCauseIfResponseTaskFailure() throws IOException,
       FailedCommandException {
-    JavaSubmission<?> javaSubmission = new JavaSubmission<>((Runnable & Serializable) () -> {});
-    Command command = javaSubmission.getCommands().get(0);
     Response response = new Response(ResponseType.TASK_FAILURE, new IllegalArgumentException());
     String outputLine = JavaObjectCodec.getInstance().encode(response);
     exceptionRule.expect(FailedCommandException.class);
     exceptionRule.expectCause(CoreMatchers.isA(IllegalArgumentException.class));
-    command.isCompleted(outputLine, false);
+    noOpJavaSubmissionCommand.isCompleted(outputLine, false);
   }
 
   @Test
   public void testCommandIsCompletedReturnsTrueAndSetsResultIfTaskSuccess() throws IOException, FailedCommandException {
-    JavaSubmission<?> javaSubmission = new JavaSubmission<>((Runnable & Serializable) () -> {});
-    Command command = javaSubmission.getCommands().get(0);
     Response response = new Response(ResponseType.TASK_SUCCESS, 5);
     String outputLine = JavaObjectCodec.getInstance().encode(response);
-    Assert.assertEquals(Optional.empty(), javaSubmission.getResult());
-    Assert.assertTrue(command.isCompleted(outputLine, false));
-    Assert.assertEquals(5, javaSubmission.getResult().orElse(null));
+    Assert.assertEquals(Optional.empty(), noOpJavaSubmission.getResult());
+    Assert.assertTrue(noOpJavaSubmissionCommand.isCompleted(outputLine, false));
+    Assert.assertEquals(5, noOpJavaSubmission.getResult().orElse(null));
   }
 
 }
