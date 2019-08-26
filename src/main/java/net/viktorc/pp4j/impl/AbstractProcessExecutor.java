@@ -70,9 +70,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private Command command;
   private FailedCommandException commandException;
   private boolean commandCompleted;
-  private boolean running;
   private boolean startedUp;
+  private boolean timerReset;
   private boolean idle;
+  private boolean running;
   private boolean killed;
   private int numOfChildThreads;
 
@@ -190,9 +191,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private void waitKeepAliveTime(long keepAliveTime) throws InterruptedException {
     synchronized (stateLock) {
       LOGGER.trace("Process going idle...");
+      timerReset = false;
       long waitTime = keepAliveTime;
       long startTime = System.currentTimeMillis();
-      while (isAlive() && idle && waitTime > 0) {
+      while (isAlive() && !timerReset && idle && waitTime > 0) {
         stateLock.wait(keepAliveTime);
         waitTime -= System.currentTimeMillis() - startTime;
       }
@@ -203,7 +205,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * It terminates the process if it is still alive and the executor is idle.
    */
   private void terminateIdleProcessIfTimedOut() {
-    if (isAlive() && idle && executeLock.tryLock()) {
+    if (isAlive() && !timerReset && idle && executeLock.tryLock()) {
       try {
         LOGGER.trace("Attempting to terminate process due to prolonged idleness");
         terminate();
@@ -313,6 +315,20 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   }
 
   /**
+   * Sets the <code>idle</code> flag of the process executor and notifies all threads waiting on the <code>stateLock</code> monitor. If
+   * there is an idle process terminator thread, invoking this method also resets that thread's timer.
+   *
+   * @param idle The new idleness state of the process executor.
+   */
+  private void setIdle(boolean idle) {
+    synchronized (stateLock) {
+      this.idle = idle;
+      timerReset = true;
+      stateLock.notifyAll();
+    }
+  }
+
+  /**
    * Starts up the process, sets up the executor infrastructure, invokes the appropriate callback methods, and executes the start-up
    * submission if there is one.
    *
@@ -341,8 +357,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         LOGGER.trace("Invoking start-up call-back methods...");
         manager.onStartup();
         onExecutorStartup();
-        idle = true;
-        stateLock.notifyAll();
+        setIdle(true);
         LOGGER.trace("Executor set up");
       }
     } finally {
@@ -374,8 +389,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
     LOGGER.trace("Tearing down executor...");
     synchronized (stateLock) {
       terminateForcibly();
+      setIdle(false);
       killed = false;
-      idle = false;
       startedUp = false;
       running = false;
       process = null;
@@ -512,8 +527,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
             if (!isAlive() || !startedUp) {
               throw new DisruptedExecutionException("Process not running and/or started up");
             }
-            idle = false;
-            stateLock.notifyAll();
+            setIdle(false);
             executeSubmission(submission);
             if (terminateProcessAfterwards) {
               LOGGER.trace("Terminating process after successful submission execution");
@@ -530,8 +544,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
             Thread.currentThread().interrupt();
             throw new DisruptedExecutionException(e);
           } finally {
-            idle = wasIdle && running;
-            stateLock.notifyAll();
+            setIdle(wasIdle && running);
           }
         }
       } finally {

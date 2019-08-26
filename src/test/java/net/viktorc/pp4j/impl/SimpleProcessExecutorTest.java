@@ -262,6 +262,26 @@ public class SimpleProcessExecutorTest extends TestCase {
   }
 
   @Test
+  public void testProcessTerminatedOnlyAfterKeepAliveTimeMillisecondsOfIdleness() throws Exception {
+    long halfKeepAliveTime = 500;
+    long keepAliveTime = 2 * halfKeepAliveTime;
+    SimpleSubmission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 1", (c, o) -> "ready".equals(o)));
+    ProcessManager processManager = new TestProcessManagerFactory(keepAliveTime, true, false, false, false).newProcessManager();
+    try (SimpleProcessExecutor executor = new SimpleProcessExecutor(processManager)) {
+      executor.start();
+      Assert.assertTrue(executor.isAlive());
+      Thread.sleep(halfKeepAliveTime);
+      Assert.assertTrue(executor.isAlive());
+      executor.execute(submission);
+      Assert.assertTrue(executor.isAlive());
+      Thread.sleep(halfKeepAliveTime);
+      Assert.assertTrue(executor.isAlive());
+      Thread.sleep(halfKeepAliveTime + WAIT_TIME_FOR_CONCURRENT_EVENTS);
+      Assert.assertFalse(executor.isAlive());
+    }
+  }
+
+  @Test
   public void testProcessExecutorTerminatesIfStartupFails() throws Exception {
     ProcessManager processManager = new TestProcessManagerFactory(null, true, false, false, true).newProcessManager();
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(processManager)) {
