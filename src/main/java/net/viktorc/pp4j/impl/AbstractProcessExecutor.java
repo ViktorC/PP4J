@@ -342,6 +342,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         manager.onStartup();
         onExecutorStartup();
         idle = true;
+        stateLock.notifyAll();
         LOGGER.trace("Executor set up");
       }
     } finally {
@@ -591,6 +592,9 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
 
   @Override
   public void execute(Submission<?> submission) throws FailedCommandException, DisruptedExecutionException {
+    if (submission == null) {
+      throw new IllegalArgumentException("The submission is null");
+    }
     executeLock.lock();
     try {
       tryExecute(submission, false);

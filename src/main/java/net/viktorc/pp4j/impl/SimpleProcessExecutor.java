@@ -69,13 +69,14 @@ public class SimpleProcessExecutor extends AbstractProcessExecutor implements Au
       try {
         if (runLock.tryLock()) {
           try {
+            startupSemaphore.drainPermits();
             LOGGER.trace("Starting process executor...");
             threadPool.execute(() -> {
               runLock.lock();
               try {
                 super.run();
               } finally {
-                startupSemaphore.drainPermits();
+                startupSemaphore.release();
                 runLock.unlock();
               }
             });

@@ -342,7 +342,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   public <T> Future<T> submit(Submission<T> submission, boolean terminateProcessAfterwards) {
     synchronized (mainLock) {
       if (submission == null) {
-        throw new IllegalArgumentException("The submission cannot be null or empty");
+        throw new IllegalArgumentException("The submission cannot be null");
       }
       if (shutdown) {
         throw new RejectedExecutionException("The pool has already been shut down");
