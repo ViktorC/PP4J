@@ -166,6 +166,16 @@ public class SimpleProcessExecutorTest extends TestCase {
   }
 
   @Test
+  public void testExecuteSubmissionWithoutOutputProcessing() throws Exception {
+    SimpleSubmission<AtomicReference<String>> submission = new SimpleSubmission<>(new SimpleCommand("some invalid command"));
+    try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
+      executor.start();
+      executor.execute(submission);
+      Assert.assertTrue(true);
+    }
+  }
+
+  @Test
   public void testExecuteSubmissionThrowsIllegalArgumentExceptionIfSubmissionNull() throws Exception {
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       executor.start();
