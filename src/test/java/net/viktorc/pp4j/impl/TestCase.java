@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TestCase {
 
-  protected static final long WAIT_TIME_FOR_CONCURRENT_EVENTS = 50;
+  protected static final long WAIT_TIME_FOR_CONCURRENT_EVENTS = 100;
 
   @Rule
   public TestRule watcher = new TestWatcher() {

@@ -35,7 +35,7 @@ import org.junit.Test;
  *
  * @author Viktor Csomor
  */
-public class PPEvsJPPEIntegrationTest extends TestCase {
+public class PPEvsJPPEPerformanceTest extends TestCase {
 
   private static final int WARM_UP_SUBMISSIONS = 5;
 

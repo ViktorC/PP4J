@@ -36,7 +36,7 @@ import org.junit.Test;
  *
  * @author Viktor Csomor
  */
-public class JPPEIntegrationTest extends TestCase {
+public class JPPEPerformanceTest extends TestCase {
 
   // Startup testing
   @Test

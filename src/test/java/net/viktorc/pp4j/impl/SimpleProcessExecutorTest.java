@@ -30,6 +30,11 @@ import org.junit.Test;
  */
 public class SimpleProcessExecutorTest extends TestCase {
 
+  /**
+   * Creates and returns a new <code>SimpleProcessExecutor</code> instance using the default test process manager factory.
+   *
+   * @return A new simple process executor instance.
+   */
   private static SimpleProcessExecutor newSimpleProcessExecutor() {
     return new SimpleProcessExecutor(new TestProcessManagerFactory().newProcessManager());
   }
