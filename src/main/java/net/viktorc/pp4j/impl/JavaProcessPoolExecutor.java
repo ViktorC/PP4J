@@ -218,7 +218,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   private static class CastCallable<T extends Serializable, S extends Callable<? super T> & Serializable>
       implements Callable<T>, Serializable {
 
-    final Callable<T> callable;
+    private final Callable<T> callable;
 
     /**
      * Constructs a serializable <code>Callable</code> instance with a serializable return type based on the specified serializable
@@ -247,7 +247,7 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
    */
   private static class CastFuture<T, S extends T> implements Future<T> {
 
-    final Future<S> origFuture;
+    private final Future<S> origFuture;
 
     /**
      * Constructs the wrapper object for the specified <code>Future</code> instance.

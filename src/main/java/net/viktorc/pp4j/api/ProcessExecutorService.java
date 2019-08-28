@@ -57,8 +57,8 @@ public interface ProcessExecutorService extends ProcessExecutor {
   void shutdown();
 
   /**
-   * Kills all the and returns a list of the submissions that have been submitted but never processed. It does not block until the processes
-   * terminate. See {@link java.util.concurrent.ExecutorService#shutdownNow()}.
+   * Kills all processes the and returns a list of the submissions that have been submitted but never processed. It does not block until
+   * the processes terminate. See {@link java.util.concurrent.ExecutorService#shutdownNow()}.
    *
    * @return A list of the submissions that were awaiting execution.
    */

@@ -375,8 +375,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     synchronized (mainLock) {
       shutdown = true;
       List<Submission<?>> queuedSubmissions = new ArrayList<>();
-      for (InternalSubmission<?> s : submissionQueue) {
-        queuedSubmissions.add(s.origSubmission);
+      for (InternalSubmission<?> submission : submissionQueue) {
+        queuedSubmissions.add(submission.getOrigSubmission());
       }
       if (poolTerminationLatch.getCount() != 0) {
         (new Thread(this::syncForceShutdown)).start();
@@ -414,16 +414,16 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    */
   private static class InternalSubmission<T> implements Submission<T> {
 
-    final Submission<T> origSubmission;
-    final boolean terminateProcessAfterwards;
-    final long receivedTime;
-    final Object lock;
-    Thread thread;
-    Exception exception;
-    volatile long submittedTime;
-    volatile long processedTime;
-    volatile boolean processed;
-    volatile boolean cancelled;
+    private final Submission<T> origSubmission;
+    private final boolean terminateProcessAfterwards;
+    private final long receivedTime;
+    private final Object lock;
+    private Thread thread;
+    private Exception exception;
+    private volatile long submittedTime;
+    private volatile long processedTime;
+    private boolean processed;
+    private boolean cancelled;
 
     /**
      * Constructs an instance according to the specified parameters.
@@ -442,13 +442,69 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
 
     /**
-     * Returns whether the submission has been fully executed.
+     * Returns the original submission instance wrapped by this internal submission.
      *
-     * @return Whether submission has been processed.
+     * @return The original submission instance.
      */
-    boolean isProcessed() {
+    Submission<T> getOrigSubmission() {
+      return origSubmission;
+    }
+
+    /**
+     * Returns whether the process executing the submission should be terminated afterwards.
+     *
+     * @return Whether the executing process should be terminated afterwards.
+     */
+    boolean getTerminateProcessAfterwards() {
+      return terminateProcessAfterwards;
+    }
+
+    /**
+     * Returns the internal state lock of the submission.
+     *
+     * @return The internal lock.
+     */
+    Object getLock() {
+      return lock;
+    }
+
+    /**
+     * Returns the system time at the construction of this submission wrapper instance.
+     *
+     * @return The time the wrapper submission was constructed in milliseconds.
+     */
+    long getReceivedTime() {
+      return receivedTime;
+    }
+
+    /**
+     * Returns the system time at the first delegation of this submission to a process executor. If the submission has not been delegated
+     * yet, it returns <code>0</code>.
+     *
+     * @return The time the wrapper submission was delegated to a process executor in milliseconds.
+     */
+    long getSubmittedTime() {
+      return submittedTime;
+    }
+
+    /**
+     * Returns the system time at the completion of the execution of this submission. If the submission has not been processed yet, it
+     * returns <code>0</code>.
+     *
+     * @return The time the submission's execution was completed in milliseconds.
+     */
+    long getProcessedTime() {
+      return processedTime;
+    }
+
+    /**
+     * Returns the thread executing the submission or <code>null</code> if its execution has not begun yet.
+     *
+     * @return The thread executing the submission.
+     */
+    Thread getThread() {
       synchronized (lock) {
-        return processed;
+        return thread;
       }
     }
 
@@ -488,6 +544,17 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
 
     /**
+     * Returns whether the submission has been fully executed.
+     *
+     * @return Whether submission has been processed.
+     */
+    boolean isProcessed() {
+      synchronized (lock) {
+        return processed;
+      }
+    }
+
+    /**
      * Returns whether the <code>cancelled</code> flag of the submission has been set to true.
      *
      * @return Whether the submission has been cancelled.
@@ -499,7 +566,19 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
 
     /**
-     * Sets the <code>cancelled</code> flag of the submission to true.
+     * Returns whether the submission can be considered done. The submission is considered done if it has completed execution, has been
+     * cancelled, or has failed.
+     *
+     * @return Whether the submission is done.
+     */
+    boolean isDone() {
+      synchronized (lock) {
+        return processed || cancelled || exception != null;
+      }
+    }
+
+    /**
+     * Sets the <code>cancelled</code> flag of the submission to <code>true</code>.
      */
     void cancel() {
       synchronized (lock) {
@@ -529,8 +608,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
 
     @Override
     public void onFinishedExecution() {
-      origSubmission.onFinishedExecution();
       processedTime = System.nanoTime();
+      origSubmission.onFinishedExecution();
       // Notify the future associated with the submission that the submission has been processed.
       synchronized (lock) {
         processed = true;
@@ -554,7 +633,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    */
   private static class InternalSubmissionFuture<T> implements Future<T> {
 
-    final InternalSubmission<T> submission;
+    private final InternalSubmission<T> submission;
 
     /**
      * Constructs a {@link Future} for the specified submission.
@@ -572,45 +651,37 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
      * @throws ExecutionException If an exception was thrown during the execution of the submission.
      */
     private T getResult() throws ExecutionException {
-      if (submission.cancelled) {
+      if (submission.isCancelled()) {
         throw new CancellationException(String.format("Submission %s cancelled", submission));
       }
-      if (submission.exception != null) {
-        throw new ExecutionException(submission.exception);
+      if (submission.getException() != null) {
+        throw new ExecutionException(submission.getException());
       }
       return submission.getResult().orElse(null);
     }
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
-      synchronized (submission.lock) {
-        /* If the submission has already been cancelled or if it has already been processed, don't do
-         * anything and return false. */
-        if (submission.cancelled || submission.processed) {
+      synchronized (submission.getLock()) {
+        // If the submission has already been cancelled or if it has already been processed, don't do anything and return false.
+        if (submission.isDone()) {
           return false;
         }
-        /* If it is already being processed and mayInterruptIfRunning is true, interrupt the executor
-         * thread. */
-        if (submission.thread != null) {
-          if (mayInterruptIfRunning) {
-            submission.cancel();
-            submission.thread.interrupt();
-          }
-          // If mayInterruptIfRunning is false, don't let the submission be cancelled.
-        } else {
-          // If the processing of the submission has not commenced yet, cancel it.
-          submission.cancel();
+        submission.cancel();
+        // If it is already being processed and mayInterruptIfRunning is true, interrupt the executor thread.
+        if (mayInterruptIfRunning && submission.getThread() != null) {
+          submission.getThread().interrupt();
         }
-        return submission.cancelled;
+        return submission.isCancelled();
       }
     }
 
     @Override
     public T get() throws InterruptedException, ExecutionException, CancellationException {
       // Wait until the submission is processed, or cancelled, or fails.
-      synchronized (submission.lock) {
-        while (!submission.processed && !submission.cancelled && submission.exception == null) {
-          submission.lock.wait();
+      synchronized (submission.getLock()) {
+        while (!submission.isDone()) {
+          submission.getLock().wait();
         }
         return getResult();
       }
@@ -619,11 +690,11 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     @Override
     public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException, CancellationException {
       // Wait until the submission is processed, or cancelled, or fails, or the method times out.
-      synchronized (submission.lock) {
+      synchronized (submission.getLock()) {
         long timeoutNs = unit.toNanos(timeout);
         long start = System.nanoTime();
-        while (!submission.processed && !submission.cancelled && submission.exception == null && timeoutNs > 0) {
-          submission.lock.wait(timeoutNs / 1000000, (int) (timeoutNs % 1000000));
+        while (!submission.isDone() && timeoutNs > 0) {
+          submission.getLock().wait(timeoutNs / 1000000, (int) (timeoutNs % 1000000));
           timeoutNs -= (System.nanoTime() - start);
         }
         T result = getResult();
@@ -636,12 +707,12 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
 
     @Override
     public boolean isCancelled() {
-      return submission.cancelled;
+      return submission.isCancelled();
     }
 
     @Override
     public boolean isDone() {
-      return submission.processed;
+      return submission.isDone();
     }
 
   }
@@ -654,7 +725,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    */
   private class InternalProcessExecutor extends AbstractProcessExecutor {
 
-    Thread submissionThread;
+    private Thread submissionThread;
 
     /**
      * Constructs an instances using a newly created process manager and the <code>secondaryThreadPool</code>.
@@ -671,12 +742,12 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     void updateSubmissionQueue(InternalSubmission<?> submission) {
       if (submission != null) {
         synchronized (mainLock) {
-          if (submission.isProcessed() || submission.isCancelled() || submission.getException() != null) {
+          if (submission.isDone()) {
             numOfSubmissions--;
             LOGGER.debug(String.format("Submission %s processed%s", submission,
                 submission.isProcessed() ? String.format(" - delay: %.3f; execution time: %.3f",
-                    (submission.submittedTime - submission.receivedTime) / 1000000000d,
-                    (submission.processedTime - submission.submittedTime) / 1000000000d) : ""));
+                    (submission.getSubmittedTime() - submission.getReceivedTime()) / 1000000000d,
+                    (submission.getProcessedTime() - submission.getSubmittedTime()) / 1000000000d) : ""));
             LOGGER.debug(getPoolStats());
             // If the pool is shutdown and there are no more submissions left, signal it.
             if (shutdown && numOfSubmissions == 0) {
@@ -713,7 +784,7 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       try {
         submission.setThread(submissionThread);
         if (!submission.isCancelled()) {
-          tryExecute(submission, submission.terminateProcessAfterwards);
+          tryExecute(submission, submission.getTerminateProcessAfterwards());
         }
       } catch (FailedCommandException e) {
         LOGGER.trace("Exception while executing submission", e);
@@ -784,8 +855,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
    */
   private class CustomizedThreadFactory implements ThreadFactory {
 
-    final String poolName;
-    final ThreadFactory defaultFactory;
+    private final String poolName;
+    private final ThreadFactory defaultFactory;
 
     /**
      * Constructs an instance according to the specified parameters.
