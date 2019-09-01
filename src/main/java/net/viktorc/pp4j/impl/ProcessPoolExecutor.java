@@ -76,7 +76,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   private final CountDownLatch poolInitLatch;
   private final CountDownLatch poolTerminationLatch;
   private final Object mainLock;
-  private final Object forceShutdownLock;
 
   private volatile int numOfSubmissions;
   private volatile boolean shutdown;
@@ -130,7 +129,6 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     poolInitLatch = new CountDownLatch(actualMinSize);
     poolTerminationLatch = new CountDownLatch(1);
     mainLock = new Object();
-    forceShutdownLock = new Object();
     try {
       startPool(actualMinSize);
     } catch (InterruptedException e) {
@@ -225,13 +223,13 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   }
 
   /**
-   * Returns whether a new {@link InternalProcessExecutor} instance should be started.
+   * Returns whether a new {@link InternalProcessExecutor} instance should be started and added to the pool.
    *
    * @return Whether the process pool should be extended.
    */
   private boolean doExtendPool() {
-    return !shutdown && (processExecutors.size() < minPoolSize ||
-        (processExecutors.size() < Math.min(maxPoolSize, numOfSubmissions + reserveSize)));
+    return (!shutdown || !submissionQueue.isEmpty()) &&
+        (processExecutors.size() < minPoolSize || (processExecutors.size() < Math.min(maxPoolSize, numOfSubmissions + reserveSize)));
   }
 
   /**
@@ -241,7 +239,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     InternalProcessExecutor executor = new InternalProcessExecutor();
     processExecutorThreadPool.execute(executor);
     processExecutors.add(executor);
-    LOGGER.debug("Process executor {} started{}{}", executor, System.lineSeparator(), getPoolStats());
+    LOGGER.debug("Process executor {} started", executor);
+    LOGGER.debug(getPoolStats());
   }
 
   /**
@@ -262,12 +261,12 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   }
 
   /**
-   * Waits until all submissions are completed and calls {@link #syncForceShutdown()}.
+   * Waits until all submissions are completed, terminates the process executors, ands shuts down the thread pools.
    */
   private void syncShutdown() {
     synchronized (mainLock) {
       try {
-        LOGGER.debug("Waiting for submissions to complete...");
+        LOGGER.debug("Waiting for remaining submissions to complete...");
         while (numOfSubmissions > 0) {
           mainLock.wait();
         }
@@ -276,47 +275,26 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         Thread.currentThread().interrupt();
         return;
       }
+      LOGGER.debug("Terminating process executors...");
+      for (InternalProcessExecutor executor : processExecutors) {
+        executor.terminate();
+      }
     }
-    syncForceShutdown();
-  }
-
-  /**
-   * Kills all the processes, shuts down the pool, and waits for termination.
-   */
-  private void syncForceShutdown() {
-    synchronized (forceShutdownLock) {
-      if (poolTerminationLatch.getCount() == 0) {
-        LOGGER.debug("Process pool had already terminated");
-        return;
-      }
-      while (poolInitLatch.getCount() != 0) {
-        poolInitLatch.countDown();
-      }
-      synchronized (mainLock) {
-        LOGGER.debug("Shutting down process executors...");
-        for (InternalProcessExecutor executor : processExecutors) {
-          executor.terminate();
-        }
-      }
-      LOGGER.debug("Shutting down thread pools...");
-      secondaryThreadPool.shutdown();
-      processExecutorThreadPool.shutdown();
-      try {
-        secondaryThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-        processExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-      } catch (InterruptedException e) {
-        LOGGER.warn(e.getMessage(), e);
-        Thread.currentThread().interrupt();
-      }
-      synchronized (mainLock) {
-        LOGGER.debug("Setting remaining submission future exceptions...");
-        for (InternalSubmission<?> submission : submissionQueue) {
-          submission.setException(new RejectedExecutionException("The process pool has shut down"));
-        }
-      }
-      poolTerminationLatch.countDown();
-      LOGGER.debug("Process pool terminated");
+    LOGGER.debug("Shutting down thread pools...");
+    secondaryThreadPool.shutdown();
+    processExecutorThreadPool.shutdown();
+    try {
+      secondaryThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+      processExecutorThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+    } catch (InterruptedException e) {
+      LOGGER.warn(e.getMessage(), e);
+      Thread.currentThread().interrupt();
     }
+    while (poolInitLatch.getCount() != 0) {
+      poolInitLatch.countDown();
+    }
+    poolTerminationLatch.countDown();
+    LOGGER.debug("Process pool terminated");
   }
 
   @Override
@@ -354,7 +332,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       if (doExtendPool()) {
         startNewProcess();
       }
-      LOGGER.debug("Submission {} received{}{}", internalSubmission, System.lineSeparator(), getPoolStats());
+      LOGGER.debug("Submission {} received", internalSubmission);
+      LOGGER.debug(getPoolStats());
       // Return a Future holding the total execution time including the submission delay.
       return new InternalSubmissionFuture<>(internalSubmission);
     }
@@ -373,14 +352,13 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
   @Override
   public List<Submission<?>> forceShutdown() {
     synchronized (mainLock) {
-      shutdown = true;
       List<Submission<?>> queuedSubmissions = new ArrayList<>();
       for (InternalSubmission<?> submission : submissionQueue) {
         queuedSubmissions.add(submission.getOrigSubmission());
       }
-      if (poolTerminationLatch.getCount() != 0) {
-        (new Thread(this::syncForceShutdown)).start();
-      }
+      numOfSubmissions -= submissionQueue.size();
+      submissionQueue.clear();
+      shutdown();
       return queuedSubmissions;
     }
   }
@@ -418,12 +396,14 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     private final boolean terminateProcessAfterwards;
     private final long receivedTime;
     private final Object lock;
+
     private Thread thread;
     private Exception exception;
-    private volatile long submittedTime;
-    private volatile long processedTime;
     private boolean processed;
     private boolean cancelled;
+
+    private volatile long submittedTime;
+    private volatile long processedTime;
 
     /**
      * Constructs an instance according to the specified parameters.
@@ -744,15 +724,12 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
         synchronized (mainLock) {
           if (submission.isDone()) {
             numOfSubmissions--;
+            mainLock.notifyAll();
             LOGGER.debug(String.format("Submission %s processed%s", submission,
                 submission.isProcessed() ? String.format(" - delay: %.3f; execution time: %.3f",
                     (submission.getSubmittedTime() - submission.getReceivedTime()) / 1000000000d,
                     (submission.getProcessedTime() - submission.getSubmittedTime()) / 1000000000d) : ""));
             LOGGER.debug(getPoolStats());
-            // If the pool is shutdown and there are no more submissions left, signal it.
-            if (shutdown && numOfSubmissions == 0) {
-              mainLock.notifyAll();
-            }
           } else {
             // If the execute method failed and there was no exception thrown, put the submission back into the queue at the front.
             submission.setThread(null);
@@ -929,7 +906,8 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       // A process has terminated. Extend the pool if necessary by using the pooled executors.
       synchronized (mainLock) {
         processExecutors.remove(executor);
-        LOGGER.debug("Process executor {} stopped{}{}", executor, System.lineSeparator(), getPoolStats());
+        LOGGER.debug("Process executor {} stopped", executor);
+        LOGGER.debug(getPoolStats());
         if (doExtendPool()) {
           startNewProcess();
         }

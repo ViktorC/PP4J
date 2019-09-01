@@ -134,15 +134,29 @@ public class ProcessPoolExecutorTest extends TestCase {
       submissions.remove(submission);
     }
     for (Future<?> future : futures) {
-      try {
-        future.get();
-        Assert.assertFalse(true);
-      } catch (Exception e) {
-        Assert.assertTrue(e instanceof ExecutionException);
-        Assert.assertTrue(e.getCause() instanceof RejectedExecutionException);
-      }
+      Assert.assertFalse(future.isDone());
     }
     pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+  }
+
+  /**
+   * Tests if the process pool can shutdown with cancelled submissions stuck in its queue.
+   *
+   * @param mayInterruptIfRunning If the submissions executor threads may be interrupted when cancelling the submissions.
+   * @throws InterruptedException If the main thread is interrupted.
+   */
+  private static void testShutdownWithCancelledQueuedSubmissions(boolean mayInterruptIfRunning) throws InterruptedException {
+    ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 2, 2, 0);
+    List<Future<?>> futures = new ArrayList<>();
+    for (int i = 0; i < 4; i++) {
+      futures.add(pool.submit(newSimpleSubmission()));
+    }
+    for (Future<?> future : futures) {
+      future.cancel(mayInterruptIfRunning);
+    }
+    pool.shutdown();
+    pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+    Assert.assertEquals(0, pool.getNumOfSubmissions());
   }
 
   @Test
@@ -591,14 +605,73 @@ public class ProcessPoolExecutorTest extends TestCase {
     } finally {
       Assert.assertTrue(Thread.interrupted());
       try {
-        Thread.sleep(1);
+        Thread.sleep(0);
       } catch (InterruptedException e) {
-        // Do this to reset the interrupted flag of the thread for the other tests.
+        // Do this to reset the interrupted flag of the thread.
       }
       pool.shutdown();
       pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
 
     }
+  }
+
+  @Test
+  public void testShutdownDoesNotWaitOnCancelledSubmissionsInTheQueue() throws InterruptedException {
+    testShutdownWithCancelledQueuedSubmissions(false);
+  }
+
+  @Test
+  public void testShutdownDoesNotWaitOnForceCancelledSubmissionsInTheQueue() throws InterruptedException {
+    testShutdownWithCancelledQueuedSubmissions(true);
+  }
+
+  @Test
+  public void testForceShutdownOnlyReturnsSubmissionsInTheQueue() throws InterruptedException {
+    ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 2, 2, 0);
+    Submission<?> submission1 = newSimpleSubmission();
+    Submission<?> submission2 = newSimpleSubmission();
+    Submission<?> submission3 = newSimpleSubmission();
+    Future<?> future1 = pool.submit(submission1);
+    Future<?> future2 = pool.submit(submission2);
+    Thread.sleep(WAIT_TIME_FOR_CONCURRENT_EVENTS);
+    Future<?> future3 = pool.submit(submission3);
+    List<Submission<?>> submissionsFromTheQueue = pool.forceShutdown();
+    Assert.assertEquals(1, submissionsFromTheQueue.size());
+    Assert.assertEquals(submission3, submissionsFromTheQueue.get(0));
+    Assert.assertFalse(future1.isDone());
+    Assert.assertFalse(future2.isDone());
+    Assert.assertFalse(future3.isDone());
+    pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+    Assert.assertTrue(future1.isDone());
+    Assert.assertTrue(future2.isDone());
+    Assert.assertFalse(future3.isDone());
+  }
+
+  @Test
+  public void testForceShutdownReturnsSubmissionsInTheQueueEvenIfCalledAfterShutdown() throws InterruptedException {
+    ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 2, 2, 0);
+    for (int i = 0; i < 4; i++) {
+      pool.submit(newSimpleSubmission());
+    }
+    Thread.sleep(WAIT_TIME_FOR_CONCURRENT_EVENTS);
+    pool.shutdown();
+    Assert.assertTrue(pool.isShutdown());
+    Assert.assertEquals(2, pool.forceShutdown().size());
+    pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+  }
+
+  @Test
+  public void testForceShutdownReturnsEmptyListOnSecondCall() throws InterruptedException {
+    ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 3, 3, 0);
+    for (int i = 0; i < 6; i++) {
+      pool.submit(newSimpleSubmission());
+    }
+    Thread.sleep(WAIT_TIME_FOR_CONCURRENT_EVENTS);
+    Assert.assertEquals(3, pool.forceShutdown().size());
+    Assert.assertTrue(pool.isShutdown());
+    Assert.assertTrue(pool.forceShutdown().isEmpty());
+    pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+    Assert.assertTrue(pool.forceShutdown().isEmpty());
   }
 
 }

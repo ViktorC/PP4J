@@ -57,8 +57,12 @@ public interface ProcessExecutorService extends ProcessExecutor {
   void shutdown();
 
   /**
-   * Kills all processes the and returns a list of the submissions that have been submitted but never processed. It does not block until
-   * the processes terminate. See {@link java.util.concurrent.ExecutorService#shutdownNow()}.
+   * Initiates the shutdown of the process pool discarding all submissions waiting for execution. It returns the list of the submissions
+   * waiting for execution in the submission queue and clears the queue. It does not interrupt the execution of submissions already taken
+   * off the submission queue by process executors. It mimics {@link java.util.concurrent.ExecutorService#shutdownNow()} in behaviour with
+   * the difference that process executors are not interrupted. To do so, the list of submissions returned by this method can be used to
+   * resolve which submissions are still executing and the execution of those submissions may be interrupted by cancelling their
+   * corresponding <code>Future</code> instances returned by the pool with <code>mayInterruptIfRunning</code> set to <code>true</code>.
    *
    * @return A list of the submissions that were awaiting execution.
    */
