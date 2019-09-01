@@ -53,7 +53,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
   public <S extends Callable<T> & Serializable> JavaSubmission(S task) {
     this.task = task::call;
     try {
-      command = JavaObjectCodec.getInstance().encode(task);
+      command = JavaObjectCodec.getInstance().encode(this.task);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
