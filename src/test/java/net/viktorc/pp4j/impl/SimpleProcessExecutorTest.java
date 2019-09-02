@@ -258,6 +258,7 @@ public class SimpleProcessExecutorTest extends TestCase {
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       executor.start();
       Assert.assertTrue(executor.isAlive());
+      Thread.sleep(WAIT_TIME_FOR_CONCURRENT_EVENTS);
       Assert.assertTrue(executor.tryExecute(submission, true));
       executor.waitFor();
       Assert.assertFalse(executor.isAlive());
