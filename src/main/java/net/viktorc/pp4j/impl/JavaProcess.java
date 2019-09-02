@@ -60,7 +60,12 @@ public class JavaProcess {
         if (line.isEmpty()) {
           continue;
         }
-        Object input = JavaObjectCodec.getInstance().decode(line);
+        Object input;
+        try {
+          input = JavaObjectCodec.getInstance().decode(line);
+        } catch (Exception e) {
+          throw new Exception(String.format("Error decoding input line \"%s\"", line), e);
+        }
         executeTask((Callable<?>) input, originalOut, dummyOut);
       }
     } catch (Throwable e) {
