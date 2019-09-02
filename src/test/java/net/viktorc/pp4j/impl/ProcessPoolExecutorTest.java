@@ -477,7 +477,7 @@ public class ProcessPoolExecutorTest extends TestCase {
   }
 
   @Test
-  public void testSubmitSubmissionFutureThrowsCancellationExceptionAndTaskIsInterruptedIfMayInterrupt()
+  public void testSubmitSubmissionFutureThrowsCancellationExceptionAndTaskInterruptedIfMayInterrupt()
       throws InterruptedException, ExecutionException {
     ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 1, 0);
     long start = System.currentTimeMillis();

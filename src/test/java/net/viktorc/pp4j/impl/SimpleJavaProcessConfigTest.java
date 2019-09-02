@@ -27,7 +27,7 @@ import org.junit.Test;
 public class SimpleJavaProcessConfigTest {
 
   @Test
-  public void testAdditionalClassPathsAreIncludedInJointClassPath() {
+  public void testAdditionalClassPathsIncludedInJointClassPath() {
     String additionalClassPath1 = "home/classes";
     String additionalClassPath2 = "somewhere_else/classes";
     SimpleJavaProcessConfig config = new SimpleJavaProcessConfig(null, additionalClassPath1, additionalClassPath2);

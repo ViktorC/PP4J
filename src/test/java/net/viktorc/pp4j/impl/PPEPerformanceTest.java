@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
 import net.viktorc.pp4j.impl.TestUtils.TestProcessManagerFactory;
-import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 
 /**
@@ -165,109 +165,109 @@ public class PPEPerformanceTest extends TestCase {
   @Test
   public void test01() throws Exception {
     ProcessPoolExecutor pool = createPool(0, 100, 0, null, true, true, false);
-    Assert.assertTrue(perfTest(pool, true, new int[]{5}, 100, 10000, 4995, 6250));
+    Assume.assumeTrue(perfTest(pool, true, new int[]{5}, 100, 10000, 4995, 6250));
   }
 
   @Test
   public void test02() throws Exception {
     ProcessPoolExecutor pool = createPool(50, 150, 20, null, false, true, false);
-    Assert.assertTrue(perfTest(pool, true, new int[]{5}, 100, 5000, 4995, 5100));
+    Assume.assumeTrue(perfTest(pool, true, new int[]{5}, 100, 5000, 4995, 5100));
   }
 
   @Test
   public void test03() throws Exception {
     ProcessPoolExecutor pool = createPool(10, 25, 5, 15000L, true, true, false);
-    Assert.assertTrue(perfTest(pool, true, new int[]{5}, 20, 10000, 4995, 5100));
+    Assume.assumeTrue(perfTest(pool, true, new int[]{5}, 20, 10000, 4995, 5100));
   }
 
   @Test
   public void test04() throws Exception {
     ProcessPoolExecutor pool = createPool(50, 150, 20, null, false, true, true);
-    Assert.assertTrue(perfTest(pool, true, new int[]{5}, 100, 5000, 4995, 5100));
+    Assume.assumeTrue(perfTest(pool, true, new int[]{5}, 100, 5000, 4995, 5100));
   }
 
   @Test
   public void test05() throws Exception {
     ProcessPoolExecutor pool = createPool(10, 50, 5, 15000L, true, true, false);
-    Assert.assertTrue(perfTest(pool, true, new int[]{5, 3, 2}, 50, 10000, 9995, 10340));
+    Assume.assumeTrue(perfTest(pool, true, new int[]{5, 3, 2}, 50, 10000, 9995, 10340));
   }
 
   @Test
   public void test06() throws Exception {
     ProcessPoolExecutor pool = createPool(100, 250, 20, null, true, true, true);
-    Assert.assertTrue(perfTest(pool, true, new int[]{5}, 800, 20000, 4995, 6000));
+    Assume.assumeTrue(perfTest(pool, true, new int[]{5}, 800, 20000, 4995, 6000));
   }
 
   @Test
   public void test07() throws Exception {
     ProcessPoolExecutor pool = createPool(0, 100, 0, null, false, true, false);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 10000, 4995, 6850));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 100, 10000, 4995, 6850));
   }
 
   @Test
   public void test08() throws Exception {
     ProcessPoolExecutor pool = createPool(50, 150, 10, null, true, true, false);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 5000, 4995, 5620));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 100, 5000, 4995, 5620));
   }
 
   @Test
   public void test09() throws Exception {
     ProcessPoolExecutor pool = createPool(10, 25, 5, 15000L, false, true, true);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 10000, 4995, 5100));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 20, 10000, 4995, 5100));
   }
 
   @Test
   public void test10() throws Exception {
     ProcessPoolExecutor pool = createPool(50, 150, 10, null, true, true, true);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 100, 5000, 4995, 5600));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 100, 5000, 4995, 5600));
   }
 
   @Test
   public void test11() throws Exception {
     ProcessPoolExecutor pool = createPool(10, 50, 5, 15000L, false, true, false);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5, 3, 2}, 50, 10000, 9995, 10350));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5, 3, 2}, 50, 10000, 9995, 10350));
   }
 
   @Test
   public void test12() throws Exception {
     ProcessPoolExecutor pool = createPool(50, 250, 20, null, true, true, true);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 800, 20000, 4995, 6000));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 800, 20000, 4995, 6000));
   }
 
   @Test
   public void test13() throws Exception {
     ProcessPoolExecutor pool = createPool(20, 40, 4, 250L, true, true, true);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 50, 5000, 4995, 8200));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 50, 5000, 4995, 8200));
   }
 
   @Test
   public void test14() throws Exception {
     ProcessPoolExecutor pool = createPool(1, 1, 0, 20000L, true, true, true);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 5, 30000, 4995, 5250));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 5, 30000, 4995, 5250));
   }
 
   @Test
   public void test15() throws Exception {
     ProcessPoolExecutor pool = createPool(1, 1, 0, null, true, true, false);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 5, 20000, 4995, 13250));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 5, 20000, 4995, 13250));
   }
 
   @Test
   public void test16() throws Exception {
     ProcessPoolExecutor pool = createPool(20, 20, 0, null, true, true, false);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 20, 5000, 4995, 5200));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 20, 5000, 4995, 5200));
   }
 
   @Test
   public void test17() throws Exception {
     ProcessPoolExecutor pool = createPool(20, 20, 0, null, true, true, false);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 40, 10000, 4995, 6200));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 40, 10000, 4995, 6200));
   }
 
   @Test
   public void test18() throws Exception {
     ProcessPoolExecutor pool = createPool(50, 250, 20, null, true, false, true);
-    Assert.assertTrue(perfTest(pool, false, new int[]{5}, 800, 20000, 4995, 5250));
+    Assume.assumeTrue(perfTest(pool, false, new int[]{5}, 800, 20000, 4995, 5250));
   }
 
 }
