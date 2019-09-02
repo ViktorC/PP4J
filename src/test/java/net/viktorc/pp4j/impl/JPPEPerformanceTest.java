@@ -36,6 +36,35 @@ import org.junit.Test;
 public class JPPEPerformanceTest extends TestCase {
 
   /**
+   * Constructs and returns a serializable runnable that just spends one second sleeping.
+   *
+   * @return A simple startup task;
+   */
+  private static Runnable newSimpleStartupTaks() {
+    return (Runnable & Serializable) () -> {
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    };
+  }
+
+  /**
+   * Constructs and returns a serializable callable that spends the specified number of seconds sleeping before it returns the string
+   * "ready".
+   *
+   * @param seconds The number of seconds the task is supposed to spend sleeping before returning its result.
+   * @return A simple submission task.
+   */
+  private static Callable<String> newSimpleSubmissionTask(int seconds) {
+    return (Callable<String> & Serializable) () -> {
+      Thread.sleep(seconds * 1000L);
+      return "ready";
+    };
+  }
+
+  /**
    * Tests the startup time of the process pool.
    *
    * @param processManagerFactory The process manager factory to use for the process pool.
@@ -73,12 +102,14 @@ public class JPPEPerformanceTest extends TestCase {
    * @throws InterruptedException If the thread is interrupted before the pool is terminated.
    * @throws ExecutionException If the execution of a task fails.
    */
-  private boolean submissionPerfTest(JavaProcessPoolExecutor pool, Supplier<Callable<Serializable>> taskSupplier, boolean reuse,
-      int numOfSubmissions, long delay, long lowerBound, long upperBound) throws InterruptedException, ExecutionException {
+  private <T extends Serializable, S extends Callable<T>> boolean submissionPerfTest(JavaProcessPoolExecutor pool, Supplier<S> taskSupplier,
+      boolean reuse, int numOfSubmissions, long delay, long lowerBound, long upperBound) throws InterruptedException, ExecutionException {
     List<Future<?>> futures = new ArrayList<>();
     long start = System.currentTimeMillis();
     for (int i = 0; i < numOfSubmissions; i++) {
-      Thread.sleep(delay);
+      if (delay > 0) {
+        Thread.sleep(delay);
+      }
       futures.add(pool.submit(taskSupplier.get(), !reuse));
     }
     for (Future<?> future : futures) {
@@ -94,7 +125,7 @@ public class JPPEPerformanceTest extends TestCase {
 
   @Test
   public void testStartup01() throws InterruptedException {
-    Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()), 1, 1, 0, 1500));
+    Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()), 1, 1, 0, 750));
   }
 
   @Test
@@ -123,7 +154,83 @@ public class JPPEPerformanceTest extends TestCase {
   @Test
   public void testStartup06() throws InterruptedException {
     Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(
-        new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096), null, null, 5000L), 1, 1, 0, 2500));
+        new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096), null, null, 5000L), 10, 15, 5, 2500));
+  }
+
+  @Test
+  public void testStartup07() throws InterruptedException {
+    Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(),
+        (Runnable & Serializable) newSimpleStartupTaks(), null, null), 1, 1, 0, 1750));
+  }
+
+  @Test
+  public void testStartup08() throws InterruptedException {
+    Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(
+        new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256),
+        (Runnable & Serializable) newSimpleStartupTaks(), null, null), 1, 1, 0, 1750));
+  }
+
+  @Test
+  public void testStartup09() throws InterruptedException {
+    Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(
+        new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096),
+        (Runnable & Serializable) newSimpleStartupTaks(), null, 3000L), 1, 1, 0, 1750));
+  }
+
+  @Test
+  public void testStartup10() throws InterruptedException {
+    Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(),
+        (Runnable & Serializable) newSimpleStartupTaks(), null, null), 10, 15, 5, 3500));
+  }
+
+  @Test
+  public void testStartup11() throws InterruptedException {
+    Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(
+        new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.CLIENT, 2, 4, 256),
+        (Runnable & Serializable) newSimpleStartupTaks(), null, null), 10, 15, 5, 3500));
+  }
+
+  @Test
+  public void testStartup12() throws InterruptedException {
+    Assume.assumeTrue(startupPerfTest(new JavaProcessManagerFactory<>(
+        new SimpleJavaProcessConfig(JVMArch.BIT_64, JVMType.SERVER, 256, 4096, 4096),
+        (Runnable & Serializable) newSimpleStartupTaks(), null, 3000L), 10, 15, 5, 3500));
+  }
+
+  @Test
+  public void test01() throws InterruptedException, ExecutionException {
+    JavaProcessPoolExecutor pool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()), 1, 1, 0);
+    Assume.assumeTrue(submissionPerfTest(pool, () -> newSimpleSubmissionTask(1), true, 3, 0, 3000, 3750));
+  }
+
+  @Test
+  public void test02() throws InterruptedException, ExecutionException {
+    JavaProcessPoolExecutor pool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()), 4, 4, 0);
+    Assume.assumeTrue(submissionPerfTest(pool, () -> newSimpleSubmissionTask(1), true, 8, 0, 2000, 2750));
+  }
+
+  @Test
+  public void test03() throws InterruptedException, ExecutionException {
+    JavaProcessPoolExecutor pool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()), 1, 1, 0);
+    Assume.assumeTrue(submissionPerfTest(pool, () -> newSimpleSubmissionTask(1), false, 3, 0, 3000, 5000));
+  }
+
+  @Test
+  public void test04() throws InterruptedException, ExecutionException {
+    JavaProcessPoolExecutor pool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()), 4, 4, 0);
+    Assume.assumeTrue(submissionPerfTest(pool, () -> newSimpleSubmissionTask(1), false, 8, 0, 2000, 4000));
+  }
+
+  @Test
+  public void test05() throws InterruptedException, ExecutionException {
+    JavaProcessPoolExecutor pool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()), 2, 8, 0);
+    Assume.assumeTrue(submissionPerfTest(pool, () -> newSimpleSubmissionTask(1), true, 8, 0, 1000, 2000));
+  }
+
+  @Test
+  public void test06() throws InterruptedException, ExecutionException {
+    JavaProcessPoolExecutor pool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig()), 2, 4, 2);
+    Assume.assumeTrue(submissionPerfTest(pool, () -> newSimpleSubmissionTask(1), true, 8, 500, 5000, 6000));
   }
 
 }
