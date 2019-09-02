@@ -26,6 +26,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import net.viktorc.pp4j.api.JavaProcessExecutorService;
 import org.slf4j.Logger;
@@ -79,6 +80,54 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
     super(processManagerFactory, minPoolSize, maxPoolSize, reserveSize);
   }
 
+  /**
+   * An implementation of {@link JavaProcessExecutorService#invokeAll(Collection, long, TimeUnit)} with an additional parameter that allows
+   * the method to signal to its caller whether it timed out.
+   *
+   * @param tasks The tasks to execute.
+   * @param timeout The duration of time to wait for the execution of the tasks at most.
+   * @param unit The unit of the wait time duration.
+   * @param timedOut An atomic boolean that the method sets according to whether it timed out or not.
+   * @param <T> The return type of the tasks.
+   * @return A list of futures corresponding to the provided task. If the method times out, these tasks are all cancelled.
+   * @throws InterruptedException If the executing thread is interrupted.
+   */
+  private <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit, AtomicBoolean timedOut)
+      throws InterruptedException {
+    if (tasks.isEmpty()) {
+      throw new IllegalArgumentException("List of tasks cannot be empty");
+    }
+    timedOut.set(false);
+    List<Future<T>> futures = new ArrayList<>();
+    for (Callable<T> task : tasks) {
+      futures.add(submit(task));
+    }
+    long waitTimeNs = unit.toNanos(timeout);
+    for (int i = 0; i < futures.size(); i++) {
+      Future<T> future = futures.get(i);
+      long start = System.nanoTime();
+      try {
+        if (!future.isDone()) {
+          future.get(waitTimeNs, TimeUnit.NANOSECONDS);
+        }
+      } catch (ExecutionException | CancellationException e) {
+        LOGGER.warn(e.getMessage(), e);
+      } catch (TimeoutException e) {
+        timedOut.set(true);
+        for (int j = i; j < futures.size(); j++) {
+          Future<T> future1 = futures.get(j);
+          if (!future1.isDone()) {
+            futures.get(j).cancel(true);
+          }
+        }
+        break;
+      } finally {
+        waitTimeNs -= (System.nanoTime() - start);
+      }
+    }
+    return futures;
+  }
+
   @Override
   public void execute(Runnable command) {
     Future<?> future = submit(command);
@@ -95,6 +144,9 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
 
   @Override
   public <T> Future<T> submit(Callable<T> task, boolean terminateProcessAfterwards) {
+    if (task == null) {
+      throw new IllegalArgumentException("Task cannot be null");
+    }
     try {
       return new CastFuture<>(submit(new JavaSubmission<>(new CastCallable<>((Callable<T> & Serializable) task)),
           terminateProcessAfterwards));
@@ -117,86 +169,39 @@ public class JavaProcessPoolExecutor extends ProcessPoolExecutor implements Java
   }
 
   @Override
-  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-    List<Future<T>> futures = new ArrayList<>();
-    for (Callable<T> t : tasks) {
-      futures.add(submit(t));
-    }
-    for (Future<T> f : futures) {
-      try {
-        if (!f.isDone()) {
-          f.get();
-        }
-      } catch (ExecutionException | CancellationException e) {
-        LOGGER.warn(e.getMessage(), e);
-      }
-    }
-    return futures;
-  }
-
-  @Override
   public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
-    List<Future<T>> futures = new ArrayList<>();
-    for (Callable<T> t : tasks) {
-      futures.add(submit(t));
-    }
-    long waitTimeNs = unit.toNanos(timeout);
-    for (int i = 0; i < futures.size(); i++) {
-      Future<T> f = futures.get(i);
-      long start = System.nanoTime();
-      try {
-        if (!f.isDone()) {
-          f.get(waitTimeNs, TimeUnit.NANOSECONDS);
-        }
-      } catch (ExecutionException | CancellationException e) {
-        LOGGER.warn(e.getMessage(), e);
-      } catch (TimeoutException e) {
-        for (int j = i; j < futures.size(); j++) {
-          futures.get(j).cancel(true);
-        }
-        break;
-      } finally {
-        waitTimeNs -= (System.nanoTime() - start);
-      }
-    }
-    return futures;
+    return invokeAll(tasks, timeout, unit, new AtomicBoolean());
   }
 
   @Override
-  public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-    ExecutionException execException = null;
-    for (Future<T> f : invokeAll(tasks)) {
-      try {
-        return f.get();
-      } catch (ExecutionException e) {
-        execException = e;
-      } catch (CancellationException e) {
-        LOGGER.warn(e.getMessage(), e);
-      }
-    }
-    if (execException == null) {
-      throw new ExecutionException(new Exception("No task completed successfully"));
-    }
-    throw execException;
+  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
+    return invokeAll(tasks, Long.MAX_VALUE, TimeUnit.DAYS);
   }
 
   @Override
   public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
       throws InterruptedException, ExecutionException, TimeoutException {
-    ExecutionException execException = null;
-    for (Future<T> f : invokeAll(tasks, timeout, unit)) {
+    AtomicBoolean timedOut = new AtomicBoolean();
+    for (Future<T> future : invokeAll(tasks, timeout, unit, timedOut)) {
       try {
-        return f.get();
-      } catch (ExecutionException e) {
-        execException = e;
-      } catch (CancellationException e) {
+        return future.get();
+      } catch (ExecutionException | CancellationException e) {
         LOGGER.warn(e.getMessage(), e);
       }
     }
-    if (execException == null) {
-      throw new TimeoutException();
+    if (timedOut.get()) {
+      throw new TimeoutException("Timed out before any task could successfully complete");
     }
-    throw execException;
+    throw new ExecutionException(new Exception("No task completed successfully"));
+  }
+
+  @Override
+  public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
+    try {
+      return invokeAny(tasks, Long.MAX_VALUE, TimeUnit.DAYS);
+    } catch (TimeoutException e) {
+      throw new ExecutionException(e);
+    }
   }
 
   @Override
