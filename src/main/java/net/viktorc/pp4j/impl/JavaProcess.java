@@ -64,7 +64,7 @@ public class JavaProcess {
         try {
           input = JavaObjectCodec.getInstance().decode(line);
         } catch (Exception e) {
-          throw new Exception(String.format("Error decoding input line \"%s\"", line), e);
+          throw new InputDecodingException(String.format("Error decoding input line \"%s\"", line), e);
         }
         executeTask((Callable<?>) input, originalOut, dummyOut);
       }
@@ -244,6 +244,25 @@ public class JavaProcess {
      */
     public Optional<Throwable> getError() {
       return Optional.ofNullable(error);
+    }
+
+  }
+
+  /**
+   * An exception class for when the decoding of a line printed to the Java process' standard in stream fails.
+   *
+   * @author Viktor Csomor
+   */
+  public static class InputDecodingException extends Exception {
+
+    /**
+     * Constructs a <code>InputDecodingException</code> using the provided error message and original exception.
+     *
+     * @param message The error message.
+     * @param originalException The original exception.
+     */
+    InputDecodingException(String message, Exception originalException) {
+      super(message, originalException);
     }
 
   }

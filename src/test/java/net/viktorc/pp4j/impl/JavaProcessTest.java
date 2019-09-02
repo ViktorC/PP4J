@@ -22,6 +22,7 @@ import java.io.PrintStream;
 import java.io.Serializable;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.viktorc.pp4j.impl.JavaProcess.InputDecodingException;
 import net.viktorc.pp4j.impl.JavaProcess.Response;
 import net.viktorc.pp4j.impl.JavaProcess.ResponseType;
 import org.junit.Assert;
@@ -196,7 +197,7 @@ public class JavaProcessTest extends TestCase {
       Assert.assertFalse(secondResponse.getResult().isPresent());
       Assert.assertTrue(secondResponse.getError().isPresent());
       Throwable error = secondResponse.getError().get();
-      Assert.assertTrue(error instanceof IllegalArgumentException);
+      Assert.assertTrue(error instanceof InputDecodingException);
     } finally {
       System.setOut(origStream);
     }
