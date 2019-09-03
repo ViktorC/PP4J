@@ -42,7 +42,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
   private static final Logger LOGGER = LoggerFactory.getLogger(JavaSubmission.class);
 
   private final SerializableTask<T> task;
-  private final String command;
+  private final String instruction;
 
   /**
    * Creates a submission for the specified task that implements both the {@link Serializable} and {@link Callable} interfaces.
@@ -53,7 +53,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
   public <S extends Callable<T> & Serializable> JavaSubmission(S task) {
     this.task = task::call;
     try {
-      command = JavaObjectCodec.getInstance().encode(this.task);
+      instruction = JavaObjectCodec.getInstance().encode(this.task);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -96,7 +96,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
   @SuppressWarnings("unchecked")
   @Override
   public List<Command> getCommands() {
-    return Collections.singletonList(new SimpleCommand(command,
+    return Collections.singletonList(new SimpleCommand(instruction,
         (command, outputLine) -> {
           Object output;
           try {
