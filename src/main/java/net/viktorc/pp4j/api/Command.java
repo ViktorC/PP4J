@@ -22,7 +22,7 @@ package net.viktorc.pp4j.api;
  *
  * @author Viktor Csomor
  */
-public interface Command {
+public interface Command extends Resettable {
 
   /**
    * Returns the instruction to send to the process.
@@ -52,10 +52,5 @@ public interface Command {
    * process is to be considered ready for executing new submissions after this exception is thrown.
    */
   boolean isCompleted(String outputLine, boolean error) throws FailedCommandException;
-
-  /**
-   * It resets the command, in case it is stateful, to its initial state.
-   */
-  void reset();
 
 }

@@ -25,7 +25,7 @@ import java.util.Optional;
  * @param <T> The return type associated with the submission.
  * @author Viktor Csomor
  */
-public interface Submission<T> {
+public interface Submission<T> extends Resettable {
 
   /**
    * Returns the commands to execute.

@@ -22,11 +22,12 @@ import java.util.Optional;
 /**
  * An interface that defines methods that allow for the managing of the life cycle of a process. It defines methods that start the process,
  * determine and handle its startup behavior, and allow for its orderly termination. The same instance may be used for the management of
- * multiple subsequent processes, thus the implementation should allow for reusability.
+ * multiple subsequent processes, thus the implementation should allow for reusability or rely on the {@link #reset()} method to clear its
+ * state.
  *
  * @author Viktor Csomor
  */
-public interface ProcessManager {
+public interface ProcessManager extends Resettable {
 
   /**
    * A method that starts a new process. The process created should always be the same and it should always be started only upon the call of

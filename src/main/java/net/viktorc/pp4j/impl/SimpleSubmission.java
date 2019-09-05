@@ -97,4 +97,8 @@ public class SimpleSubmission<T> extends AbstractSubmission<T> {
     return new ArrayList<>(commands);
   }
 
+  @Override
+  public void reset() {
+  }
+
 }

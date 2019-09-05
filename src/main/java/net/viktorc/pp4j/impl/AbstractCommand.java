@@ -99,12 +99,6 @@ public abstract class AbstractCommand implements Command {
   }
 
   @Override
-  public void reset() {
-    stdOutLines.clear();
-    stdErrLines.clear();
-  }
-
-  @Override
   public String getInstruction() {
     return instruction;
   }
@@ -120,6 +114,12 @@ public abstract class AbstractCommand implements Command {
         stdOutLines.add(outputLine);
       }
     }
+  }
+
+  @Override
+  public void reset() {
+    stdOutLines.clear();
+    stdErrLines.clear();
   }
 
 }

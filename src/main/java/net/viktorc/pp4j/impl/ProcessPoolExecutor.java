@@ -600,6 +600,11 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
     }
 
     @Override
+    public void reset() {
+      origSubmission.reset();
+    }
+
+    @Override
     public String toString() {
       return String.format("%s@%s", origSubmission, Integer.toHexString(hashCode()));
     }

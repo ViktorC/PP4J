@@ -17,6 +17,7 @@ package net.viktorc.pp4j.impl;
 
 import java.util.Optional;
 import java.util.stream.Collectors;
+import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
 
 /**
@@ -41,6 +42,11 @@ public abstract class AbstractSubmission<T> implements Submission<T> {
   @Override
   public Optional<T> getResult() {
     return Optional.ofNullable(result);
+  }
+
+  @Override
+  public void reset() {
+    result = null;
   }
 
   @Override

@@ -66,4 +66,8 @@ public abstract class AbstractProcessManager implements ProcessManager {
     return Optional.ofNullable(keepAliveTime);
   }
 
+  @Override
+  public void reset() {
+  }
+
 }

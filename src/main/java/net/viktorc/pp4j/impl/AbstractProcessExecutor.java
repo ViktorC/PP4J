@@ -480,6 +480,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private void executeSubmission(Submission<?> submission)
       throws IOException, InterruptedException, FailedCommandException, DisruptedExecutionException {
     LOGGER.trace("Starting execution of submission");
+    submission.reset();
     submission.onStartedExecution();
     for (Command command : submission.getCommands()) {
       executeCommand(command);
@@ -633,6 +634,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   @Override
   public void run() {
     runLock.lock();
+    manager.reset();
     try {
       int returnCode = UNEXPECTED_TERMINATION_RETURN_CODE;
       try {
