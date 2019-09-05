@@ -15,6 +15,8 @@
  */
 package net.viktorc.pp4j.impl;
 
+import java.nio.charset.Charset;
+import net.viktorc.pp4j.api.FailedStartupException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -27,46 +29,64 @@ public class SimpleProcessManagerTest extends TestCase {
 
   @Test
   public void testStartsUpInstantlyTrueIfNoPredicateDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""));
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset());
     Assert.assertTrue(manager.startsUpInstantly());
   }
 
   @Test
   public void testStartsUpInstantlyFalseIfPredicateDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), null, (o, e) -> true);
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null,
+        (o, e) -> true);
     Assert.assertFalse(manager.startsUpInstantly());
   }
 
   @Test
-  public void testIsStartedUpReturnsTrueIfPredicateDoes() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), null, (o, e) -> !e && "ready".equals(o));
+  public void testIsStartedUpReturnsTrueIfPredicateDoes() throws FailedStartupException {
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null,
+        (o, e) -> !e && "ready".equals(o));
     Assert.assertFalse(manager.isStartedUp("bla", false));
     Assert.assertFalse(manager.isStartedUp("ready", true));
     Assert.assertTrue(manager.isStartedUp("ready", false));
   }
 
   @Test
+  public void testIsStartedUpThrowsFailedStartupException() throws FailedStartupException {
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null,
+        (o, e) -> {
+          if (e) {
+            throw new FailedStartupException(o);
+          }
+          return true;
+        });
+    Assert.assertTrue(manager.isStartedUp("", false));
+    String errorOutput = "oops";
+    exceptionRule.expect(FailedStartupException.class);
+    exceptionRule.expectMessage(errorOutput);
+    manager.isStartedUp(errorOutput, true);
+  }
+
+  @Test
   public void testInitSubmissionEmptyIfNoProviderDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""));
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset());
     Assert.assertFalse(manager.getInitSubmission().isPresent());
   }
 
   @Test
   public void testInitSubmissionNotEmptyIfProviderDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), null, null,
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null, null,
         () -> new SimpleSubmission<>(new SimpleCommand("")), null);
     Assert.assertTrue(manager.getInitSubmission().isPresent());
   }
 
   @Test
   public void testTerminationSubmissionEmptyIfNoProviderDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""));
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset());
     Assert.assertFalse(manager.getTerminationSubmission().isPresent());
   }
 
   @Test
   public void tesTerminationSubmissionNotEmptyIfProviderDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), null, null, null,
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null, null, null,
         () -> new SimpleSubmission<>(new SimpleCommand("")));
     Assert.assertTrue(manager.getTerminationSubmission().isPresent());
   }

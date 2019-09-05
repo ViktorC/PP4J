@@ -32,6 +32,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.DisruptedExecutionException;
 import net.viktorc.pp4j.api.FailedCommandException;
+import net.viktorc.pp4j.api.FailedStartupException;
 import net.viktorc.pp4j.api.ProcessExecutor;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.Submission;
@@ -69,6 +70,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   private BufferedReader stdErrReader;
   private Command command;
   private FailedCommandException commandException;
+  private FailedStartupException startupException;
   private boolean commandCompleted;
   private boolean startedUp;
   private boolean timerReset;
@@ -104,11 +106,14 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    */
   private void processStartupOutput(String line, boolean error) {
     synchronized (stateLock) {
-      startedUp = manager.isStartedUp(line, error);
-      LOGGER.trace("Output denotes process start-up completion: {}", startedUp);
-      if (startedUp) {
-        stateLock.notifyAll();
+      try {
+        startedUp = manager.isStartedUp(line, error);
+        LOGGER.trace("Output denotes start-up completion: {}", startedUp);
+      } catch (FailedStartupException e) {
+        startupException = e;
+        LOGGER.trace("Output denotes start-up failure");
       }
+      stateLock.notifyAll();
     }
   }
 
@@ -126,10 +131,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         commandCompleted = true;
         commandException = e;
       }
+      stateLock.notifyAll();
       LOGGER.trace("Output denotes command completion: {}", commandCompleted);
-      if (commandCompleted) {
-        stateLock.notifyAll();
-      }
     }
   }
 
@@ -281,8 +284,9 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * Waits for the process to start up if it does not start up instantly.
    *
    * @throws InterruptedException If the thread is interrupted while waiting for the process to start up.
+   * @throws FailedStartupException If the process startup fails.
    */
-  private void waitForProcessStartup() throws InterruptedException {
+  private void waitForProcessStartup() throws InterruptedException, FailedStartupException {
     synchronized (stateLock) {
       LOGGER.trace("Waiting for process to start up...");
       startedUp = manager.startsUpInstantly();
@@ -290,6 +294,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         if (killed) {
           LOGGER.trace("Process killed before it could start up");
           return;
+        }
+        if (startupException != null) {
+          LOGGER.trace("Process startup failed", startupException);
+          throw startupException;
         }
         stateLock.wait();
       }
@@ -334,9 +342,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    *
    * @throws IOException If the process cannot be started.
    * @throws InterruptedException If the executing thread is interrupted while waiting for the process to start up.
+   * @throws FailedStartupException If the process startup fails.
    * @throws FailedCommandException If the initial submission's execution fails due to a command failure.
    */
-  private void setUpExecutor() throws IOException, InterruptedException, FailedCommandException {
+  private void setUpExecutor() throws IOException, InterruptedException, FailedStartupException, FailedCommandException {
     LOGGER.trace("Setting up executor...");
     executeLock.lock();
     try {
@@ -353,12 +362,16 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), charset));
         startAndWaitForChildThreads();
         waitForProcessStartup();
-        executeInitialSubmission();
-        LOGGER.trace("Invoking start-up call-back methods...");
-        manager.onStartup();
-        onExecutorStartup();
-        setIdle(true);
-        LOGGER.trace("Executor set up");
+        if (!killed) {
+          executeInitialSubmission();
+          if (!killed) {
+            LOGGER.trace("Invoking start-up call-back methods...");
+            manager.onStartup();
+            onExecutorStartup();
+            setIdle(true);
+            LOGGER.trace("Executor set up");
+          }
+        }
       }
     } finally {
       executeLock.unlock();
@@ -394,6 +407,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       startedUp = false;
       running = false;
       process = null;
+      startupException = null;
       stateLock.notifyAll();
       LOGGER.trace("Invoking termination call-back methods...");
       manager.onTermination(returnCode);

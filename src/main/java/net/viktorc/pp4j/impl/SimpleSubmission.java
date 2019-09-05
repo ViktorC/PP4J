@@ -22,7 +22,7 @@ import java.util.Objects;
 import net.viktorc.pp4j.api.Command;
 
 /**
- * A simple sub-class of the {@link AbstractSubmission} interface that allows for the specification of the commands to execute and the
+ * A simple sub-class of the {@link AbstractSubmission} class that allows for the specification of the commands to execute and the
  * result object to return.
  *
  * @param <T> The expected type of the result of the submission.

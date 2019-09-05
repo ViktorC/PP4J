@@ -28,27 +28,27 @@ import net.viktorc.pp4j.api.ProcessManager;
 public abstract class AbstractProcessManager implements ProcessManager {
 
   private final ProcessBuilder builder;
+  private final Charset charset;
   private final Long keepAliveTime;
 
   /**
    * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with the specified maximum life span.
    *
    * @param builder The instance to build the processes with.
+   * @param charset The character set to use to communicate with the managed process.
    * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
    * of the process will not be limited.
    */
-  protected AbstractProcessManager(ProcessBuilder builder, Long keepAliveTime) {
+  protected AbstractProcessManager(ProcessBuilder builder, Charset charset, Long keepAliveTime) {
+    if (builder == null) {
+      throw new IllegalArgumentException("Process builder cannot be null");
+    }
+    if (charset == null) {
+      throw new IllegalArgumentException("Charset cannot be null");
+    }
     this.builder = builder;
+    this.charset = charset;
     this.keepAliveTime = keepAliveTime;
-  }
-
-  /**
-   * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with an unlimited life span.
-   *
-   * @param builder The instance to build the processes with.
-   */
-  protected AbstractProcessManager(ProcessBuilder builder) {
-    this(builder, null);
   }
 
   @Override
@@ -58,7 +58,7 @@ public abstract class AbstractProcessManager implements ProcessManager {
 
   @Override
   public Charset getEncoding() {
-    return Charset.defaultCharset();
+    return charset;
   }
 
   @Override

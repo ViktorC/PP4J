@@ -18,8 +18,8 @@ package net.viktorc.pp4j.impl;
 import net.viktorc.pp4j.api.FailedCommandException;
 
 /**
- * A simple sub-class of the {@link AbstractCommand} abstract class that relies on a functional interface to implement the
- * {@link AbstractCommand#isExecutionCompleted(String, boolean)} method.
+ * A simple sub-class of the {@link AbstractCommand} class that relies on instances of a functional interface passed to its constructor to
+ * implement the {@link AbstractCommand#isExecutionCompleted(String, boolean)} method.
  *
  * @author Viktor Csomor
  */

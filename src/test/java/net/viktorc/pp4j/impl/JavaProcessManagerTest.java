@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.viktorc.pp4j.api.FailedCommandException;
+import net.viktorc.pp4j.api.FailedStartupException;
 import net.viktorc.pp4j.api.Submission;
 import net.viktorc.pp4j.impl.JavaProcess.Response;
 import net.viktorc.pp4j.impl.JavaProcess.ResponseType;
@@ -33,13 +35,13 @@ import org.junit.Test;
 public class JavaProcessManagerTest extends TestCase {
 
   @Test
-  public void testIsStartedUpReturnsFalseIfLineNotDecodeable() {
+  public void testIsStartedUpReturnsFalseIfLineNotDecodeable() throws FailedStartupException {
     JavaProcessManager<?> javaProcessManager = new JavaProcessManager<>(new ProcessBuilder(""), null, null, null);
     Assert.assertFalse(javaProcessManager.isStartedUp("", false));
   }
 
   @Test
-  public void testIsStartedUpReturnsFalseIfLineFromStdErr() throws IOException {
+  public void testIsStartedUpReturnsFalseIfLineFromStdErr() throws IOException, FailedStartupException {
     JavaProcessManager<?> javaProcessManager = new JavaProcessManager<>(new ProcessBuilder(""), null, null, null);
     Response response = new Response(ResponseType.STARTUP_SUCCESS);
     String line = JavaObjectCodec.getInstance().encode(response);
@@ -47,13 +49,20 @@ public class JavaProcessManagerTest extends TestCase {
   }
 
   @Test
-  public void testIsStartedUpOnlyReturnsTrueIfResponseStartupSuccess() throws IOException {
+  public void testIsStartedUpOnlyReturnsTrueIfResponseStartupSuccess() throws IOException, FailedStartupException {
     JavaProcessManager<?> javaProcessManager = new JavaProcessManager<>(new ProcessBuilder(""), null, null, null);
     JavaObjectCodec codec = JavaObjectCodec.getInstance();
     Assert.assertFalse(javaProcessManager.isStartedUp(codec.encode(new Response(ResponseType.TASK_SUCCESS)), false));
     Assert.assertFalse(javaProcessManager.isStartedUp(codec.encode(new Response(ResponseType.TASK_FAILURE)), false));
     Assert.assertFalse(javaProcessManager.isStartedUp(codec.encode(new Response(ResponseType.PROCESS_FAILURE)), false));
     Assert.assertTrue(javaProcessManager.isStartedUp(codec.encode(new Response(ResponseType.STARTUP_SUCCESS)), false));
+  }
+
+  @Test
+  public void testIsStartedUpThrowsFailedStartupExceptionIfCalledWithJavaFailureMessage() throws FailedStartupException {
+    JavaProcessManager<?> javaProcessManager = new JavaProcessManager<>(new ProcessBuilder(""), null, null, null);
+    exceptionRule.expect(FailedStartupException.class);
+    javaProcessManager.isStartedUp(JavaProcessManager.JAVA_FATAL_ERROR_MESSAGE, false);
   }
 
   @Test

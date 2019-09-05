@@ -63,8 +63,9 @@ public interface ProcessManager {
    * @param outputLine A line of output produced by the process.
    * @param error Whether this line has been output to the standard error or the standard out stream.
    * @return Whether the process is to be considered started up.
+   * @throws FailedStartupException If the output signals a process failure and the process is not expected to recover.
    */
-  boolean isStartedUp(String outputLine, boolean error);
+  boolean isStartedUp(String outputLine, boolean error) throws FailedStartupException;
 
   /**
    * Determines the duration of continuous idleness after which the process is to be terminated. The process is considered idle if it is

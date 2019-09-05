@@ -28,9 +28,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An implementation of the {@link net.viktorc.pp4j.api.ProcessExecutor} interface that allows for the running and management of a process
- * based on a {@link ProcessManager} instance to enable the execution of submissions in this process. The process may be launched by
- * invoking the {@link #start()} method and submissions may be executed in the process using the {@link #execute(Submission)} method.
+ * An sub-class of the {@link AbstractProcessExecutor} class for the running and management of a process using a {@link ProcessManager}
+ * instance to allow for the execution of submissions in this process. The process may be launched by invoking the {@link #start()} method
+ * and submissions may be executed in the process using the {@link #execute(Submission)} method.
  *
  * @author Viktor Csomor
  */

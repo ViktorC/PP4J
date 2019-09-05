@@ -257,7 +257,9 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       }
     }
     poolInitLatch.await();
-    LOGGER.debug("Pool started up");
+    if (!shutdown) {
+      LOGGER.debug("Pool started up");
+    }
   }
 
   /**

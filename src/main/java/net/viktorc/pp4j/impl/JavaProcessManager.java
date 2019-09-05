@@ -17,9 +17,7 @@ package net.viktorc.pp4j.impl;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.nio.charset.Charset;
-import java.util.Optional;
-import net.viktorc.pp4j.api.Submission;
+import net.viktorc.pp4j.api.FailedStartupException;
 import net.viktorc.pp4j.impl.JavaProcess.Response;
 import net.viktorc.pp4j.impl.JavaProcess.ResponseType;
 import org.slf4j.Logger;
@@ -32,12 +30,14 @@ import org.slf4j.LoggerFactory;
  * startup task.
  * @author Viktor Csomor
  */
-public class JavaProcessManager<T extends Runnable & Serializable> extends AbstractProcessManager {
+public class JavaProcessManager<T extends Runnable & Serializable> extends SimpleProcessManager {
+
+  /**
+   * The message the Java application launcher outputs if it fails (due to illegal arguments).
+   */
+  public static final String JAVA_FATAL_ERROR_MESSAGE = "Error: A fatal exception has occurred. Program will exit.";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JavaProcessManager.class);
-
-  private final T initTask;
-  private final T wrapUpTask;
 
   /**
    * Constructs a <code>JavaProcessManager</code> instance using the specified parameters.
@@ -51,61 +51,39 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Abstr
    * <code>null</code>, the life-cycle of processes will not be limited based on idleness.
    */
   public JavaProcessManager(ProcessBuilder builder, T initTask, T wrapUpTask, Long keepAliveTime) {
-    super(builder, keepAliveTime);
-    this.initTask = initTask;
-    this.wrapUpTask = wrapUpTask;
-  }
-
-  @Override
-  public boolean startsUpInstantly() {
-    return false;
-  }
-
-  @Override
-  public boolean isStartedUp(String outputLine, boolean error) {
-    if (!error) {
-      try {
-        Object output = JavaObjectCodec.getInstance().decode(outputLine);
-        if (output instanceof Response) {
-          Response response = (Response) output;
-          if (response.getType() == ResponseType.PROCESS_FAILURE) {
-            LOGGER.error("Java process error during startup", response.getError().orElse(null));
+    super(builder,
+        JavaObjectCodec.CHARSET,
+        keepAliveTime,
+        (outputLine, error) -> {
+          if (!error) {
+            if (outputLine.contains(JAVA_FATAL_ERROR_MESSAGE)) {
+              throw new FailedStartupException("Java process startup failed");
+            }
+            try {
+              Object output = JavaObjectCodec.getInstance().decode(outputLine);
+              if (output instanceof Response) {
+                Response response = (Response) output;
+                if (response.getType() == ResponseType.PROCESS_FAILURE) {
+                  LOGGER.error("Java process error during startup", response.getError().orElse(null));
+                }
+                return response.getType() == ResponseType.STARTUP_SUCCESS;
+              }
+            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
+              LOGGER.trace(e.getMessage(), e);
+            }
           }
-          return response.getType() == ResponseType.STARTUP_SUCCESS;
-        }
-      } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
-        LOGGER.trace(e.getMessage(), e);
-      }
-    }
-    return false;
-  }
-
-  @Override
-  public Optional<Submission<?>> getInitSubmission() {
-    if (initTask != null) {
-      return Optional.of(new JavaSubmission<>(initTask));
-    }
-    return Optional.empty();
-  }
-
-  @Override
-  public Optional<Submission<?>> getTerminationSubmission() {
-    // Avoid having to serialize the enclosing instance.
-    T wrapUpTask = this.wrapUpTask;
-    return Optional.of(new JavaSubmission<>((Runnable & Serializable) () -> {
-      try {
-        if (wrapUpTask != null) {
-          wrapUpTask.run();
-        }
-      } finally {
-        JavaProcess.exit();
-      }
-    }));
-  }
-
-  @Override
-  public Charset getEncoding() {
-    return JavaObjectCodec.CHARSET;
+          return false;
+        },
+        () -> initTask == null ? null : new JavaSubmission<>(initTask),
+        () -> new JavaSubmission<>((Runnable & Serializable) () -> {
+          try {
+            if (wrapUpTask != null) {
+              wrapUpTask.run();
+            }
+          } finally {
+            JavaProcess.exit();
+          }
+        }));
   }
 
 }

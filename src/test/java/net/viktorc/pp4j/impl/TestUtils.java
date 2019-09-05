@@ -19,6 +19,8 @@ import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.Charset;
+import net.viktorc.pp4j.api.FailedStartupException;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 
@@ -131,19 +133,13 @@ class TestUtils {
     @Override
     public ProcessManager newProcessManager() {
       return new SimpleProcessManager(builder,
+          Charset.defaultCharset(),
           keepAliveTime,
-          verifyStartup ? (outputLine, error) -> !error && "hi".equals(outputLine) : null,
+          throwStartupException ? (outputLine, error) -> {
+            throw new FailedStartupException("test");
+          } : verifyStartup ? (outputLine, error) -> !error && "hi".equals(outputLine) : null,
           () -> executeInitSubmission ? new SimpleSubmission<>(new SimpleCommand("start", (c, o) -> "ok".equals(o))) : null,
-          () -> manuallyTerminate ? new SimpleSubmission<>(new SimpleCommand("stop", (c, o) -> "bye".equals(o))) : null) {
-
-        @Override
-        public boolean startsUpInstantly() {
-          if (throwStartupException) {
-            throw new RuntimeException("Test startup exception.");
-          }
-          return !verifyStartup;
-        }
-      };
+          () -> manuallyTerminate ? new SimpleSubmission<>(new SimpleCommand("stop", (c, o) -> "bye".equals(o))) : null);
     }
 
   }
