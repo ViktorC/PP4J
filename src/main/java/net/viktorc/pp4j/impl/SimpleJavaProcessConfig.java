@@ -43,7 +43,6 @@ public class SimpleJavaProcessConfig implements JavaProcessConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleJavaProcessConfig.class);
 
   private final String javaLauncherCommand;
-  private final JVMArch arch;
   private final JVMType type;
   private final Integer initHeapSizeMb;
   private final Integer maxHeapSizeMb;
@@ -54,17 +53,15 @@ public class SimpleJavaProcessConfig implements JavaProcessConfig {
    * Constructs a <code>SimpleJavaProcessConfig</code> instance according to the specified parameters.
    *
    * @param javaLauncherCommand The command for the Java application launcher.
-   * @param arch The architecture of the JVM. If it is null, it will be ignored.
    * @param type The type of the JVM. If it is null, it will be ignored.
    * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is null, it will be ignored.
    * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is null, it will be ignored.
    * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is null, it will be ignored.
    * @param additionalClassPaths Any additional class paths to be used by the JVM. Null entries and empty strings will be ignored.
    */
-  public SimpleJavaProcessConfig(String javaLauncherCommand, JVMArch arch, JVMType type, Integer initHeapSizeMb, Integer maxHeapSizeMb,
+  public SimpleJavaProcessConfig(String javaLauncherCommand, JVMType type, Integer initHeapSizeMb, Integer maxHeapSizeMb,
       Integer stackSizeKb, String... additionalClassPaths) {
     this.javaLauncherCommand = javaLauncherCommand;
-    this.arch = arch;
     this.type = type;
     this.initHeapSizeMb = initHeapSizeMb;
     this.maxHeapSizeMb = maxHeapSizeMb;
@@ -78,14 +75,13 @@ public class SimpleJavaProcessConfig implements JavaProcessConfig {
   /**
    * Constructs a <code>SimpleJavaProcessConfig</code> instance according to the specified parameters.
    *
-   * @param arch The architecture of the JVM. If it is null, it will be ignored.
    * @param type The type of the JVM. If it is null, it will be ignored.
    * @param initHeapSizeMb The initial heap size of the JVM in megabytes. If it is null, it will be ignored.
    * @param maxHeapSizeMb The maximum heap size of the JVM in megabytes. If it is null, it will be ignored.
    * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is null, it will be ignored.
    */
-  public SimpleJavaProcessConfig(JVMArch arch, JVMType type, Integer initHeapSizeMb, Integer maxHeapSizeMb, Integer stackSizeKb) {
-    this(DEFAULT_JAVA_LAUNCHER_COMMAND, arch, type, initHeapSizeMb, maxHeapSizeMb, stackSizeKb);
+  public SimpleJavaProcessConfig(JVMType type, Integer initHeapSizeMb, Integer maxHeapSizeMb, Integer stackSizeKb) {
+    this(DEFAULT_JAVA_LAUNCHER_COMMAND, type, initHeapSizeMb, maxHeapSizeMb, stackSizeKb);
   }
 
   /**
@@ -96,7 +92,7 @@ public class SimpleJavaProcessConfig implements JavaProcessConfig {
    * @param stackSizeKb The maximum stack size of the JVM in kilobytes. If it is null, it will be ignored.
    */
   public SimpleJavaProcessConfig(Integer initHeapSizeMb, Integer maxHeapSizeMb, Integer stackSizeKb) {
-    this(null, null, initHeapSizeMb, maxHeapSizeMb, stackSizeKb);
+    this(null, initHeapSizeMb, maxHeapSizeMb, stackSizeKb);
   }
 
   /**
@@ -106,7 +102,7 @@ public class SimpleJavaProcessConfig implements JavaProcessConfig {
    * @param additionalClassPaths Any additional class paths to be used by the JVM. Null entries and empty strings will be ignored.
    */
   public SimpleJavaProcessConfig(String javaLauncherCommand, String... additionalClassPaths) {
-    this(javaLauncherCommand, null, null, null, null, null, additionalClassPaths);
+    this(javaLauncherCommand, null, null, null, null, additionalClassPaths);
   }
 
   /**
@@ -155,11 +151,6 @@ public class SimpleJavaProcessConfig implements JavaProcessConfig {
     getDefaultClassPath().ifPresent(classPaths::add);
     Optional.ofNullable(additionalClassPath).ifPresent(classPaths::add);
     return Optional.ofNullable(classPaths.isEmpty() ? null : String.join(File.pathSeparator, classPaths));
-  }
-
-  @Override
-  public Optional<JVMArch> getArch() {
-    return Optional.ofNullable(arch);
   }
 
   @Override

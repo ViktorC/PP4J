@@ -19,7 +19,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import net.viktorc.pp4j.api.JavaProcessConfig;
-import net.viktorc.pp4j.api.JavaProcessConfig.JVMArch;
 import net.viktorc.pp4j.api.JavaProcessConfig.JVMType;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
@@ -110,7 +109,6 @@ public class JavaProcessManagerFactory<T extends Runnable & Serializable> implem
       javaOptions.add("-cp");
       javaOptions.add(v);
     });
-    config.getArch().ifPresent(v -> javaOptions.add(v == JVMArch.BIT_32 ? "-d32" : "-d64"));
     config.getType().ifPresent(v -> javaOptions.add(v == JVMType.CLIENT ? "-client" : "-server"));
     config.getInitHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xms%dm", v)));
     config.getMaxHeapSizeMb().ifPresent(v -> javaOptions.add(String.format("-Xmx%dm", v)));
