@@ -27,6 +27,7 @@
   </scm>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>8</maven.compiler.source>
   </properties>
   <distributionManagement>
     <snapshotRepository>
@@ -98,8 +99,8 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.8.1</version>
         <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
+          <source>${maven.compiler.source}</source>
+          <target>${maven.compiler.source}</target>
         </configuration>
       </plugin>
       <plugin>
@@ -107,6 +108,7 @@
         <artifactId>maven-javadoc-plugin</artifactId>
         <version>3.1.1</version>
         <configuration>
+          <source>${maven.compiler.source}</source>
           <noqualifier>all</noqualifier>
           <reportOutputDirectory>${basedir}/docs</reportOutputDirectory>
           <destDir>docs</destDir>
