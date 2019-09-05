@@ -111,13 +111,15 @@ public abstract class AbstractCommand implements Command {
 
   @Override
   public final boolean isCompleted(String outputLine, boolean error) throws FailedCommandException {
-    boolean completed = isExecutionCompleted(outputLine, error);
-    if (error) {
-      stdErrLines.add(outputLine);
-    } else {
-      stdOutLines.add(outputLine);
+    try {
+      return isExecutionCompleted(outputLine, error);
+    } finally {
+      if (error) {
+        stdErrLines.add(outputLine);
+      } else {
+        stdOutLines.add(outputLine);
+      }
     }
-    return completed;
   }
 
 }

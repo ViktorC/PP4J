@@ -92,4 +92,44 @@ public class SimpleCommandTest extends TestCase {
     Assert.assertEquals(String.format("dog%n3"), jointStdErrLines);
   }
 
+  @Test
+  public void testSavesProcessOutputEvenIfFailedCommandExceptionThrown() throws FailedCommandException {
+    String errorTriggerMessage = "boop";
+    SimpleCommand command = new SimpleCommand("", (c, o) -> {
+      if (errorTriggerMessage.equals(o)) {
+        throw new FailedCommandException(c, o);
+      }
+      return true;
+    });
+    command.isCompleted("hi", false);
+    command.isCompleted("ho", false);
+    exceptionRule.expect(FailedCommandException.class);
+    try {
+      command.isCompleted(errorTriggerMessage, false);
+    } finally {
+      Assert.assertEquals(0, command.getStandardErrLines().size());
+      Assert.assertEquals(3, command.getStandardOutLines().size());
+      Assert.assertEquals("", command.getJointStandardErrLines());
+      Assert.assertEquals(String.format("hi%nho%n%s", errorTriggerMessage), command.getJointStandardOutLines());
+    }
+  }
+
+  @Test
+  public void testResetClearsSavedProcessOutput() throws FailedCommandException {
+    SimpleCommand command = new SimpleCommand("", (c, o) -> "jiff".equals(o), (c, o) -> "jeff".equals(o));
+    command.isCompleted("wut", true);
+    command.isCompleted("meng", false);
+    command.isCompleted("blob", true);
+    command.isCompleted("derp", false);
+    Assert.assertEquals(2, command.getStandardOutLines().size());
+    Assert.assertEquals(2, command.getStandardErrLines().size());
+    Assert.assertEquals(String.format("meng%nderp"), command.getJointStandardOutLines());
+    Assert.assertEquals(String.format("wut%nblob"), command.getJointStandardErrLines());
+    command.reset();
+    Assert.assertEquals(0, command.getStandardOutLines().size());
+    Assert.assertEquals(0, command.getStandardErrLines().size());
+    Assert.assertEquals("", command.getJointStandardOutLines());
+    Assert.assertEquals("", command.getJointStandardErrLines());
+  }
+
 }
