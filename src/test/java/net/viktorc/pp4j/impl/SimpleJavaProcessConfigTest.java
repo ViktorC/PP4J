@@ -27,55 +27,55 @@ import org.junit.Test;
 public class SimpleJavaProcessConfigTest extends TestCase {
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfJavaLauncherCommandNull() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfJavaLauncherCommandNull() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig(null);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfJavaLauncherCommandEmpty() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfJavaLauncherCommandEmpty() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig("");
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfInitHeapSizeNegative() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfInitHeapSizeNegative() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig(-1, 1, 1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfInitHeapSizeZero() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfInitHeapSizeZero() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig(0, 1, 1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfMaxHeapSizeNegative() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfMaxHeapSizeNegative() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig(1, -1, 1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfMaxHeapSizeZero() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfMaxHeapSizeZero() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig(1, 0, 1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfStackSizeNegative() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfStackSizeNegative() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig(1, 1, -1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfStackSizeZero() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfStackSizeZero() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig(1, 1, 0);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfInitHeapSizeGreaterThanMaxHeapSize() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfInitHeapSizeGreaterThanMaxHeapSize() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleJavaProcessConfig(2, 1, 0);
   }

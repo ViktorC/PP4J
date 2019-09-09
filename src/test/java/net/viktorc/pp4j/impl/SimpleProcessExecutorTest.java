@@ -40,7 +40,7 @@ public class SimpleProcessExecutorTest extends TestCase {
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfProcessManagerNull() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfProcessManagerNull() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleProcessExecutor(null);
   }
@@ -76,7 +76,7 @@ public class SimpleProcessExecutorTest extends TestCase {
   }
 
   @Test
-  public void testThrowsIllegalStateExceptionIfStartingAlreadyStartedExecutor() throws Exception {
+  public void testStartThrowsIllegalStateExceptionIfAlreadyStarted() throws Exception {
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       executor.start();
       exceptionRule.expect(IllegalStateException.class);
@@ -85,7 +85,7 @@ public class SimpleProcessExecutorTest extends TestCase {
   }
 
   @Test
-  public void testThrowsIllegalStateExceptionIfRunningAlreadyStartedExecutor() throws Exception {
+  public void testRunThrowsIllegalStateExceptionIfAlreadyStarted() throws Exception {
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       executor.start();
       exceptionRule.expect(IllegalStateException.class);
@@ -94,7 +94,7 @@ public class SimpleProcessExecutorTest extends TestCase {
   }
 
   @Test
-  public void testThrowsIllegalStateExceptionIfStartingAlreadyRunningExecutor() throws Exception {
+  public void testStartThrowsIllegalStateExceptionIfAlreadyRunning() throws Exception {
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       Thread thread = new Thread(executor);
       thread.start();
@@ -105,7 +105,7 @@ public class SimpleProcessExecutorTest extends TestCase {
   }
 
   @Test
-  public void testThrowsIllegalStateExceptionIfRunningAlreadyRunningExecutor() throws Exception {
+  public void testRunThrowsIllegalStateExceptionIfAlreadyRunning() throws Exception {
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       Thread thread = new Thread(executor);
       thread.start();
@@ -159,9 +159,11 @@ public class SimpleProcessExecutorTest extends TestCase {
   @Test
   public void testExecuteSubmission() throws Exception {
     AtomicReference<String> stringReference = new AtomicReference<>();
+    String intermediateMessage = "in progress";
+    String completionMessage = "ready";
     SimpleCommand command = new SimpleCommand("process 3", (o, s) -> {
-      if ("ready".equals(o)) {
-        stringReference.set("ready");
+      if (completionMessage.equals(o)) {
+        stringReference.set(completionMessage);
         return true;
       }
       return false;
@@ -171,8 +173,11 @@ public class SimpleProcessExecutorTest extends TestCase {
       executor.start();
       executor.execute(submission);
       Assert.assertTrue(submission.getResult().isPresent());
-      Assert.assertEquals("ready", submission.getResult().get().get());
-      Assert.assertTrue(command.getCommandOutputStore().getJointStandardOutLines().contains("in progress\nin progress\nready"));
+      Assert.assertEquals(completionMessage, submission.getResult().get().get());
+      Assert.assertTrue(command
+          .getCommandOutputStore()
+          .getJointStandardOutLines()
+          .contains(String.format("%s%n%s%n%s", intermediateMessage, intermediateMessage, completionMessage)));
     }
   }
 

@@ -28,6 +28,18 @@ import org.junit.Test;
 public class SimpleCommandTest extends TestCase {
 
   @Test
+  public void testConstructorThrowsExceptionIfInstructionNull() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleCommand(null);
+  }
+
+  @Test
+  public void testConstructorThrowsExceptionIfPredicateNull() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleCommand("", (o, s) -> true, null);
+  }
+
+  @Test
   public void testGeneratesOutputFalseIfNoCompletionPredicatesDefined() {
     SimpleCommand command = new SimpleCommand("");
     Assert.assertFalse(command.generatesOutput());
@@ -37,18 +49,6 @@ public class SimpleCommandTest extends TestCase {
   public void testGeneratesOutputTrueIfCompletionPredicatesDefined() {
     SimpleCommand command = new SimpleCommand("", (o, s) -> true, (o, s) -> false);
     Assert.assertTrue(command.generatesOutput());
-  }
-
-  @Test
-  public void testThrowsExceptionIfInstructionNull() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new SimpleCommand(null);
-  }
-
-  @Test
-  public void testThrowsExceptionIfPredicateNull() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new SimpleCommand("", (o, s) -> true, null);
   }
 
   @Test

@@ -25,7 +25,7 @@ import org.junit.Test;
 public class JavaProcessManagerFactoryTest extends TestCase {
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfConfigNull() {
+  public void testConstructorThrowsIllegalArgumentExceptionIfConfigNull() {
     exceptionRule.expect(IllegalArgumentException.class);
     new JavaProcessManagerFactory<>(null);
   }

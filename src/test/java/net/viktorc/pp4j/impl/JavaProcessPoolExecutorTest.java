@@ -225,7 +225,7 @@ public class JavaProcessPoolExecutorTest extends TestCase {
     int multiplicand1 = 3;
     int multiplicand2 = 4;
     Future<Integer> future = pool.submit((Callable<Integer> & Serializable) () -> multiplicand1 * multiplicand2);
-    Assert.assertEquals(new Integer(12), future.get());
+    Assert.assertEquals(Integer.valueOf(12), future.get());
     pool.shutdown();
     pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
   }
@@ -259,7 +259,7 @@ public class JavaProcessPoolExecutorTest extends TestCase {
     JavaProcessPoolExecutor pool = new JavaProcessPoolExecutor(new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(), null,
         (Runnable & Serializable) newRunnableForWritingMessageToFile(tempFile, message), null), 1, 1, 0);
     Future<Integer> future = pool.submit((Callable<Integer> & Serializable) () -> 1, true);
-    Assert.assertEquals(new Integer(1), future.get());
+    Assert.assertEquals(Integer.valueOf(1), future.get());
     Thread.sleep(WAIT_TIME_FOR_CONCURRENT_EVENTS);
     Assert.assertEquals(message, readFileContents(tempFile));
     pool.shutdown();
@@ -407,7 +407,7 @@ public class JavaProcessPoolExecutorTest extends TestCase {
     Assert.assertEquals(6, futures.size());
     for (Future<Integer> future : futures) {
       Assert.assertTrue(future.isDone());
-      Assert.assertEquals(new Integer(3), future.get());
+      Assert.assertEquals(Integer.valueOf(3), future.get());
     }
     pool.shutdown();
     pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -479,7 +479,7 @@ public class JavaProcessPoolExecutorTest extends TestCase {
       Assert.assertTrue(future.isCancelled());
       try {
         future.get();
-        Assert.assertTrue(false);
+        Assert.fail();
       } catch (Exception e) {
         Assert.assertTrue(e instanceof CancellationException);
       }

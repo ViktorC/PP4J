@@ -160,55 +160,55 @@ public class ProcessPoolExecutorTest extends TestCase {
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfProcessManagerFactoryNull() throws InterruptedException {
+  public void testConstructorThrowsIllegalArgumentExceptionIfProcessManagerFactoryNull() throws InterruptedException {
     exceptionRule.expect(IllegalArgumentException.class);
     new ProcessPoolExecutor(null, 1, 5, 1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfMinPoolSizeNegative() throws InterruptedException {
+  public void testConstructorThrowsIllegalArgumentExceptionIfMinPoolSizeNegative() throws InterruptedException {
     exceptionRule.expect(IllegalArgumentException.class);
     new ProcessPoolExecutor(new TestProcessManagerFactory(), -1, 5, 1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfMaxPoolSizeZero() throws InterruptedException {
+  public void testConstructorThrowsIllegalArgumentExceptionIfMaxPoolSizeZero() throws InterruptedException {
     exceptionRule.expect(IllegalArgumentException.class);
     new ProcessPoolExecutor(new TestProcessManagerFactory(), 0, 0, 0);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfMaxPoolSizeLessThanMinPoolSize() throws InterruptedException {
+  public void testConstructorThrowsIllegalArgumentExceptionIfMaxPoolSizeLessThanMinPoolSize() throws InterruptedException {
     exceptionRule.expect(IllegalArgumentException.class);
     new ProcessPoolExecutor(new TestProcessManagerFactory(), 3, 2, 1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfReserveSizeNegative() throws InterruptedException {
+  public void testConstructorThrowsIllegalArgumentExceptionIfReserveSizeNegative() throws InterruptedException {
     exceptionRule.expect(IllegalArgumentException.class);
     new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 5, -1);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIReserveSizeGreaterThanMaxPoolSize() throws InterruptedException {
+  public void testConstructorThrowsIllegalArgumentExceptionIReserveSizeGreaterThanMaxPoolSize() throws InterruptedException {
     exceptionRule.expect(IllegalArgumentException.class);
     new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 3, 4);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfThreadKeepAliveTimeZero() throws InterruptedException {
+  public void testConstructorThrowsIllegalArgumentExceptionIfThreadKeepAliveTimeZero() throws InterruptedException {
     exceptionRule.expect(IllegalArgumentException.class);
     new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 5, 3, 0);
   }
 
   @Test
-  public void testThrowsIllegalArgumentExceptionIfThreadKeepAliveTimeNegative() throws InterruptedException {
+  public void testConstructorThrowsIllegalArgumentExceptionIfThreadKeepAliveTimeNegative() throws InterruptedException {
     exceptionRule.expect(IllegalArgumentException.class);
     new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 5, 3, -1);
   }
 
   @Test
-  public void testThrowsInterruptedExceptionIfConstructorInterrupted() throws InterruptedException {
+  public void testConstructorThrowsInterruptedExceptionIfConstructorInterrupted() throws InterruptedException {
     Thread.currentThread().interrupt();
     exceptionRule.expect(InterruptedException.class);
     new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 1, 0);
@@ -552,9 +552,10 @@ public class ProcessPoolExecutorTest extends TestCase {
   @Test
   public void testExecuteSubmissionWithReturnValue() throws InterruptedException, DisruptedExecutionException, FailedCommandException {
     AtomicReference<String> stringReference = new AtomicReference<>();
+    String completionMessage = "ready";
     Command command = new SimpleCommand("process 1", (o, s) -> {
-      if ("ready".equals(o)) {
-        stringReference.set("ready");
+      if (completionMessage.equals(o)) {
+        stringReference.set(completionMessage);
         return true;
       }
       return false;
@@ -563,7 +564,7 @@ public class ProcessPoolExecutorTest extends TestCase {
     ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 1, 0);
     pool.execute(submission);
     Assert.assertTrue(submission.getResult().isPresent());
-    Assert.assertEquals("ready", submission.getResult().get().get());
+    Assert.assertEquals(completionMessage, submission.getResult().get().get());
     pool.shutdown();
     pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
   }

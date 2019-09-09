@@ -42,13 +42,15 @@ public class SimpleProcessManagerTest extends TestCase {
 
   @Test
   public void testIsStartedUpReturnsTrueIfAppropriatePredicateDoes() throws FailedStartupException {
+    String stdOutStartupMessage = "ready";
+    String stdErrStartupMessage = "recovered";
     SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(),
-        (o, s) -> "ready".equals(o), (o, s) -> "recovered".equals(o));
+        (o, s) -> stdOutStartupMessage.equals(o), (o, s) -> stdErrStartupMessage.equals(o));
     Assert.assertFalse(manager.isStartedUp("bla", false));
-    Assert.assertFalse(manager.isStartedUp("ready", true));
-    Assert.assertTrue(manager.isStartedUp("ready", false));
-    Assert.assertFalse(manager.isStartedUp("recovered", false));
-    Assert.assertTrue(manager.isStartedUp("recovered", true));
+    Assert.assertFalse(manager.isStartedUp(stdOutStartupMessage, true));
+    Assert.assertTrue(manager.isStartedUp(stdOutStartupMessage, false));
+    Assert.assertFalse(manager.isStartedUp(stdErrStartupMessage, false));
+    Assert.assertTrue(manager.isStartedUp(stdErrStartupMessage, true));
   }
 
   @Test

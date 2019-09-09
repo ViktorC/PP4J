@@ -32,25 +32,25 @@ import org.junit.Test;
 public class SimpleSubmissionTest extends TestCase {
 
   @Test
-  public void testThrowsExceptionIfCommandsNull() {
+  public void testConstructorThrowsExceptionIfCommandsNull() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleSubmission<>((List<Command>) null);
   }
 
   @Test
-  public void testThrowsExceptionIfCommandsEmpty() {
+  public void testConstructorThrowsExceptionIfCommandsEmpty() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleSubmission<>(Collections.emptyList());
   }
 
   @Test
-  public void testThrowsExceptionIfCommandsAllNull() {
+  public void testConstructorThrowsExceptionIfCommandsAllNull() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleSubmission<>(Collections.singletonList(null));
   }
 
   @Test
-  public void testThrowsExceptionIfCommandsContainNull() {
+  public void testConstructorThrowsExceptionIfCommandsContainNull() {
     exceptionRule.expect(IllegalArgumentException.class);
     new SimpleSubmission<>(Arrays.asList(new SimpleCommand(""), null));
   }
@@ -64,8 +64,9 @@ public class SimpleSubmissionTest extends TestCase {
   @Test
   public void testReturnsCorrectResult() throws FailedCommandException {
     AtomicInteger result = new AtomicInteger(0);
+    String completionMessage = "done";
     SimpleSubmission<AtomicInteger> submission = new SimpleSubmission<>(new SimpleCommand("", (o, s) -> {
-      if ("done".equals(o)) {
+      if (completionMessage.equals(o)) {
         result.set(1);
         return true;
       }
@@ -75,7 +76,7 @@ public class SimpleSubmissionTest extends TestCase {
     command.isCompleted("not quite done", false);
     Assert.assertTrue(submission.getResult().isPresent());
     Assert.assertEquals(0, submission.getResult().get().get());
-    command.isCompleted("done", false);
+    command.isCompleted(completionMessage, false);
     Assert.assertTrue(submission.getResult().isPresent());
     Assert.assertEquals(1, submission.getResult().get().get());
   }

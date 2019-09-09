@@ -48,7 +48,7 @@ public class JavaSubmissionTest extends TestCase {
   }
 
   @Test
-  public void testThrowsUncheckedIOExceptionIfNotSerializable() {
+  public void testConstructorThrowsUncheckedIOExceptionIfNotSerializable() {
     Object nonSerializableObject = new Object();
     exceptionRule.expect(UncheckedIOException.class);
     new JavaSubmission<>((Runnable & Serializable) () -> System.out.println(nonSerializableObject));
@@ -74,7 +74,7 @@ public class JavaSubmissionTest extends TestCase {
   public void testTaskReturnsCorrectValue() throws Exception {
     JavaSubmission<Integer> javaSubmission = new JavaSubmission<>((Callable<Integer> & Serializable) () -> 1);
     SerializableTask<Integer> task = javaSubmission.getTask();
-    Assert.assertEquals(new Integer(1), task.call());
+    Assert.assertEquals(Integer.valueOf(1), task.call());
   }
 
   @Test
