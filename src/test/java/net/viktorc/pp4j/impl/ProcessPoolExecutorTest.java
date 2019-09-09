@@ -675,4 +675,26 @@ public class ProcessPoolExecutorTest extends TestCase {
     Assert.assertTrue(pool.forceShutdown().isEmpty());
   }
 
+  @Test
+  public void testAwaitTerminationReturnsTrueIfPoolTerminatesInTime() throws InterruptedException {
+    ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 1, 0);
+    pool.submit(newSimpleSubmission());
+    pool.shutdown();
+    Assert.assertFalse(pool.isTerminated());
+    Assert.assertTrue(pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS));
+    Assert.assertTrue(pool.isTerminated());
+  }
+
+  @Test
+  public void testAwaitTerminationReturnsFalseIfItTimesOut() throws InterruptedException {
+    ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 1, 0);
+    pool.submit(newSimpleSubmission());
+    pool.shutdown();
+    Assert.assertFalse(pool.isTerminated());
+    Assert.assertFalse(pool.awaitTermination(WAIT_TIME_FOR_CONCURRENT_EVENTS, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(pool.isTerminated());
+    Assert.assertTrue(pool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS));
+    Assert.assertTrue(pool.isTerminated());
+  }
+
 }
