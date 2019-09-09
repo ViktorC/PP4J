@@ -16,9 +16,9 @@
 package net.viktorc.pp4j.api;
 
 /**
- * An interface that defines methods for providing an instruction string and processing of the outputs of the process in response to the
+ * An interface that defines methods for providing an instruction string and for processing the outputs of the process in response to the
  * instruction. The {@link #isCompleted(String, boolean)} method is invoked every time a new line is output to one the process' standard
- * streams and is responsible for determining when the process finished executing the command.
+ * streams and is responsible for determining when the execution of the command is completed.
  *
  * @author Viktor Csomor
  */
@@ -33,17 +33,17 @@ public interface Command extends Resettable {
 
   /**
    * A method called before the issuing of the instruction. It denotes whether the command is expected to generate output. If it returns
-   * <code>false</code>, the command is considered successfully processed as soon as it is written to the process' standard in and
-   * therefore the process is considered ready for new commands right away. If it returns <code>true</code>, the
-   * {@link #isCompleted(String, boolean)} method determines when the command is deemed processed.
+   * <code>false</code>, the command is considered successfully processed as soon as the instruction is written to the process' standard
+   * in and therefore, the process is considered ready for new commands right away. If it returns <code>true</code>, the
+   * {@link #isCompleted(String, boolean)} method determines when the command's execution can be considered completed.
    *
    * @return Whether the executing process is expected to generate output in response to the command.
    */
   boolean generatesOutput();
 
   /**
-   * A method called every time a new line is printed to the standard out or standard error stream of the process after the command has
-   * been sent to its standard in until the method returns <code>true</code> or throws a <code>FailedCommandException</code>.
+   * A method called every time a new line is printed to the standard out or standard error stream of the process after the command is
+   * sent to its standard in stream until <code>true</code> is returned or a <code>FailedCommandException</code> is thrown.
    *
    * @param outputLine The new line of output printed to the standard out of the process.
    * @param error Whether this line has been output to the standard error or to the standard out stream.

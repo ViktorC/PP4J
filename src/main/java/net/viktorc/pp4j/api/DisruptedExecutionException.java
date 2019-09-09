@@ -16,7 +16,7 @@
 package net.viktorc.pp4j.api;
 
 /**
- * An exception thrown when the execution of a submission is disrupted by an error beyond the submission.
+ * An exception thrown when the execution of a submission is disrupted by an error unrelated to the submission itself.
  *
  * @author Viktor Csomor
  */

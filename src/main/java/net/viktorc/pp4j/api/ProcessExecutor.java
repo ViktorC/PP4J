@@ -16,7 +16,7 @@
 package net.viktorc.pp4j.api;
 
 /**
- * An interface that defines an executor that encapsulates a process and serves as a handle for having the process execute submissions.
+ * An interface that defines an executor that encapsulates a process and allows for executing submissions in this process.
  *
  * @author Viktor Csomor
  */
@@ -30,8 +30,8 @@ public interface ProcessExecutor {
    * @param submission The submission to execute.
    * @throws FailedCommandException If one of the submission's commands fails.
    * @throws DisruptedExecutionException If the executor is stopped before it could complete the execution of the submission, or if there
-   * is any other error that is not caused by the submission that leaves the execution of the submission incomplete. Implementations of
-   * the <code>ProcessExecutor</code> are encouraged to terminate the executor when throwing this exception.
+   * is any other error unrelated to the submission that leaves the execution of the submission incomplete. Implementations of
+   * <code>ProcessExecutor</code> are encouraged to terminate the executor when throwing this exception.
    */
   void execute(Submission<?> submission) throws FailedCommandException, DisruptedExecutionException;
 

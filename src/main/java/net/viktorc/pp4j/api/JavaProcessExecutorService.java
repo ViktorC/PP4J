@@ -20,7 +20,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
- * An interface for Java process pools that extends both the {@link ProcessExecutorService} and {@link ExecutorService} interfaces.
+ * An interface for Java process executor service that extends both the {@link ProcessExecutorService} and {@link ExecutorService}
+ * interfaces.
  *
  * @author Viktor Csomor
  */
@@ -31,7 +32,7 @@ public interface JavaProcessExecutorService extends ProcessExecutorService, Exec
    *
    * @param task The task to execute.
    * @param terminateProcessAfterwards Whether the process is to be terminated after the execution of the task.
-   * @return A <code>Future</code> instance to allow for waiting for the task to be executed or to cancel it.
+   * @return A <code>Future</code> instance representing the pending completion of the task.
    */
   Future<?> submit(Runnable task, boolean terminateProcessAfterwards);
 
@@ -42,8 +43,7 @@ public interface JavaProcessExecutorService extends ProcessExecutorService, Exec
    * @param result The object representing the result of the operation.
    * @param terminateProcessAfterwards Whether the process is to be terminated after the execution of the task.
    * @param <T> The type of the result.
-   * @return A <code>Future</code> instance to allow for waiting for the task to be executed, to cancel it, or to retrieve the value of the
-   * result of the operation.
+   * @return A <code>Future</code> instance representing the pending completion of the task.
    */
   <T> Future<T> submit(Runnable task, T result, boolean terminateProcessAfterwards);
 
@@ -53,8 +53,7 @@ public interface JavaProcessExecutorService extends ProcessExecutorService, Exec
    * @param task The task to execute.
    * @param terminateProcessAfterwards Whether the process is to be terminated after the execution of the task.
    * @param <T> The type of the result.
-   * @return A <code>Future</code> instance to allow for waiting for the task to be executed, to cancel it, or to retrieve the value of the
-   * result of the operation.
+   * @return A <code>Future</code> instance representing the pending completion of the task.
    */
   <T> Future<T> submit(Callable<T> task, boolean terminateProcessAfterwards);
 

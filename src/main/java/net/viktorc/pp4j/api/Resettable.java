@@ -16,7 +16,8 @@
 package net.viktorc.pp4j.api;
 
 /**
- * An interface for potentially stateful objects that may be reset to their initial state for all intents and purposes.
+ * An interface for potentially stateful objects that may be reset to a state identical to their initial state for all intents and
+ * purposes.
  *
  * @author Viktor Csomor
  */

@@ -20,17 +20,17 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
- * An interface that outlines an executing mechanism for {@link Submission} instances in separate processes and allows for the tracking of
- * the progress of the execution via {@link Future} instances. It also defines the same shutdown-related methods as the
- * {@link java.util.concurrent.ExecutorService} interface to conform to its behaviour specifications.
+ * A {@link ProcessExecutor} for executing {@link Submission} instances in separate processes that facilitates the tracking and management
+ * of the progress of the submissions via {@link Future} instances. It also defines the same shutdown methods as the
+ * {@link java.util.concurrent.ExecutorService} interface and generally conforms to its behaviour specifications.
  *
  * @author Viktor Csomor
  */
 public interface ProcessExecutorService extends ProcessExecutor {
 
   /**
-   * Returns the {@link ProcessManagerFactory} instance responsible for creating instances of an implementation of the
-   * {@link ProcessManager} interface for managing the processes of the pool.
+   * Returns the {@link ProcessManagerFactory} instance responsible for creating instances of the {@link ProcessManager} interface for
+   * managing the processes of the pool.
    *
    * @return The process manager factory of the process pool.
    */
@@ -45,8 +45,7 @@ public interface ProcessExecutorService extends ProcessExecutor {
    * @param terminateProcessAfterwards Whether the process to which the submission is delegated should be terminated after the execution of
    * the submission.
    * @param <T> The type variable of the submission.
-   * @return A <code>Future</code> instance that allows for the waiting for the completion of the execution, the cancellation thereof, or
-   * the retrieval of its optional result.
+   * @return A <code>Future</code> instance representing the pending completion of the task.
    */
   <T> Future<T> submit(Submission<T> submission, boolean terminateProcessAfterwards);
 
@@ -76,7 +75,7 @@ public interface ProcessExecutorService extends ProcessExecutor {
   boolean isShutdown();
 
   /**
-   * Returns whether the process pool has successfully been shut down with all its processes terminated. See {@link
+   * Returns whether the process pool has been shut down with all its processes terminated. See {@link
    * java.util.concurrent.ExecutorService#isTerminated()}.
    *
    * @return Whether all the processes of the pool have terminated.
@@ -88,7 +87,7 @@ public interface ProcessExecutorService extends ProcessExecutor {
    * java.util.concurrent.ExecutorService#awaitTermination(long, TimeUnit)}.
    *
    * @param timeout The amount of time to wait for the pool's termination.
-   * @param unit The unit of the amount.
+   * @param unit The unit of that amount.
    * @return Whether the pool has successfully terminated or a timeout occurred.
    * @throws InterruptedException If the thread is interrupted while the method is blocking.
    */
@@ -101,8 +100,7 @@ public interface ProcessExecutorService extends ProcessExecutor {
    *
    * @param submission The submission to execute.
    * @param <T> The type variable of the submission.
-   * @return A <code>Future</code> instance that allows for the waiting for the completion of the execution, the
-   * cancellation thereof, or the retrieval of its optional result.
+   * @return A <code>Future</code> instance representing the pending completion of the task.
    */
   default <T> Future<T> submit(Submission<T> submission) {
     return submit(submission, false);

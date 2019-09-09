@@ -16,7 +16,7 @@
 package net.viktorc.pp4j.api;
 
 /**
- * A functional interface that defines a method for creating new instances of an implementation of the {@link ProcessManager} interface.
+ * A functional interface that defines a method for creating new instances of the {@link ProcessManager} interface.
  *
  * @author Viktor Csomor
  */

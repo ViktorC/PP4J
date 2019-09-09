@@ -20,7 +20,7 @@ import java.nio.charset.Charset;
 import java.util.Optional;
 
 /**
- * An interface that defines methods that allow for the managing of the life cycle of a process. It defines methods that start the process,
+ * An interface that defines methods that allow for the definition and management of a process. It includes methods that start the process,
  * determine and handle its startup behavior, and allow for its orderly termination. The same instance may be used for the management of
  * multiple subsequent processes, thus the implementation should allow for reusability or rely on the {@link #reset()} method to clear its
  * state.
@@ -30,8 +30,7 @@ import java.util.Optional;
 public interface ProcessManager extends Resettable {
 
   /**
-   * A method that starts a new process. The process created should always be the same and it should always be started only upon the call of
-   * this method.
+   * Starts a new process. The process created should always be the same and it should always be started only upon the call of this method.
    *
    * @return A new process.
    * @throws IOException If the process cannot be started.
@@ -46,23 +45,21 @@ public interface ProcessManager extends Resettable {
   Charset getEncoding();
 
   /**
-   * A method that denotes whether the process should be considered started up instantly or if it is only started up once a certain output
-   * has been printed to its standard out or standard error streams. If it returns <code>true</code>, the  process is instantly considered
-   * started up and ready as soon as it is running, and the method {@link #onStartup()} is executed. If it returns <code>false</code>,
-   * the method {@link #isStartedUp(String, boolean)} determines when the process is considered started up.
+   * Determines whether the process should be considered started up instantly or if it is only started up once a certain output is printed
+   * to its standard out or standard error streams. If it returns <code>true</code>, the  process is immediately considered started up and
+   * ready as soon as it starts running. If it returns <code>false</code>, the method {@link #isStartedUp(String, boolean)} determines
+   * when the process can be considered started up.
    *
-   * @return Whether the process instantly start up as soon as it is run or if it is started up and ready only when a certain output has
-   * been written to one of its output streams.
+   * @return Whether the process can be considered started up and ready for submissions immediately after it starts.
    */
   boolean startsUpInstantly();
 
   /**
-   * Handles the output of the underlying process after it has been started. The return value of the method determines whether the process
-   * is to be considered started up and ready for the execution of the method {@link #onStartup()}. It is only ever called if
-   * {@link #startsUpInstantly()} returns <code>false</code>.
+   * Handles the output of the process after its launch. The return value of the method determines whether the process is to be considered
+   * started up and ready for submissions. It is only ever called if {@link #startsUpInstantly()} returns <code>false</code>.
    *
    * @param outputLine A line of output produced by the process.
-   * @param error Whether this line has been output to the standard error or the standard out stream.
+   * @param error Whether this line was output to the standard error or the standard out stream.
    * @return Whether the process is to be considered started up.
    * @throws FailedStartupException If the output signals a process failure and the process is not expected to recover.
    */
@@ -72,12 +69,12 @@ public interface ProcessManager extends Resettable {
    * Determines the duration of continuous idleness after which the process is to be terminated. The process is considered idle if it is
    * started up and not processing a submission.
    *
-   * @return The number of milliseconds of idleness after which the process is to be terminated.
+   * @return The number of milliseconds of continuous idleness after which the process is to be terminated.
    */
   Optional<Long> getKeepAliveTime();
 
   /**
-   * Returns an optional submission to execute upon starting up the process. No other submissions are to be accepted until this submission
+   * Returns an optional submission to execute upon the startup the process. No other submissions are to be accepted until this submission
    * is processed. If the returned optional is empty, no initial submission is executed.
    *
    * @return The optional initial submission that is for setting up the process for later submissions.
@@ -85,7 +82,7 @@ public interface ProcessManager extends Resettable {
   Optional<Submission<?>> getInitSubmission();
 
   /**
-   * Returns an optional submission for terminating the process.  It allows for an opportunity to execute commands to close resources or
+   * Returns an optional submission for terminating the process. It allows for an opportunity to execute commands to close resources or
    * to exit the process in an orderly way. If the returned optional is empty, the process is killed forcibly.
    *
    * @return The optional termination submission for shutting down the process.
@@ -93,7 +90,7 @@ public interface ProcessManager extends Resettable {
   Optional<Submission<?>> getTerminationSubmission();
 
   /**
-   * A callback method invoked after the process is started up and the initial submission, if there is one, is executed.
+   * A callback method invoked after the process starts up and the initial submission, if there is one, is executed.
    */
   default void onStartup() {
   }

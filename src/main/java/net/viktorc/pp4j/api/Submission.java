@@ -20,7 +20,7 @@ import java.util.Optional;
 
 /**
  * An interface that defines methods necessary for the submission and execution of commands in {@link ProcessExecutor} instances. It also
- * defines methods to call once the processing of the submitted commands has started or finished.
+ * defines methods to call when the processing of the submitted commands starts or finishes.
  *
  * @param <T> The return type associated with the submission.
  * @author Viktor Csomor
@@ -43,13 +43,13 @@ public interface Submission<T> extends Resettable {
   Optional<T> getResult();
 
   /**
-   * A method that is executed once the processing of the submitted commands has begun.
+   * A method that is executed once the processing of the submitted commands begins.
    */
   default void onStartedExecution() {
   }
 
   /**
-   * A method to execute once the processing of the submitted commands has completed.
+   * A method to execute once the processing of the submitted commands finishes.
    */
   default void onFinishedExecution() {
   }

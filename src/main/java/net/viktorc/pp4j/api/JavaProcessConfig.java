@@ -18,7 +18,7 @@ package net.viktorc.pp4j.api;
 import java.util.Optional;
 
 /**
- * An interface for the definition of the Java processes launcher and some of the JVM options.
+ * An interface for the definition of the Java process' launcher command and some of the JVM options.
  *
  * @author Viktor Csomor
  */
@@ -33,7 +33,7 @@ public interface JavaProcessConfig {
   String getJavaLauncherCommand();
 
   /**
-   * Returns a set of paths to load class files from in the Java process, separated by the system's path separator.
+   * Returns a set of paths to load class files from in the Java process, delimited by the system's path separator.
    *
    * @return The class path to use in the JVM.
    */
@@ -61,9 +61,9 @@ public interface JavaProcessConfig {
   Optional<Integer> getMaxHeapSizeMb();
 
   /**
-   * Return the max stack size the JVM should use in kilobytes.
+   * Return the stack size the JVM should use in kilobytes.
    *
-   * @return The max stack size of the JVM in kilobytes.
+   * @return The stack size of the JVM in kilobytes.
    */
   Optional<Integer> getStackSizeKb();
 
