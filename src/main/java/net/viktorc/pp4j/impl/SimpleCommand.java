@@ -35,8 +35,8 @@ public class SimpleCommand extends AbstractCommand {
    * @param instruction The instruction to write to the process' standard in.
    * @param isCompletedStdOut The predicate that allows for the processing of the process' standard output in response to the command and
    * determines when the command is to be considered processed.
-   * @param isCompletedStdErr The predicate that allows for the processing of the process' standard error output in response to the command and
-   * determines when the command is to be considered processed.
+   * @param isCompletedStdErr The predicate that allows for the processing of the process' standard error output in response to the command
+   * and determines when the command is to be considered processed.
    * @throws IllegalArgumentException If either of the two predicates is <code>null</code>.
    */
   public SimpleCommand(String instruction, CommandCompletionPredicate isCompletedStdOut, CommandCompletionPredicate isCompletedStdErr) {
@@ -44,9 +44,9 @@ public class SimpleCommand extends AbstractCommand {
     if (isCompletedStdOut == null || isCompletedStdErr == null) {
       throw new IllegalArgumentException("Command completion predicate cannot be null");
     }
+    generatesOutput = true;
     this.isCompletedStdOut = isCompletedStdOut;
     this.isCompletedStdErr = isCompletedStdErr;
-    generatesOutput = true;
   }
 
   /**
@@ -58,8 +58,8 @@ public class SimpleCommand extends AbstractCommand {
    * determines when the command is to be considered processed.
    */
   public SimpleCommand(String instruction, CommandCompletionPredicate isCompletedStdOut) {
-    this(instruction, isCompletedStdOut, ((command, outputLine) -> {
-      throw new FailedCommandException(command, outputLine);
+    this(instruction, isCompletedStdOut, ((outputLine, outputStore) -> {
+      throw new FailedCommandException(String.format("Command failure indicated by %s printed to stderr", outputLine));
     }));
   }
 
@@ -70,9 +70,9 @@ public class SimpleCommand extends AbstractCommand {
    */
   public SimpleCommand(String instruction) {
     super(instruction);
+    generatesOutput = false;
     isCompletedStdOut = null;
     isCompletedStdErr = null;
-    generatesOutput = false;
   }
 
   @Override
@@ -83,8 +83,8 @@ public class SimpleCommand extends AbstractCommand {
   @Override
   protected boolean isExecutionCompleted(String outputLine, boolean error) throws FailedCommandException {
     return (error ?
-        isCompletedStdErr == null || isCompletedStdErr.isCompleted(this, outputLine) :
-        isCompletedStdOut == null || isCompletedStdOut.isCompleted(this, outputLine));
+        isCompletedStdErr == null || isCompletedStdErr.isCompleted(outputLine, getCommandOutputStore()) :
+        isCompletedStdOut == null || isCompletedStdOut.isCompleted(outputLine, getCommandOutputStore()));
   }
 
   /**
@@ -99,12 +99,12 @@ public class SimpleCommand extends AbstractCommand {
     /**
      * Returns whether the command's execution is complete based on the latest line of output.
      *
-     * @param command The command that owns the predicate and is being executed.
      * @param outputLine The latest line output by the process executing the command.
+     * @param commandOutputStore The output store holding all previous outputs of the process in response to the command.
      * @return Whether the latest line of output denotes command completion.
      * @throws FailedCommandException If the command's execution is completed but the command failed.
      */
-    boolean isCompleted(SimpleCommand command, String outputLine) throws FailedCommandException;
+    boolean isCompleted(String outputLine, ProcessOutputStore commandOutputStore) throws FailedCommandException;
 
   }
 

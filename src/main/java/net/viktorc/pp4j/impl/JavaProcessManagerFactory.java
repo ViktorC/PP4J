@@ -54,21 +54,6 @@ public class JavaProcessManagerFactory<T extends Runnable & Serializable> implem
     if (config == null) {
       throw new IllegalArgumentException("The config argument cannot be null");
     }
-    if (config.getJavaLauncherCommand() == null || config.getJavaLauncherCommand().isEmpty()) {
-      throw new IllegalArgumentException("The Java launcher command cannot be null or empty");
-    }
-    if (config.getInitHeapSizeMb().isPresent() && config.getInitHeapSizeMb().get() <= 0) {
-      throw new IllegalArgumentException("Initial heap size must be greater than 0");
-    }
-    if (config.getMaxHeapSizeMb().isPresent() && config.getMaxHeapSizeMb().get() <= 0) {
-      throw new IllegalArgumentException("Maximum heap size must be greater than 0");
-    }
-    if (config.getStackSizeKb().isPresent() && config.getStackSizeKb().get() <= 0) {
-      throw new IllegalArgumentException("Stack size must be greater than 0");
-    }
-    if (config.getClassPath().isPresent() && config.getClassPath().get().isEmpty()) {
-      throw new IllegalArgumentException("Class path cannot be an empty string");
-    }
     this.config = config;
     this.initTask = initTask;
     this.wrapUpTask = wrapUpTask;

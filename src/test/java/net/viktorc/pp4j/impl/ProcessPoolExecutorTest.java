@@ -47,7 +47,7 @@ public class ProcessPoolExecutorTest extends TestCase {
    * @return A new simple submission instance.
    */
   private static Submission<?> newSimpleSubmission() {
-    return new SimpleSubmission<>(new SimpleCommand("process 1", (c, o) -> "ready".equals(o)));
+    return new SimpleSubmission<>(new SimpleCommand("process 1", (o, s) -> "ready".equals(o)));
   }
 
   /**
@@ -375,7 +375,7 @@ public class ProcessPoolExecutorTest extends TestCase {
   @Test
   public void testSubmitSubmissionWithReturnValue() throws InterruptedException, ExecutionException {
     AtomicInteger result = new AtomicInteger(0);
-    Command command = new SimpleCommand("process 1", (c, o) -> {
+    Command command = new SimpleCommand("process 1", (o, s) -> {
       if ("ready".equals(o)) {
         result.set(13);
         return true;
@@ -394,8 +394,8 @@ public class ProcessPoolExecutorTest extends TestCase {
 
   @Test
   public void testSubmitSubmissionFutureThrowsExecutionExceptionIfCommandFails() throws InterruptedException, ExecutionException {
-    Command command = new SimpleCommand("process 1", (c, o) -> {
-      throw new FailedCommandException(c, o);
+    Command command = new SimpleCommand("process 1", (o, s) -> {
+      throw new FailedCommandException("hell no");
     });
     Submission<?> submission = new SimpleSubmission<>(command);
     ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 3, 5, 0);
@@ -552,7 +552,7 @@ public class ProcessPoolExecutorTest extends TestCase {
   @Test
   public void testExecuteSubmissionWithReturnValue() throws InterruptedException, DisruptedExecutionException, FailedCommandException {
     AtomicReference<String> stringReference = new AtomicReference<>();
-    Command command = new SimpleCommand("process 1", (c, o) -> {
+    Command command = new SimpleCommand("process 1", (o, s) -> {
       if ("ready".equals(o)) {
         stringReference.set("ready");
         return true;
@@ -571,8 +571,8 @@ public class ProcessPoolExecutorTest extends TestCase {
   @Test
   public void testExecuteThrowsFailedCommandExceptionIfCommandFails()
       throws InterruptedException, DisruptedExecutionException, FailedCommandException {
-    Command command = new SimpleCommand("process 1", (c, o) -> {
-      throw new FailedCommandException(c, o);
+    Command command = new SimpleCommand("process 1", (o, s) -> {
+      throw new FailedCommandException("no good");
     });
     Submission<?> submission = new SimpleSubmission<>(command);
     ProcessPoolExecutor pool = new ProcessPoolExecutor(new TestProcessManagerFactory(), 1, 1, 0);

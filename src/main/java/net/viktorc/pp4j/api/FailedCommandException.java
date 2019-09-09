@@ -25,40 +25,19 @@ public class FailedCommandException extends Exception {
   /**
    * Wraps the provided exception in a <code>FailedCommandException</code>.
    *
-   * @param command The failed command.
    * @param e The cause exception.
    */
-  public FailedCommandException(Command command, Throwable e) {
-    super(getBaseErrorMessage(command), e);
+  public FailedCommandException(Throwable e) {
+    super(e);
   }
 
   /**
-   * Creates a <code>FailedCommandException</code> for the specified command with the provided error message.
+   * Creates a <code>FailedCommandException</code> with the provided error message.
    *
-   * @param command The failed command.
-   * @param message The reason of the failure.
+   * @param message The error message describing the cause of the exception.
    */
-  public FailedCommandException(Command command, String message) {
-    super(String.format("%s with reason: %s", getBaseErrorMessage(command), message));
-  }
-
-  /**
-   * Creates a <code>FailedCommandException</code> for the specified command.
-   *
-   * @param command The failed command.
-   */
-  public FailedCommandException(Command command) {
-    super(getBaseErrorMessage(command));
-  }
-
-  /**
-   * Returns the base error message containing the command instruction.
-   *
-   * @param command The failed command.
-   * @return The base error message.
-   */
-  private static String getBaseErrorMessage(Command command) {
-    return String.format("Execution of command \"%s\" failed", command.getInstruction());
+  public FailedCommandException(String message) {
+    super(message);
   }
 
 }

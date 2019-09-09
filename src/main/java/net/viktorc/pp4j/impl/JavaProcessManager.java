@@ -53,27 +53,27 @@ public class JavaProcessManager<T extends Runnable & Serializable> extends Simpl
   public JavaProcessManager(ProcessBuilder builder, T initTask, T wrapUpTask, Long keepAliveTime) {
     super(builder,
         JavaObjectCodec.CHARSET,
-        keepAliveTime,
-        (outputLine, error) -> {
-          if (!error) {
-            if (outputLine.contains(JAVA_FATAL_ERROR_MESSAGE)) {
-              throw new FailedStartupException("Java process startup failed");
-            }
-            try {
-              Object output = JavaObjectCodec.getInstance().decode(outputLine);
-              if (output instanceof Response) {
-                Response response = (Response) output;
-                if (response.getType() == ResponseType.PROCESS_FAILURE) {
-                  LOGGER.error("Java process error during startup", response.getError().orElse(null));
-                }
-                return response.getType() == ResponseType.STARTUP_SUCCESS;
+        (outputLine, outputStore) -> {
+          if (outputLine.contains(JAVA_FATAL_ERROR_MESSAGE)) {
+            throw new FailedStartupException(String.format("Java process startup failed: %s%n%s",
+                outputStore.getJointStandardOutLines(), outputLine));
+          }
+          try {
+            Object output = JavaObjectCodec.getInstance().decode(outputLine);
+            if (output instanceof Response) {
+              Response response = (Response) output;
+              if (response.getType() == ResponseType.PROCESS_FAILURE) {
+                throw new FailedStartupException(response.getError().orElse(null));
               }
-            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
-              LOGGER.trace(e.getMessage(), e);
+              return response.getType() == ResponseType.STARTUP_SUCCESS;
             }
+          } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
+            LOGGER.trace(e.getMessage(), e);
           }
           return false;
         },
+        (outputLine, outputStore) -> false,
+        keepAliveTime,
         () -> initTask == null ? null : new JavaSubmission<>(initTask),
         () -> new JavaSubmission<>((Runnable & Serializable) () -> {
           try {

@@ -66,7 +66,7 @@ public class PPEPerformanceTest extends TestCase {
     if (procTimes != null) {
       commands = new ArrayList<>();
       for (int procTime : procTimes) {
-        commands.add(new SimpleCommand("process " + procTime, (command, outputLine) -> "ready".equals(outputLine)));
+        commands.add(new SimpleCommand("process " + procTime, (outputLine, outputStore) -> "ready".equals(outputLine)));
       }
     }
     return new SimpleSubmission<Object>(commands) {

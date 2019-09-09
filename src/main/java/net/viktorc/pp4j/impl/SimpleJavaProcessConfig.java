@@ -39,7 +39,11 @@ import org.slf4j.LoggerFactory;
  */
 public class SimpleJavaProcessConfig implements JavaProcessConfig {
 
-  private static final String DEFAULT_JAVA_LAUNCHER_COMMAND = "java";
+  /**
+   * The program used to launch new Java processes by default.
+   */
+  public static final String DEFAULT_JAVA_LAUNCHER_COMMAND = "java";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleJavaProcessConfig.class);
 
   private final String javaLauncherCommand;
@@ -61,6 +65,21 @@ public class SimpleJavaProcessConfig implements JavaProcessConfig {
    */
   public SimpleJavaProcessConfig(String javaLauncherCommand, JVMType type, Integer initHeapSizeMb, Integer maxHeapSizeMb,
       Integer stackSizeKb, String... additionalClassPaths) {
+    if (javaLauncherCommand == null || javaLauncherCommand.isEmpty()) {
+      throw new IllegalArgumentException("Java launcher command cannot be null or empty");
+    }
+    if (initHeapSizeMb != null && initHeapSizeMb <= 0) {
+      throw new IllegalArgumentException("The initial heap size must be positive");
+    }
+    if (maxHeapSizeMb != null && maxHeapSizeMb <= 0) {
+      throw new IllegalArgumentException("The maximum heap size must be positive");
+    }
+    if (initHeapSizeMb != null && maxHeapSizeMb != null && initHeapSizeMb > maxHeapSizeMb) {
+      throw new IllegalArgumentException("The initial heap size cannot exceed the maximum heap size");
+    }
+    if (stackSizeKb != null && stackSizeKb <= 0) {
+      throw new IllegalArgumentException("The stack size must be positive");
+    }
     this.javaLauncherCommand = javaLauncherCommand;
     this.type = type;
     this.initHeapSizeMb = initHeapSizeMb;

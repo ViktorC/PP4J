@@ -15,8 +15,6 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.util.ArrayList;
-import java.util.List;
 import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.FailedCommandException;
 
@@ -29,8 +27,7 @@ import net.viktorc.pp4j.api.FailedCommandException;
 public abstract class AbstractCommand implements Command {
 
   private final String instruction;
-  private final List<String> stdOutLines;
-  private final List<String> stdErrLines;
+  private final ProcessOutputStore commandOutputStore;
 
   /**
    * Constructs an instance holding the specified instruction.
@@ -43,8 +40,16 @@ public abstract class AbstractCommand implements Command {
       throw new IllegalArgumentException("The instruction cannot be null");
     }
     this.instruction = instruction;
-    stdOutLines = new ArrayList<>();
-    stdErrLines = new ArrayList<>();
+    commandOutputStore = new ProcessOutputStore();
+  }
+
+  /**
+   * Returns the process output store containing the process' output in response to the command.
+   *
+   * @return The output store used to capture to process' output in response to the command.
+   */
+  public ProcessOutputStore getCommandOutputStore() {
+    return commandOutputStore;
   }
 
   /**
@@ -58,46 +63,6 @@ public abstract class AbstractCommand implements Command {
    */
   protected abstract boolean isExecutionCompleted(String outputLine, boolean error) throws FailedCommandException;
 
-  /**
-   * Returns a list of lines output to the standard out of the underlying process after the instruction has been written to the standard in
-   * of the process.
-   *
-   * @return A list of lines output to the standard out of the underlying process.
-   */
-  public List<String> getStandardOutLines() {
-    return new ArrayList<>(stdOutLines);
-  }
-
-  /**
-   * Returns a list of lines output to the standard error of the underlying process after the instruction has been written to the standard
-   * in of the process.
-   *
-   * @return A list of lines output to the standard error stream of the underlying process.
-   */
-  public List<String> getStandardErrLines() {
-    return new ArrayList<>(stdErrLines);
-  }
-
-  /**
-   * Returns a string of the lines output to the standard out of the underlying process after the instruction has been written to the
-   * standard in of the process.
-   *
-   * @return A string of the lines output to the standard out of the underlying process.
-   */
-  public String getJointStandardOutLines() {
-    return String.join(System.lineSeparator(), stdOutLines);
-  }
-
-  /**
-   * Returns a string of the lines output to the standard error of the underlying process after the instruction has been written to the
-   * standard in of the process.
-   *
-   * @return A string of the lines output to the standard error of the underlying process.
-   */
-  public String getJointStandardErrLines() {
-    return String.join(System.lineSeparator(), stdErrLines);
-  }
-
   @Override
   public String getInstruction() {
     return instruction;
@@ -108,18 +73,13 @@ public abstract class AbstractCommand implements Command {
     try {
       return isExecutionCompleted(outputLine, error);
     } finally {
-      if (error) {
-        stdErrLines.add(outputLine);
-      } else {
-        stdOutLines.add(outputLine);
-      }
+      commandOutputStore.storeOutput(outputLine, error);
     }
   }
 
   @Override
   public void reset() {
-    stdOutLines.clear();
-    stdErrLines.clear();
+    commandOutputStore.clear();
   }
 
 }

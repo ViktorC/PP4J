@@ -20,9 +20,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.util.function.Supplier;
 import net.viktorc.pp4j.api.FailedStartupException;
 import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
+import net.viktorc.pp4j.api.Submission;
 
 /**
  * A utility class for testing.
@@ -99,10 +101,11 @@ class TestUtils {
 
     private final Long keepAliveTime;
     private final boolean verifyStartup;
-    private final boolean executeInitSubmission;
-    private final boolean manuallyTerminate;
     private final boolean throwStartupException;
     private final ProcessBuilder builder;
+    private final Charset charset;
+    private final Supplier<Submission<?>> initSubmissionSupplier;
+    private final Supplier<Submission<?>> terminationSubmissionSupplier;
 
     /**
      * Constructs an instance according to the specified parameters.
@@ -117,10 +120,15 @@ class TestUtils {
         boolean throwStartupException) {
       this.keepAliveTime = keepAliveTime;
       this.verifyStartup = verifyStartup;
-      this.executeInitSubmission = executeInitSubmission;
-      this.manuallyTerminate = manuallyTerminate;
       this.throwStartupException = throwStartupException;
       builder = new ProcessBuilder(getExecutable().getAbsolutePath());
+      charset = Charset.defaultCharset();
+      initSubmissionSupplier = () -> executeInitSubmission ?
+          new SimpleSubmission<>(new SimpleCommand("start", (o, s) -> "ok".equals(o))) :
+          null;
+      terminationSubmissionSupplier = () -> manuallyTerminate ?
+          new SimpleSubmission<>(new SimpleCommand("stop", (o, s) -> "bye".equals(o))) :
+          null;
     }
 
     /**
@@ -132,14 +140,17 @@ class TestUtils {
 
     @Override
     public ProcessManager newProcessManager() {
-      return new SimpleProcessManager(builder,
-          Charset.defaultCharset(),
-          keepAliveTime,
-          throwStartupException ? (outputLine, error) -> {
-            throw new FailedStartupException("test");
-          } : verifyStartup ? (outputLine, error) -> !error && "hi".equals(outputLine) : null,
-          () -> executeInitSubmission ? new SimpleSubmission<>(new SimpleCommand("start", (c, o) -> "ok".equals(o))) : null,
-          () -> manuallyTerminate ? new SimpleSubmission<>(new SimpleCommand("stop", (c, o) -> "bye".equals(o))) : null);
+      if (verifyStartup) {
+        return new SimpleProcessManager(builder,
+            charset,
+            throwStartupException ? (outputLine, outputStore) -> {
+              throw new FailedStartupException("test");
+            } : (outputLine, outputStore) -> "hi".equals(outputLine),
+            keepAliveTime,
+            initSubmissionSupplier,
+            terminationSubmissionSupplier);
+      }
+      return new SimpleProcessManager(builder, charset, keepAliveTime, initSubmissionSupplier, terminationSubmissionSupplier);
     }
 
   }

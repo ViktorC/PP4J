@@ -330,13 +330,11 @@ public class ProcessPoolExecutor implements ProcessExecutorService {
       numOfSubmissions++;
       InternalSubmission<T> internalSubmission = new InternalSubmission<>(submission, terminateProcessAfterwards);
       submissionQueue.addLast(internalSubmission);
-      // If necessary, adjust the pool size given the new submission.
       if (doExtendPool()) {
         startNewProcess();
       }
       LOGGER.debug("Submission {} received", internalSubmission);
       LOGGER.debug(getPoolStats());
-      // Return a Future holding the total execution time including the submission delay.
       return new InternalSubmissionFuture<>(internalSubmission);
     }
   }

@@ -35,29 +35,25 @@ public class SimpleProcessManagerTest extends TestCase {
 
   @Test
   public void testStartsUpInstantlyFalseIfPredicateDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null,
-        (o, e) -> true);
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(),
+        (o, s) -> true);
     Assert.assertFalse(manager.startsUpInstantly());
   }
 
   @Test
-  public void testIsStartedUpReturnsTrueIfPredicateDoes() throws FailedStartupException {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null,
-        (o, e) -> !e && "ready".equals(o));
+  public void testIsStartedUpReturnsTrueIfAppropriatePredicateDoes() throws FailedStartupException {
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(),
+        (o, s) -> "ready".equals(o), (o, s) -> "recovered".equals(o));
     Assert.assertFalse(manager.isStartedUp("bla", false));
     Assert.assertFalse(manager.isStartedUp("ready", true));
     Assert.assertTrue(manager.isStartedUp("ready", false));
+    Assert.assertFalse(manager.isStartedUp("recovered", false));
+    Assert.assertTrue(manager.isStartedUp("recovered", true));
   }
 
   @Test
   public void testIsStartedUpThrowsFailedStartupException() throws FailedStartupException {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null,
-        (o, e) -> {
-          if (e) {
-            throw new FailedStartupException(o);
-          }
-          return true;
-        });
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), (o, s) -> true);
     Assert.assertTrue(manager.isStartedUp("", false));
     String errorOutput = "oops";
     exceptionRule.expect(FailedStartupException.class);
@@ -73,7 +69,7 @@ public class SimpleProcessManagerTest extends TestCase {
 
   @Test
   public void testInitSubmissionNotEmptyIfProviderDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null, null,
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null,
         () -> new SimpleSubmission<>(new SimpleCommand("")), null);
     Assert.assertTrue(manager.getInitSubmission().isPresent());
   }
@@ -85,10 +81,90 @@ public class SimpleProcessManagerTest extends TestCase {
   }
 
   @Test
-  public void tesTerminationSubmissionNotEmptyIfProviderDefined() {
-    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null, null, null,
+  public void testTerminationSubmissionNotEmptyIfProviderDefined() {
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(), null, null,
         () -> new SimpleSubmission<>(new SimpleCommand("")));
     Assert.assertTrue(manager.getTerminationSubmission().isPresent());
+  }
+
+  @Test
+  public void testStoresProcessOutputCorrectly() throws FailedStartupException {
+    String stdOutMessage1 = "01";
+    String stdOutMessage2 = "02";
+    String stdErrMessage1 = "aa";
+    String stdErrMessage2 = "ab";
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(),
+        (o, s) -> true, (o, s) -> true);
+    manager.isStartedUp(stdOutMessage1, false);
+    manager.isStartedUp(stdErrMessage1, true);
+    manager.isStartedUp(stdOutMessage2, false);
+    manager.isStartedUp(stdErrMessage2, true);
+    ProcessOutputStore outputStore = manager.getStartupOutputStore();
+    Assert.assertEquals(2, outputStore.getStandardOutLines().size());
+    Assert.assertEquals(2, outputStore.getStandardErrLines().size());
+    Assert.assertEquals(stdOutMessage1, outputStore.getStandardOutLines().get(0));
+    Assert.assertEquals(stdOutMessage2, outputStore.getStandardOutLines().get(1));
+    Assert.assertEquals(stdErrMessage1, outputStore.getStandardErrLines().get(0));
+    Assert.assertEquals(stdErrMessage2, outputStore.getStandardErrLines().get(1));
+    Assert.assertEquals(String.format("%s%n%s", stdOutMessage1, stdOutMessage2), outputStore.getJointStandardOutLines());
+    Assert.assertEquals(String.format("%s%n%s", stdErrMessage1, stdErrMessage2), outputStore.getJointStandardErrLines());
+  }
+
+  @Test
+  public void testStoresProcessOutputEvenIfFailedStartupExceptionThrown() throws FailedStartupException {
+    String message1 = "01";
+    String message2 = "02";
+    String errorTriggerMessage = "boop";
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(),
+        (o, s) -> {
+          if (errorTriggerMessage.equals(o)) {
+            throw new FailedStartupException("ye");
+          }
+          return true;
+        });
+    manager.isStartedUp(message1, false);
+    manager.isStartedUp(message2, false);
+    exceptionRule.expect(FailedStartupException.class);
+    try {
+      manager.isStartedUp(errorTriggerMessage, false);
+    } finally {
+      ProcessOutputStore outputStore = manager.getStartupOutputStore();
+      Assert.assertEquals(3, outputStore.getStandardOutLines().size());
+      Assert.assertTrue(outputStore.getStandardErrLines().isEmpty());
+      Assert.assertEquals(message1, outputStore.getStandardOutLines().get(0));
+      Assert.assertEquals(message2, outputStore.getStandardOutLines().get(1));
+      Assert.assertEquals(errorTriggerMessage, outputStore.getStandardOutLines().get(2));
+      Assert.assertEquals(String.format("%s%n%s%n%s", message1, message2, errorTriggerMessage), outputStore.getJointStandardOutLines());
+      Assert.assertEquals("", outputStore.getJointStandardErrLines());
+    }
+  }
+
+  @Test
+  public void testResetClearsSavedProcessOutput() throws FailedStartupException {
+    String stdOutMessage1 = "hey";
+    String stdOutMessage2 = "ho";
+    String stdErrMessage1 = "dee";
+    String stdErrMessage2 = "quad";
+    SimpleProcessManager manager = new SimpleProcessManager(new ProcessBuilder(""), Charset.defaultCharset(),
+        (o, s) -> true, (o, s) -> true);
+    manager.isStartedUp(stdOutMessage1, false);
+    manager.isStartedUp(stdErrMessage1, true);
+    manager.isStartedUp(stdOutMessage2, false);
+    manager.isStartedUp(stdErrMessage2, true);
+    ProcessOutputStore outputStore = manager.getStartupOutputStore();
+    Assert.assertEquals(2, outputStore.getStandardOutLines().size());
+    Assert.assertEquals(2, outputStore.getStandardErrLines().size());
+    Assert.assertEquals(stdOutMessage1, outputStore.getStandardOutLines().get(0));
+    Assert.assertEquals(stdOutMessage2, outputStore.getStandardOutLines().get(1));
+    Assert.assertEquals(stdErrMessage1, outputStore.getStandardErrLines().get(0));
+    Assert.assertEquals(stdErrMessage2, outputStore.getStandardErrLines().get(1));
+    Assert.assertEquals(String.format("%s%n%s", stdOutMessage1, stdOutMessage2), outputStore.getJointStandardOutLines());
+    Assert.assertEquals(String.format("%s%n%s", stdErrMessage1, stdErrMessage2), outputStore.getJointStandardErrLines());
+    manager.reset();
+    Assert.assertTrue(outputStore.getStandardOutLines().isEmpty());
+    Assert.assertTrue(outputStore.getStandardErrLines().isEmpty());
+    Assert.assertTrue(outputStore.getJointStandardOutLines().isEmpty());
+    Assert.assertTrue(outputStore.getJointStandardErrLines().isEmpty());
   }
 
 }

@@ -35,7 +35,7 @@ public class SimpleCommandTest extends TestCase {
 
   @Test
   public void testGeneratesOutputTrueIfCompletionPredicatesDefined() {
-    SimpleCommand command = new SimpleCommand("", (c, o) -> true, (c, o) -> false);
+    SimpleCommand command = new SimpleCommand("", (o, s) -> true, (o, s) -> false);
     Assert.assertTrue(command.generatesOutput());
   }
 
@@ -48,88 +48,109 @@ public class SimpleCommandTest extends TestCase {
   @Test
   public void testThrowsExceptionIfPredicateNull() {
     exceptionRule.expect(IllegalArgumentException.class);
-    new SimpleCommand("", (c, o) -> true, null);
+    new SimpleCommand("", (o, s) -> true, null);
   }
 
   @Test
   public void testIsCompletedThrowsExceptionWhenStdErrPredicateNotDefined() throws FailedCommandException {
-    SimpleCommand command = new SimpleCommand("", (c, o) -> true);
+    SimpleCommand command = new SimpleCommand("", (o, s) -> true);
     exceptionRule.expect(FailedCommandException.class);
     command.isCompleted("", true);
   }
 
   @Test
   public void testIsCompletedReturnsTrueIfPredicateDoes() throws FailedCommandException {
-    SimpleCommand command = new SimpleCommand("", (c, o) -> "done".equals(o), (c, o) -> "error".equals(o));
-    Assert.assertFalse(command.isCompleted("error", false));
-    Assert.assertFalse(command.isCompleted("", false));
-    Assert.assertTrue(command.isCompleted("done", false));
-    Assert.assertFalse(command.isCompleted("done", true));
-    Assert.assertFalse(command.isCompleted("", true));
-    Assert.assertTrue(command.isCompleted("error", true));
+    String stdOutSuccessPrerequisiteMessage = "meh";
+    String stdOutSuccessMessage = "done";
+    String stdErrSuccessMessage = "error";
+    SimpleCommand command = new SimpleCommand("",
+        (o, s) -> stdOutSuccessMessage.equals(o) && s.getStandardOutLines().contains(stdOutSuccessPrerequisiteMessage),
+        (o, s) -> stdErrSuccessMessage.equals(o));
+    Assert.assertFalse(command.isCompleted(stdErrSuccessMessage, false));
+    Assert.assertFalse(command.isCompleted(stdOutSuccessMessage, false));
+    Assert.assertFalse(command.isCompleted(stdOutSuccessPrerequisiteMessage, false));
+    Assert.assertTrue(command.isCompleted(stdOutSuccessMessage, false));
+    Assert.assertFalse(command.isCompleted(stdOutSuccessMessage, true));
+    Assert.assertFalse(command.isCompleted(stdOutSuccessPrerequisiteMessage, true));
+    Assert.assertTrue(command.isCompleted(stdErrSuccessMessage, true));
   }
 
   @Test
   public void testSavesProcessOutputCorrectly() throws FailedCommandException {
-    SimpleCommand command = new SimpleCommand("", (c, o) -> true, (c, o) -> true);
-    command.isCompleted("1", false);
-    command.isCompleted("dog", true);
-    command.isCompleted("2", false);
-    command.isCompleted("cat", false);
-    command.isCompleted("3", true);
-    List<String> stdOutLines = command.getStandardOutLines();
-    List<String> stdErrLines = command.getStandardErrLines();
-    String jointStdOutLines = command.getJointStandardOutLines();
-    String jointStdErrLines = command.getJointStandardErrLines();
+    String stdOutMessage1 = "1";
+    String stdOutMessage2 = "2";
+    String stdOutMessage3 = "cat";
+    String stdErrMessage1 = "dog";
+    String stdErrMessage2 = "3";
+    SimpleCommand command = new SimpleCommand("", (o, s) -> true, (o, s) -> true);
+    command.isCompleted(stdOutMessage1, false);
+    command.isCompleted(stdErrMessage1, true);
+    command.isCompleted(stdOutMessage2, false);
+    command.isCompleted(stdOutMessage3, false);
+    command.isCompleted(stdErrMessage2, true);
+    ProcessOutputStore outputStore = command.getCommandOutputStore();
+    List<String> stdOutLines = outputStore.getStandardOutLines();
+    List<String> stdErrLines = outputStore.getStandardErrLines();
+    String jointStdOutLines = outputStore.getJointStandardOutLines();
+    String jointStdErrLines = outputStore.getJointStandardErrLines();
     Assert.assertEquals(3, stdOutLines.size());
     Assert.assertEquals(2, stdErrLines.size());
-    Assert.assertEquals("1", stdOutLines.get(0));
-    Assert.assertEquals("2", stdOutLines.get(1));
-    Assert.assertEquals("cat", stdOutLines.get(2));
-    Assert.assertEquals("dog", stdErrLines.get(0));
-    Assert.assertEquals("3", stdErrLines.get(1));
-    Assert.assertEquals(String.format("1%n2%ncat"), jointStdOutLines);
-    Assert.assertEquals(String.format("dog%n3"), jointStdErrLines);
+    Assert.assertEquals(stdOutMessage1, stdOutLines.get(0));
+    Assert.assertEquals(stdOutMessage2, stdOutLines.get(1));
+    Assert.assertEquals(stdOutMessage3, stdOutLines.get(2));
+    Assert.assertEquals(stdErrMessage1, stdErrLines.get(0));
+    Assert.assertEquals(stdErrMessage2, stdErrLines.get(1));
+    Assert.assertEquals(String.format("%s%n%s%n%s", stdOutMessage1, stdOutMessage2, stdOutMessage3), jointStdOutLines);
+    Assert.assertEquals(String.format("%s%n%s", stdErrMessage1, stdErrMessage2), jointStdErrLines);
   }
 
   @Test
   public void testSavesProcessOutputEvenIfFailedCommandExceptionThrown() throws FailedCommandException {
+    String dummyMessage1 = "hi";
+    String dummyMessage2 = "ho";
     String errorTriggerMessage = "boop";
-    SimpleCommand command = new SimpleCommand("", (c, o) -> {
+    SimpleCommand command = new SimpleCommand("", (o, s) -> {
       if (errorTriggerMessage.equals(o)) {
-        throw new FailedCommandException(c, o);
+        throw new FailedCommandException("Command failed");
       }
       return true;
     });
-    command.isCompleted("hi", false);
-    command.isCompleted("ho", false);
+    command.isCompleted(dummyMessage1, false);
+    command.isCompleted(dummyMessage2, false);
     exceptionRule.expect(FailedCommandException.class);
     try {
       command.isCompleted(errorTriggerMessage, false);
     } finally {
-      Assert.assertEquals(0, command.getStandardErrLines().size());
-      Assert.assertEquals(3, command.getStandardOutLines().size());
-      Assert.assertEquals("", command.getJointStandardErrLines());
-      Assert.assertEquals(String.format("hi%nho%n%s", errorTriggerMessage), command.getJointStandardOutLines());
+      ProcessOutputStore outputStore = command.getCommandOutputStore();
+      Assert.assertEquals(0, outputStore.getStandardErrLines().size());
+      Assert.assertEquals(3, outputStore.getStandardOutLines().size());
+      Assert.assertEquals("", outputStore.getJointStandardErrLines());
+      Assert.assertEquals(String.format("%s%n%s%n%s", dummyMessage1, dummyMessage2, errorTriggerMessage),
+          outputStore.getJointStandardOutLines());
     }
   }
 
   @Test
   public void testResetClearsSavedProcessOutput() throws FailedCommandException {
-    SimpleCommand command = new SimpleCommand("", (c, o) -> "jiff".equals(o), (c, o) -> "jeff".equals(o));
-    command.isCompleted("wut", true);
-    command.isCompleted("meng", false);
-    command.isCompleted("blob", true);
-    command.isCompleted("derp", false);
-    Assert.assertEquals(2, command.getStandardOutLines().size());
-    Assert.assertEquals(2, command.getStandardErrLines().size());
-    Assert.assertEquals(String.format("meng%nderp"), command.getJointStandardOutLines());
-    Assert.assertEquals(String.format("wut%nblob"), command.getJointStandardErrLines());
+    String stdOutMessage1 = "meng";
+    String stdOutMessage2 = "derp";
+    String stdErrMessage1 = "wut";
+    String stdErrMessage2 = "blob";
+    SimpleCommand command = new SimpleCommand("", (o, s) -> true, (o, s) -> true);
+    command.isCompleted(stdErrMessage1, true);
+    command.isCompleted(stdOutMessage1, false);
+    command.isCompleted(stdErrMessage2, true);
+    command.isCompleted(stdOutMessage2, false);
+    ProcessOutputStore outputStore = command.getCommandOutputStore();
+    Assert.assertEquals(2, outputStore.getStandardOutLines().size());
+    Assert.assertEquals(2, outputStore.getStandardErrLines().size());
+    Assert.assertEquals(String.format("%s%n%s", stdOutMessage1, stdOutMessage2), outputStore.getJointStandardOutLines());
+    Assert.assertEquals(String.format("%s%n%s", stdErrMessage1, stdErrMessage2), outputStore.getJointStandardErrLines());
     command.reset();
-    Assert.assertEquals(0, command.getStandardOutLines().size());
-    Assert.assertEquals(0, command.getStandardErrLines().size());
-    Assert.assertEquals("", command.getJointStandardOutLines());
-    Assert.assertEquals("", command.getJointStandardErrLines());
+    Assert.assertTrue(outputStore.getStandardOutLines().isEmpty());
+    Assert.assertTrue(outputStore.getStandardErrLines().isEmpty());
+    Assert.assertTrue(outputStore.getJointStandardOutLines().isEmpty());
+    Assert.assertTrue(outputStore.getJointStandardErrLines().isEmpty());
   }
 
 }

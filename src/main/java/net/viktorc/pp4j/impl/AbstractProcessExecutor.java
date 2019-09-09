@@ -89,6 +89,12 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
    * submissions.
    */
   protected AbstractProcessExecutor(ProcessManager manager, ExecutorService threadPool) {
+    if (manager == null) {
+      throw new IllegalArgumentException("The process manager cannot be null");
+    }
+    if (threadPool == null) {
+      throw new IllegalArgumentException("The thread pool cannot be null");
+    }
     this.manager = manager;
     this.threadPool = threadPool;
     runLock = new ReentrantLock(true);

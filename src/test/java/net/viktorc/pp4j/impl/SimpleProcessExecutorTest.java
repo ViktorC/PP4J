@@ -40,6 +40,12 @@ public class SimpleProcessExecutorTest extends TestCase {
   }
 
   @Test
+  public void testThrowsIllegalArgumentExceptionIfProcessManagerNull() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleProcessExecutor(null);
+  }
+
+  @Test
   public void testIsAliveAfterStart() throws Exception {
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       Assert.assertFalse(executor.isAlive());
@@ -153,7 +159,7 @@ public class SimpleProcessExecutorTest extends TestCase {
   @Test
   public void testExecuteSubmission() throws Exception {
     AtomicReference<String> stringReference = new AtomicReference<>();
-    SimpleCommand command = new SimpleCommand("process 3", (c, o) -> {
+    SimpleCommand command = new SimpleCommand("process 3", (o, s) -> {
       if ("ready".equals(o)) {
         stringReference.set("ready");
         return true;
@@ -166,7 +172,7 @@ public class SimpleProcessExecutorTest extends TestCase {
       executor.execute(submission);
       Assert.assertTrue(submission.getResult().isPresent());
       Assert.assertEquals("ready", submission.getResult().get().get());
-      Assert.assertTrue(command.getJointStandardOutLines().contains("in progress\nin progress\nready"));
+      Assert.assertTrue(command.getCommandOutputStore().getJointStandardOutLines().contains("in progress\nin progress\nready"));
     }
   }
 
@@ -191,8 +197,8 @@ public class SimpleProcessExecutorTest extends TestCase {
 
   @Test
   public void testExecuteSubmissionThrowsFailedCommandException() throws Exception {
-    SimpleSubmission<AtomicReference<String>> submission = new SimpleSubmission<>(new SimpleCommand("process 3", (c, o) -> {
-      throw new FailedCommandException(c, o);
+    SimpleSubmission<AtomicReference<String>> submission = new SimpleSubmission<>(new SimpleCommand("process 3", (o, s) -> {
+      throw new FailedCommandException("nah");
     }));
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       executor.start();
@@ -204,7 +210,7 @@ public class SimpleProcessExecutorTest extends TestCase {
   @Test
   public void testExecuteSubmissionThrowsDisruptedExecutionExceptionIfProcessTerminatedMidExecution() throws Exception {
     SimpleSubmission<AtomicReference<String>> submission = new SimpleSubmission<>(
-        new SimpleCommand("process 3", (c, o) -> "ready".equals(o)));
+        new SimpleCommand("process 3", (o, s) -> "ready".equals(o)));
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       Thread thread = new Thread(() -> {
         try {
@@ -223,7 +229,7 @@ public class SimpleProcessExecutorTest extends TestCase {
 
   @Test
   public void testExecuteSubmissionThrowsDisruptedExecutionExceptionIfProcessAlreadyTerminated() throws Exception {
-    SimpleSubmission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 5", (c, o) -> "ready".equals(o)));
+    SimpleSubmission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 5", (o, s) -> "ready".equals(o)));
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       executor.start();
       executor.terminate();
@@ -234,8 +240,8 @@ public class SimpleProcessExecutorTest extends TestCase {
 
   @Test
   public void testTryExecuteSubmissionFalseIfAlreadyExecuting() throws Exception {
-    SimpleSubmission<?> submission1 = new SimpleSubmission<>(new SimpleCommand("process 1", (c, o) -> "ready".equals(o)));
-    SimpleSubmission<?> submission2 = new SimpleSubmission<>(new SimpleCommand("process 2", (c, o) -> "ready".equals(o)));
+    SimpleSubmission<?> submission1 = new SimpleSubmission<>(new SimpleCommand("process 1", (o, s) -> "ready".equals(o)));
+    SimpleSubmission<?> submission2 = new SimpleSubmission<>(new SimpleCommand("process 2", (o, s) -> "ready".equals(o)));
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       executor.start();
       Thread thread = new Thread(() -> {
@@ -254,7 +260,7 @@ public class SimpleProcessExecutorTest extends TestCase {
 
   @Test
   public void testTryExecuteSubmissionTerminatesProcessAfterwards() throws Exception {
-    SimpleSubmission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 1", (c, o) -> "ready".equals(o)));
+    SimpleSubmission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 1", (o, s) -> "ready".equals(o)));
     try (SimpleProcessExecutor executor = newSimpleProcessExecutor()) {
       executor.start();
       Assert.assertTrue(executor.isAlive());
@@ -281,7 +287,7 @@ public class SimpleProcessExecutorTest extends TestCase {
   public void testProcessTerminatedOnlyAfterKeepAliveTimeMillisecondsOfIdleness() throws Exception {
     long halfKeepAliveTime = 500;
     long keepAliveTime = 2 * halfKeepAliveTime;
-    SimpleSubmission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 1", (c, o) -> "ready".equals(o)));
+    SimpleSubmission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 1", (o, s) -> "ready".equals(o)));
     ProcessManager processManager = new TestProcessManagerFactory(keepAliveTime, true, false, false, false).newProcessManager();
     try (SimpleProcessExecutor executor = new SimpleProcessExecutor(processManager)) {
       executor.start();

@@ -15,7 +15,6 @@
  */
 package net.viktorc.pp4j.impl;
 
-import java.util.Optional;
 import org.junit.Test;
 
 /**
@@ -29,66 +28,6 @@ public class JavaProcessManagerFactoryTest extends TestCase {
   public void testThrowsIllegalArgumentExceptionIfConfigNull() {
     exceptionRule.expect(IllegalArgumentException.class);
     new JavaProcessManagerFactory<>(null);
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfJavaLauncherCommandNull() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(null));
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfJavaLauncherCommandEmpty() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(""));
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfInitHeapSizeZero() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(0, 1, 1));
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfInitHeapSizeLessThanZero() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(-1, 1, 1));
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfMaxHeapSizeZero() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(1, 0, 1));
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfMaxHeapSizeLessThanZero() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(1, -1, 1));
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfStackSizeZero() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(1, 1, 0));
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfStackSizeLessThanZero() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig(1, 1, -1));
-  }
-
-  @Test
-  public void testThrowsIllegalArgumentExceptionIfClassPathEmpty() {
-    exceptionRule.expect(IllegalArgumentException.class);
-    new JavaProcessManagerFactory<>(new SimpleJavaProcessConfig() {
-
-      @Override
-      public Optional<String> getClassPath() {
-        return Optional.of("");
-      }
-    });
   }
 
 }

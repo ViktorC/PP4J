@@ -64,7 +64,7 @@ public class SimpleSubmissionTest extends TestCase {
   @Test
   public void testReturnsCorrectResult() throws FailedCommandException {
     AtomicInteger result = new AtomicInteger(0);
-    SimpleSubmission<AtomicInteger> submission = new SimpleSubmission<>(new SimpleCommand("", (c, o) -> {
+    SimpleSubmission<AtomicInteger> submission = new SimpleSubmission<>(new SimpleCommand("", (o, s) -> {
       if ("done".equals(o)) {
         result.set(1);
         return true;

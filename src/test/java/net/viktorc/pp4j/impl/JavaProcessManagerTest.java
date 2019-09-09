@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.viktorc.pp4j.api.FailedCommandException;
 import net.viktorc.pp4j.api.FailedStartupException;
 import net.viktorc.pp4j.api.Submission;
 import net.viktorc.pp4j.impl.JavaProcess.Response;
@@ -54,8 +53,14 @@ public class JavaProcessManagerTest extends TestCase {
     JavaObjectCodec codec = JavaObjectCodec.getInstance();
     Assert.assertFalse(javaProcessManager.isStartedUp(codec.encode(new Response(ResponseType.TASK_SUCCESS)), false));
     Assert.assertFalse(javaProcessManager.isStartedUp(codec.encode(new Response(ResponseType.TASK_FAILURE)), false));
-    Assert.assertFalse(javaProcessManager.isStartedUp(codec.encode(new Response(ResponseType.PROCESS_FAILURE)), false));
     Assert.assertTrue(javaProcessManager.isStartedUp(codec.encode(new Response(ResponseType.STARTUP_SUCCESS)), false));
+  }
+
+  @Test
+  public void testIsStartedUpThrowsFailedStartupExceptionIfResponseProcessFailure() throws FailedStartupException, IOException {
+    JavaProcessManager<?> javaProcessManager = new JavaProcessManager<>(new ProcessBuilder(""), null, null, null);
+    exceptionRule.expect(FailedStartupException.class);
+    javaProcessManager.isStartedUp(JavaObjectCodec.getInstance().encode(new Response(ResponseType.PROCESS_FAILURE)), false);
   }
 
   @Test

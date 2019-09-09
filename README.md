@@ -36,24 +36,19 @@ All process pools of PP4J implement the `ProcessExecutorService` interface. The 
 ```java
 ProcessManagerFactory processManagerFactory = () -> new SimpleProcessManager(new ProcessBuilder("test.exe"),
     Charset.defaultCharset(),
+    (outputLine, startupOutputStore) -> "hi".equals(outputLine),
     60000L,
-    (outputLine, error) -> {
-      if (error) {
-        throw new FailedStartupException(outputLine);
-      }
-      return "hi".equals(outputLine)
-    },
-    () -> new SimpleSubmission<>(new SimpleCommand("start", (command, outputLine) -> "ok".equals(outputLine))),
-    () -> new SimpleSubmission<>(new SimpleCommand("stop", (command, outputLine) -> "bye".equals(outputLine))));
+    () -> new SimpleSubmission<>(new SimpleCommand("start", (outputLine, commandOutputStore) -> "ok".equals(outputLine))),
+    () -> new SimpleSubmission<>(new SimpleCommand("stop", (outputLine, commandOutputStore) -> "bye".equals(outputLine))));
 ProcessExecutorService pool = new ProcessPoolExecutor(processManagerFactory, 10, 50, 5);
 ```
-In the example above, a process pool for instances of a program called "test.exe" is created. Every time the pool starts a new process, it waits until the message "hi" is output to the process' standard out, signaling that it has started up, then the pool sends the instruction "start" to the process' standard in. The instruction "start" has the process perform some startup activities before it outputs "ok". Once this message is output to the process' standard out, the pool considers the process ready for submissions. By default, when something is output to the process' standard error stream, a `FailedCommandException` is thrown. This behaviour can be overriden by specifying an additional predicate for the standard error stream as the third argument of the constructor. Throwing a `FailedCommandException` from these predicates or from the `isCompleted` method (when implementing the `Command` interface directly) is indicative of the completion of the command and results in the abortion of the execution of the submission. Whenever the process needs to be terminated (either due to timing out or cancellation after the execution of a submission), the pool tries to terminate the process in an orderly way by sending it the "stop" instruction. If the response to this is "bye", the process is considered terminated. However, if something is printed to the process' standard error stream in response to the "stop" instruction, the process is killed forcibly. As specified by the second argument of the constructor of `AbstractProcessManager`, processes in the pool are terminated after 1 minute of idleness. The pool's minimum size is 10, its maximum size is 50, and its reserve size is 5.
+In the example above, a process pool for instances of a program called "test.exe" is created. Every time the pool starts a new process, it waits until the message "hi" is output to the process' standard out, signaling that it has started up. By default, if the process outputs something to its standard error stream, the process manager considers the startup unsuccessful and throws a `FailedStartupException` which results in the shutdown of the pool. This behaviour can be configured by defining a predicate to handle the standard error output of the process during startup. If everything goes to plan, after a successful startup, the manager sends the instruction "start" to the process' standard in. The instruction "start" has the process perform some startup activities before it outputs "ok". Once this message is output to the process' standard out, the manager considers the process ready for submissions. By default, when something is output to the process' standard error stream during command execution, a `FailedCommandException` is thrown. This behaviour can be overriden by specifying an additional predicate for the standard error stream as the third argument of the constructor. Throwing a `FailedCommandException` from these predicates or from the `isCompleted` method (when implementing the `Command` interface directly) is indicative of the completion of the command and results in the abortion of the execution of the submission. Whenever the process needs to be terminated (either due to timing out or cancellation after the execution of a submission), the pool tries to terminate the process in an orderly way by sending it the "stop" instruction. If the response to this is "bye", the process is considered terminated. However, if something is printed to the process' standard error stream in response to the "stop" instruction, the process is killed forcibly. As specified by the fourth argument of the constructor of `SimpleProcessManager`, processes in the pool are terminated after 1 minute of idleness. The pool's minimum size is 10, its maximum size is 50, and its reserve size is 5.
 ```java
 List<Future<?>> futures = new ArrayList<>();
 for (int i = 0; i < 30; i++) {
   Thread.sleep(100);
   Submission<?> submission = new SimpleSubmission<>(new SimpleCommand("process 5",
-      (command, outputLine) -> "ready".equals(outputLine)));
+      (outputLine, commandOutputStore) -> "ready".equals(outputLine)));
   futures.add(pool.submit(submission, true));
 }
 pool.shutdown();
@@ -69,7 +64,7 @@ ProcessExecutorService pool = new ProcessPoolExecutor(processManagerFactory, 10,
 List<Future<AtomicReference<String>>> futures = new ArrayList<>();
 for (int i = 0; i < 10; i++) {
   AtomicReference<String> result = new AtomicReference<>();
-  Command command = new SimpleCommand("echo user:$USER", (command1, outputLine) -> {
+  Command command = new SimpleCommand("echo user:$USER", (outputLine, commandOutputStore) -> {
     if (outputLine.startsWith("user:")) {
       result.set(outputLine.substring(5));
       return true;
@@ -90,10 +85,9 @@ The above examples demonstrate both the flexibility of the API and the effective
 ## Process Executor
 Besides the process pools, PP4J also provides a standard implementation of the `ProcessExecutor` interface, `SimpleProcessExecutor` for the running of single processes without pooling. This, as presented below, allows for the synchronous execution of submissions in a single separate process with ease.
 ```java
-ProcessManager processManager = new SimpleProcessManager(new ProcessBuilder("cmd.exe"),
-    Charset.defaultCharset());
+ProcessManager processManager = new SimpleProcessManager(new ProcessBuilder("cmd.exe"), Charset.defaultCharset());
 SimpleCommand command = new SimpleCommand("netstat & echo netstat done",
-    (command1, outputLine) -> "netstat done".equals(outputLine));
+    (outputLine, commandOutputStore) -> "netstat done".equals(outputLine));
 SimpleSubmission<?> submission = new SimpleSubmission<>(command);
 try (SimpleProcessExecutor executor = new SimpleProcessExecutor(processManager)) {
   executor.start();

@@ -18,6 +18,7 @@ package net.viktorc.pp4j.impl;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Optional;
+import net.viktorc.pp4j.api.FailedStartupException;
 import net.viktorc.pp4j.api.ProcessManager;
 
 /**
@@ -30,6 +31,7 @@ public abstract class AbstractProcessManager implements ProcessManager {
   private final ProcessBuilder builder;
   private final Charset charset;
   private final Long keepAliveTime;
+  private final ProcessOutputStore startupOutputStore;
 
   /**
    * Constructs a manager for the processes created by the specified {@link java.lang.ProcessBuilder} with the specified maximum life span.
@@ -49,7 +51,27 @@ public abstract class AbstractProcessManager implements ProcessManager {
     this.builder = builder;
     this.charset = charset;
     this.keepAliveTime = keepAliveTime;
+    startupOutputStore = new ProcessOutputStore();
   }
+
+  /**
+   * Returns the process output store containing the process' startup output.
+   *
+   * @return The output store used to capture to process' pre-startup output.
+   */
+  public ProcessOutputStore getStartupOutputStore() {
+    return startupOutputStore;
+  }
+
+  /**
+   * It determines whether the line output by the process denotes that it has successfully started up.
+   *
+   * @param outputLine The line output by the process.
+   * @param error Whether the line was output to the process' standard error stream or its standard out stream.
+   * @return Whether the output line denotes the startup of the process.
+   * @throws FailedStartupException If the output line denotes that the startup of the process has failed.
+   */
+  protected abstract boolean isProcessStartedUp(String outputLine, boolean error) throws FailedStartupException;
 
   @Override
   public Process start() throws IOException {
@@ -62,12 +84,22 @@ public abstract class AbstractProcessManager implements ProcessManager {
   }
 
   @Override
+  public boolean isStartedUp(String outputLine, boolean error) throws FailedStartupException {
+    try {
+      return isProcessStartedUp(outputLine, error);
+    } finally {
+      startupOutputStore.storeOutput(outputLine, error);
+    }
+  }
+
+  @Override
   public Optional<Long> getKeepAliveTime() {
     return Optional.ofNullable(keepAliveTime);
   }
 
   @Override
   public void reset() {
+    startupOutputStore.clear();
   }
 
 }

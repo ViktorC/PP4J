@@ -24,13 +24,68 @@ import org.junit.Test;
  *
  * @author Viktor Csomor
  */
-public class SimpleJavaProcessConfigTest {
+public class SimpleJavaProcessConfigTest extends TestCase {
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfJavaLauncherCommandNull() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig(null);
+  }
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfJavaLauncherCommandEmpty() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig("");
+  }
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfInitHeapSizeNegative() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig(-1, 1, 1);
+  }
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfInitHeapSizeZero() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig(0, 1, 1);
+  }
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfMaxHeapSizeNegative() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig(1, -1, 1);
+  }
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfMaxHeapSizeZero() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig(1, 0, 1);
+  }
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfStackSizeNegative() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig(1, 1, -1);
+  }
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfStackSizeZero() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig(1, 1, 0);
+  }
+
+  @Test
+  public void testThrowsIllegalArgumentExceptionIfInitHeapSizeGreaterThanMaxHeapSize() {
+    exceptionRule.expect(IllegalArgumentException.class);
+    new SimpleJavaProcessConfig(2, 1, 0);
+  }
 
   @Test
   public void testAdditionalClassPathsIncludedInJointClassPath() {
     String additionalClassPath1 = "home/classes";
     String additionalClassPath2 = "somewhere_else/classes";
-    SimpleJavaProcessConfig config = new SimpleJavaProcessConfig(null, additionalClassPath1, additionalClassPath2);
+    SimpleJavaProcessConfig config = new SimpleJavaProcessConfig(SimpleJavaProcessConfig.DEFAULT_JAVA_LAUNCHER_COMMAND,
+        additionalClassPath1, additionalClassPath2);
     Optional<String> optionalClassPath = config.getClassPath();
     Assert.assertTrue(optionalClassPath.isPresent());
     String classPath = optionalClassPath.get();

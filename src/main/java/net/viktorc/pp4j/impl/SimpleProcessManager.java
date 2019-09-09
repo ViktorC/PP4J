@@ -30,50 +30,124 @@ import net.viktorc.pp4j.api.Submission;
  */
 public class SimpleProcessManager extends AbstractProcessManager {
 
-  private final StartupPredicate startupPredicate;
+  private final boolean startsUpInstantly;
+  private final ProcessStartupPredicate startupPredicateStdOut;
+  private final ProcessStartupPredicate startupPredicateStdErr;
   private final Supplier<Submission<?>> initSubmissionSupplier;
   private final Supplier<Submission<?>> terminationSubmissionSupplier;
 
   /**
-   * Constructs a manager for the processes created by the specified {@link ProcessBuilder}.
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process does not start up
+   * instantly and its startup is determined by the startup predicates.
    *
    * @param builder The instance to build the processes with.
    * @param charset The character set to use to communicate with the managed process.
+   * @param startupPredicateStdOut The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard out stream.
+   * @param startupPredicateStdErr The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard error stream.
    * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
    * of the process will not be limited.
-   * @param startupPredicate The predicate to use to determine when the process can be considered started up. The two parameters are the
-   * line output to the process' stream and whether that stream is the standard error or the standard out stream. If it is
-   * <code>null</code>, the process is assumed to start up instantaneously.
    * @param initSubmissionSupplier The optional initial submission supplier for generating the submission to submit to the process right
    * after it started up.
    * @param terminationSubmissionSupplier The optional termination submission supplier to use to generate the submission to terminate the
    * process.
    */
-  public SimpleProcessManager(ProcessBuilder builder, Charset charset, Long keepAliveTime, StartupPredicate startupPredicate,
-      Supplier<Submission<?>> initSubmissionSupplier, Supplier<Submission<?>> terminationSubmissionSupplier) {
+  public SimpleProcessManager(ProcessBuilder builder, Charset charset, ProcessStartupPredicate startupPredicateStdOut,
+      ProcessStartupPredicate startupPredicateStdErr, Long keepAliveTime, Supplier<Submission<?>> initSubmissionSupplier,
+      Supplier<Submission<?>> terminationSubmissionSupplier) {
     super(builder, charset, keepAliveTime);
-    this.startupPredicate = startupPredicate;
+    if (startupPredicateStdOut == null || startupPredicateStdErr == null) {
+      throw new IllegalArgumentException("The startup predicates cannot be null");
+    }
+    startsUpInstantly = false;
+    this.startupPredicateStdOut = startupPredicateStdOut;
+    this.startupPredicateStdErr = startupPredicateStdErr;
     this.initSubmissionSupplier = initSubmissionSupplier;
     this.terminationSubmissionSupplier = terminationSubmissionSupplier;
   }
 
   /**
-   * Constructs a manager for the processes created by the specified {@link ProcessBuilder}.
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process does not start up
+   * instantly and its startup is determined by the provided startup predicate. The constructed instance throws a
+   * <code>FailedStartupException</code> if anything is printed to the process' standard error during startup process.
+   *
+   * @param builder The instance to build the processes with.
+   * @param charset The character set to use to communicate with the managed process.
+   * @param startupPredicateStdOut The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard out stream.
+   * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
+   * of the process will not be limited.
+   * @param initSubmissionSupplier The optional initial submission supplier for generating the submission to submit to the process right
+   * after it started up.
+   * @param terminationSubmissionSupplier The optional termination submission supplier to use to generate the submission to terminate the
+   * process.
+   */
+  public SimpleProcessManager(ProcessBuilder builder, Charset charset, ProcessStartupPredicate startupPredicateStdOut, Long keepAliveTime,
+      Supplier<Submission<?>> initSubmissionSupplier, Supplier<Submission<?>> terminationSubmissionSupplier) {
+    this(builder, charset, startupPredicateStdOut, (outputLine, startupOutputStore) -> {
+      throw new FailedStartupException(String.format("Startup failure indicated by %s printed to stderr", outputLine));
+    }, keepAliveTime, initSubmissionSupplier, terminationSubmissionSupplier);
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process starts up instantly.
    *
    * @param builder The instance to build the processes with.
    * @param charset The character set to use to communicate with the managed process.
    * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
    * of the process will not be limited.
-   * @param startupPredicate The predicate to use to determine when the process can be considered started up. The two parameters are the
-   * line output to the process' stream and whether that stream is the standard error or the standard out stream. If it is
-   * <code>null</code>, the process is assumed to start up instantaneously.
+   * @param initSubmissionSupplier The optional initial submission supplier for generating the submission to submit to the process right
+   * after it started up.
+   * @param terminationSubmissionSupplier The optional termination submission supplier to use to generate the submission to terminate the
+   * process.
    */
-  public SimpleProcessManager(ProcessBuilder builder, Charset charset, Long keepAliveTime, StartupPredicate startupPredicate) {
-    this(builder, charset, keepAliveTime, startupPredicate, null, null);
+  public SimpleProcessManager(ProcessBuilder builder, Charset charset, Long keepAliveTime, Supplier<Submission<?>> initSubmissionSupplier,
+      Supplier<Submission<?>> terminationSubmissionSupplier) {
+    super(builder, charset, keepAliveTime);
+    startsUpInstantly = true;
+    this.startupPredicateStdOut = null;
+    this.startupPredicateStdErr = null;
+    this.initSubmissionSupplier = initSubmissionSupplier;
+    this.terminationSubmissionSupplier = terminationSubmissionSupplier;
   }
 
   /**
-   * Constructs a manager for the processes created by the specified {@link ProcessBuilder}.
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process does not start up
+   * instantly and its startup is determined by the startup predicates.
+   *
+   * @param builder The instance to build the processes with.
+   * @param charset The character set to use to communicate with the managed process.
+   * @param startupPredicateStdOut The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard out stream.
+   * @param startupPredicateStdErr The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard error stream.
+   * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
+   * of the process will not be limited.
+   */
+  public SimpleProcessManager(ProcessBuilder builder, Charset charset, ProcessStartupPredicate startupPredicateStdOut,
+      ProcessStartupPredicate startupPredicateStdErr, Long keepAliveTime) {
+    this(builder, charset, startupPredicateStdOut, startupPredicateStdErr, keepAliveTime, null, null);
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process does not start up
+   * instantly and its startup is determined by the provided startup predicate. The constructed instance throws a
+   * <code>FailedStartupException</code> if anything is printed to the process' standard error during startup process.
+   *
+   * @param builder The instance to build the processes with.
+   * @param charset The character set to use to communicate with the managed process.
+   * @param startupPredicateStdOut The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard out stream.
+   * @param keepAliveTime The number of milliseconds after which idle processes are terminated. If it is <code>null</code>, the life span
+   * of the process will not be limited.
+   */
+  public SimpleProcessManager(ProcessBuilder builder, Charset charset, ProcessStartupPredicate startupPredicateStdOut, Long keepAliveTime) {
+    this(builder, charset, startupPredicateStdOut, keepAliveTime, null, null);
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process starts up instantly.
    *
    * @param builder The instance to build the processes with.
    * @param charset The character set to use to communicate with the managed process.
@@ -81,27 +155,59 @@ public class SimpleProcessManager extends AbstractProcessManager {
    * of the process will not be limited.
    */
   public SimpleProcessManager(ProcessBuilder builder, Charset charset, Long keepAliveTime) {
-    this(builder, charset, keepAliveTime, null);
+    this(builder, charset, keepAliveTime, null, null);
   }
 
   /**
-   * Constructs a manager for the processes created by the specified {@link ProcessBuilder}.
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process does not start up
+   * instantly and its startup is determined by the startup predicates.
+   *
+   * @param builder The instance to build the processes with.
+   * @param charset The character set to use to communicate with the managed process.
+   * @param startupPredicateStdOut The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard out stream.
+   * @param startupPredicateStdErr The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard error stream.
+   */
+  public SimpleProcessManager(ProcessBuilder builder, Charset charset, ProcessStartupPredicate startupPredicateStdOut,
+      ProcessStartupPredicate startupPredicateStdErr) {
+    this(builder, charset, startupPredicateStdOut, startupPredicateStdErr, null, null, null);
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process does not start up
+   * instantly and its startup is determined by the provided startup predicate. The constructed instance throws a
+   * <code>FailedStartupException</code> if anything is printed to the process' standard error during startup process.
+   *
+   * @param builder The instance to build the processes with.
+   * @param charset The character set to use to communicate with the managed process.
+   * @param startupPredicateStdOut The predicate to use to determine when the process can be considered started up based on its output
+   * to its standard out stream.
+   */
+  public SimpleProcessManager(ProcessBuilder builder, Charset charset, ProcessStartupPredicate startupPredicateStdOut) {
+    this(builder, charset, startupPredicateStdOut, null, null, null);
+  }
+
+  /**
+   * Constructs a manager for the processes created by the specified {@link ProcessBuilder} assuming that the process starts up instantly.
    *
    * @param builder The instance to build the processes with.
    * @param charset The character set to use to communicate with the managed process.
    */
   public SimpleProcessManager(ProcessBuilder builder, Charset charset) {
-    this(builder, charset, null);
+    this(builder, charset, (Long) null, null, null);
   }
 
   @Override
   public boolean startsUpInstantly() {
-    return startupPredicate == null;
+    return startsUpInstantly;
   }
 
   @Override
-  public boolean isStartedUp(String outputLine, boolean error) throws FailedStartupException {
-    return startupPredicate == null || startupPredicate.isStartedUp(outputLine, error);
+  public boolean isProcessStartedUp(String outputLine, boolean error) throws FailedStartupException {
+    return error ?
+        startupPredicateStdErr == null || startupPredicateStdErr.isStartedUp(outputLine, getStartupOutputStore()) :
+        startupPredicateStdOut == null || startupPredicateStdOut.isStartedUp(outputLine, getStartupOutputStore());
   }
 
   @Override
@@ -120,17 +226,17 @@ public class SimpleProcessManager extends AbstractProcessManager {
    * @author Viktor Csomor
    */
   @FunctionalInterface
-  public interface StartupPredicate {
+  public interface ProcessStartupPredicate {
 
     /**
      * Returns whether the process is started up and ready to execute commands based on the latest line of output.
      *
      * @param outputLine The latest line output by the process.
-     * @param error Whether the output was printed to the process' standard error stream.
+     * @param startupOutputStore The output store holding all previous pre-startup outputs of the process.
      * @return Whether the latest line of output signals the startup of the process.
      * @throws FailedStartupException If the output denotes process failure.
      */
-    boolean isStartedUp(String outputLine, boolean error) throws FailedStartupException;
+    boolean isStartedUp(String outputLine, ProcessOutputStore startupOutputStore) throws FailedStartupException;
 
   }
 

@@ -97,7 +97,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
   @Override
   public List<Command> getCommands() {
     return Collections.singletonList(new SimpleCommand(instruction,
-        (command, outputLine) -> {
+        (outputLine, outputStore) -> {
           Object output;
           try {
             output = JavaObjectCodec.getInstance().decode(outputLine);
@@ -112,7 +112,7 @@ public class JavaSubmission<T extends Serializable> extends AbstractSubmission<T
                 setResult((T) response.getResult().orElse(null));
                 return true;
               case TASK_FAILURE:
-                throw new FailedCommandException(command, response.getError().orElse(null));
+                throw new FailedCommandException(response.getError().orElse(null));
               case PROCESS_FAILURE:
                 LOGGER.error("Java process error upon task submission", response.getError().orElse(null));
                 return false;
