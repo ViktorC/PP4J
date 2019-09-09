@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * An abstract implementation of the {@link ProcessExecutor} interface for starting, managing, and interacting with a process. The life
- * cycle of the associated process is encapsulated within that of the {@link #run()} method of instances of this class.
+ * cycle of the associated process is encapsulated within that of the {@link #run()} method.
  *
  * @author Viktor Csomor
  */
@@ -137,8 +137,8 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
         commandCompleted = true;
         commandException = e;
       }
-      stateLock.notifyAll();
       LOGGER.trace("Output denotes command completion: {}", commandCompleted);
+      stateLock.notifyAll();
     }
   }
 
@@ -302,7 +302,7 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
           return;
         }
         if (startupException != null) {
-          LOGGER.trace("Process startup failed", startupException);
+          LOGGER.trace("Process startup failed");
           throw startupException;
         }
         stateLock.wait();
@@ -410,10 +410,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
       terminateForcibly();
       setIdle(false);
       killed = false;
-      startedUp = false;
       running = false;
-      process = null;
+      startedUp = false;
       startupException = null;
+      process = null;
       stateLock.notifyAll();
       LOGGER.trace("Invoking termination call-back methods...");
       manager.onTermination(returnCode);

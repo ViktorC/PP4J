@@ -199,15 +199,15 @@ public class SimpleProcessManager extends AbstractProcessManager {
   }
 
   @Override
-  public boolean startsUpInstantly() {
-    return startsUpInstantly;
-  }
-
-  @Override
   public boolean isProcessStartedUp(String outputLine, boolean error) throws FailedStartupException {
     return error ?
         startupPredicateStdErr == null || startupPredicateStdErr.isStartedUp(outputLine, getStartupOutputStore()) :
         startupPredicateStdOut == null || startupPredicateStdOut.isStartedUp(outputLine, getStartupOutputStore());
+  }
+
+  @Override
+  public boolean startsUpInstantly() {
+    return startsUpInstantly;
   }
 
   @Override
