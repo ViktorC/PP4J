@@ -92,7 +92,7 @@ SimpleSubmission<?> submission = new SimpleSubmission<>(command);
 try (SimpleProcessExecutor executor = new SimpleProcessExecutor(processManager)) {
   executor.start();
   executor.execute(submission);
-  System.out.println(command.getJointStandardOutLines());
+  System.out.println(command.getCommandOutputStore().getJointStandardOutLines());
 }
 ```
 
