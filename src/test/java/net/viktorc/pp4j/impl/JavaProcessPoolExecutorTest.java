@@ -491,11 +491,12 @@ public class JavaProcessPoolExecutorTest extends TestCase {
   @Test
   public void testInvokeAllCompletedTasksNotCancelledAfterTimeout() throws InterruptedException, ExecutionException {
     String result = "hell yeah";
+    long sleepTime = 3000;
     JavaProcessPoolExecutor pool = newDefaultJavaProcessPool(2, 2, 0);
     List<Future<String>> futures = pool.invokeAll(Arrays.asList((Callable<String> & Serializable) () -> {
-          Thread.sleep(2000);
+          Thread.sleep(sleepTime);
           return "no way";
-        }, (Callable<String> & Serializable) () -> result), 1000, TimeUnit.MILLISECONDS);
+        }, (Callable<String> & Serializable) () -> result), sleepTime - WAIT_TIME_FOR_CONCURRENT_EVENTS, TimeUnit.MILLISECONDS);
     Assert.assertEquals(2, futures.size());
     Future<String> future1 = futures.get(0);
     Future<String> future2 = futures.get(1);
