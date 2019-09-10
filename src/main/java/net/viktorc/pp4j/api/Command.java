@@ -17,7 +17,7 @@ package net.viktorc.pp4j.api;
 
 /**
  * An interface that defines methods for providing an instruction string and for processing the outputs of the process in response to the
- * instruction. The {@link #isCompleted(String, boolean)} method is invoked every time a new line is output to one the process' standard
+ * instruction. The {@link #isCompleted(String, boolean)} method is invoked every time a new line is output to one of the process' standard
  * streams and is responsible for determining when the execution of the command is completed.
  *
  * @author Viktor Csomor
