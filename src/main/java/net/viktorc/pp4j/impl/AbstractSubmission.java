@@ -17,7 +17,6 @@ package net.viktorc.pp4j.impl;
 
 import java.util.Optional;
 import java.util.stream.Collectors;
-import net.viktorc.pp4j.api.Command;
 import net.viktorc.pp4j.api.Submission;
 
 /**
