@@ -47,15 +47,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An implementation of the {@link ProcessExecutorService} interface for maintaining and managing a pool of pre-started processes. The
- * processes are executed in instances of an own {@link net.viktorc.pp4j.api.ProcessExecutor} implementation. Each executor is assigned an
- * instance of an implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface using an implementation of the
- * {@link ProcessManagerFactory} interface. The pool accepts submissions in the form of {@link Submission} implementations which are
- * executed in any one of the available active process executors maintained by the pool. While executing a submission, the executor cannot
- * accept further submissions. The submissions are queued and executed as soon as there is an available executor. The size of the pool is
- * always kept between the minimum pool size and the maximum pool size (both inclusive). The reserve size specifies the minimum number of
- * processes that should always be available (there are no guarantees that there actually will be this many available executors at any
- * given time). This class uses <a href="https://www.slf4j.org/">SLF4J</a> for logging.
+ * An implementation of the {@link ProcessExecutorService} interface for maintaining and managing a pool of process executors. The
+ * processes executors are instances of an internal {@link net.viktorc.pp4j.api.ProcessExecutor} implementation. Each executor is assigned
+ * an {@link net.viktorc.pp4j.api.ProcessManager} instance provided by the pool's {@link ProcessManagerFactory} instance. The pool accepts
+ * submissions in the form of {@link Submission} instances which are executed in any one of the available active process executors
+ * maintained by the pool. While executing a submission, the same executor cannot accept further submissions. The submissions are queued
+ * and executed as soon as there is an available executor. The size of the pool is always kept between the minimum pool size and the
+ * maximum pool size (both inclusive). The reserve size specifies the minimum number of processes executors that should always be available
+ * (there are no guarantees that there actually will be this many available executors at any given time).
+ *
+ * This class uses <a href="https://www.slf4j.org/">SLF4J</a> for logging.
  *
  * @author Viktor Csomor
  */

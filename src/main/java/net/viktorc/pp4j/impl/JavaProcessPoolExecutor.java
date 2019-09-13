@@ -33,10 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A sub-class of {@link ProcessPoolExecutor} that implements the {@link JavaProcessExecutorService} interface. It uses Java processes for
- * the implementation of multiprocessing. It communicates with the processes via their standard streams exchanging serialized and encoded
- * objects. It can send {@link Runnable} and {@link Callable} instances to the processes; and it receives the result or exception object
- * serialized and encoded into a string.
+ * A sub-class of {@link ProcessPoolExecutor} that implements the {@link JavaProcessExecutorService} interface. It manages Java processes
+ * to implement a multiprocessing mechanism with the same API as that of the standard Java thread pools. It communicates with the processes
+ * via their standard streams exchanging serialized and encoded Java objects. It sends tasks to the processes for execution and it receives
+ * the results or exceptions thrown in return.
  *
  * @author Viktor Csomor
  */

@@ -22,7 +22,9 @@ import net.viktorc.pp4j.api.FailedStartupException;
 import net.viktorc.pp4j.api.ProcessManager;
 
 /**
- * An abstract implementation of the {@link net.viktorc.pp4j.api.ProcessManager} interface.
+ * An abstract implementation of the {@link ProcessManager} interface that allows for the definition of the process builder instance to use
+ * to launch the processes, the duration of continuous idleness after which processes are to be terminated, and the character set to use
+ * when exchanging messages with the processes through their standard streams. It also stores all the startup outputs of the processes.
  *
  * @author Viktor Csomor
  */

@@ -27,8 +27,9 @@ import java.util.Base64.Decoder;
 import java.util.Base64.Encoder;
 
 /**
- * A singleton for encoding Java objects as strings and decoding strings into Java objects. It uses the default Java object
- * serialization/deserialization and Base64 encoding/decoding.
+ * A singleton for encoding Java objects as strings and decoding strings into Java objects. It uses the default {@link ObjectInputStream}
+ * and {@link ObjectOutputStream} classes for the serialization and deserialization of Java objects to and from byte array streams, and it
+ * uses Base64 for the encoding and decoding of the byte array streams.
  *
  * @author Viktor Csomor
  */

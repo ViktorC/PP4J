@@ -24,7 +24,7 @@ import net.viktorc.pp4j.api.ProcessManager;
 import net.viktorc.pp4j.api.ProcessManagerFactory;
 
 /**
- * An implementation of the {@link ProcessManagerFactory} for the creation of {@link JavaProcessManager} instances using a single
+ * An implementation of the {@link ProcessManagerFactory} interface for the creation of {@link JavaProcessManager} instances using a single
  * {@link ProcessBuilder} instance.
  *
  * @param <T> A type variable implementing the {@link Runnable} and {@link Serializable} interfaces that defines the base class of the
