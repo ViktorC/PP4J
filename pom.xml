@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.viktorc</groupId>
   <artifactId>pp4j</artifactId>
-  <version>3.0.0</version>
+  <version>3.0.1</version>
   <name>PP4J</name>
   <description>A multiprocessing library for Java.</description>
   <url>https://github.com/ViktorC/PP4J</url>
