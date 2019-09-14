@@ -640,10 +640,10 @@ public abstract class AbstractProcessExecutor implements ProcessExecutor, Runnab
   @Override
   public void run() {
     runLock.lock();
-    manager.reset();
     try {
       int returnCode = UNEXPECTED_TERMINATION_RETURN_CODE;
       try {
+        manager.reset();
         setUpExecutor();
         returnCode = process.waitFor();
         LOGGER.trace("Process exited with return code {}", returnCode);
