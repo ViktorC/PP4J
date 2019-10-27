@@ -83,7 +83,7 @@ public class JavaProcess {
   /**
    * Invoking this method from within a task results in the main method exiting upon the iteration following the execution of the task.
    */
-  static void exit() {
+  public static void exit() {
     exit = true;
   }
 
